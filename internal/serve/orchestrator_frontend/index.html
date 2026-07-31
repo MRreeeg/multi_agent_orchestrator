@@ -1,0 +1,3487 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reasonix — 多Agent编排控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:oklch(17% .005 280);--bg-2:oklch(20% .006 275);
+  --panel:oklch(21.5% .007 275);--panel-2:oklch(24.5% .008 275);
+  --card:oklch(23.5% .007 275);--card-hover:oklch(26.5% .008 275);
+  --border:oklch(30% .008 275);--border-strong:oklch(38% .01 275);
+  --fg:oklch(96% .004 280);--fg-2:oklch(81% .005 280);
+  --muted:oklch(63% .006 280);--muted-2:oklch(49% .006 280);
+  --accent:oklch(68% .16 38);--accent-soft:oklch(68% .16 38/.15);--accent-strong:oklch(72% .18 36);
+  --success:oklch(70% .14 145);--success-soft:oklch(70% .14 145/.14);
+  --warning:oklch(78% .14 85);--warning-soft:oklch(78% .14 85/.16);
+  --danger:oklch(66% .18 25);--danger-soft:oklch(66% .18 25/.16);
+  --violet:oklch(72% .14 295);--violet-soft:oklch(72% .14 295/.16);
+  --blue:oklch(65% .16 250);--blue-soft:oklch(65% .16 250/.16);
+  --green:oklch(70% .16 155);--green-soft:oklch(70% .16 155/.16);
+  --red:oklch(65% .18 20);--red-soft:oklch(65% .18 20/.16);
+  --shadow-sm:0 1px 0 oklch(0% 0 0/.35);
+  --shadow-md:0 8px 24px -8px oklch(0% 0 0/.5);
+  --shadow-lg:0 24px 60px -16px oklch(0% 0 0/.65);
+  --radius:8px;--radius-lg:12px;
+  --sans:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --heading:'Space Grotesk',var(--sans);
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden}
+body{font:14px/1.6 var(--sans);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+::-webkit-scrollbar-track{background:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{cursor:pointer;font:inherit;border:none;background:none;color:inherit}
+input,textarea,select{font:inherit;color:inherit}
+
+/* ── Layout ── */
+.app{display:grid;grid-template-columns:56px 1fr 300px;grid-template-rows:48px 1fr;height:100vh}
+.app--no-config{grid-template-columns:56px 1fr 0px}
+.topbar{grid-column:1/-1;background:var(--bg-2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;z-index:10}
+.topbar__brand{font-family:var(--heading);font-weight:700;font-size:15px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.topbar__logo{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--violet));display:flex;align-items:center;justify-content:center;font-family:var(--heading);font-weight:700;font-size:11px;color:oklch(99% 0 0)}
+.topbar__sep{width:1px;height:20px;background:var(--border)}
+.topbar__title{font-family:var(--heading);font-size:13px;font-weight:500;color:var(--fg-2)}
+.topbar__spacer{flex:1}
+.topbar__status{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.topbar__dot{width:6px;height:6px;border-radius:50%;background:var(--muted-2)}
+.topbar__dot--live{background:var(--success);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.topbar__preset{display:flex;align-items:center;gap:6px}
+.topbar__preset select{height:28px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);padding:0 8px;font-size:12px;outline:none;cursor:pointer}
+.topbar__preset select:focus{border-color:var(--accent)}
+.topbar__btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--fg-2);font-size:12px;transition:all .18s ease}
+.topbar__btn:hover{background:var(--panel);color:var(--fg);border-color:var(--border-strong)}
+.topbar__btn--accent{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.topbar__btn--accent:hover{background:oklch(68% .16 38/.25)}
+.topbar__btn--danger{background:var(--danger-soft);color:var(--danger);border-color:transparent}
+.topbar__btn--danger:hover{background:oklch(66% .18 25/.25)}
+.topbar__btn--success{background:var(--success-soft);color:var(--success);border-color:transparent}
+.topbar__btn svg{width:14px;height:14px}
+
+/* ── Sidebar nav ── */
+.sidebar{grid-row:2;background:var(--bg-2);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;overflow:hidden}
+.nav-btn{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:var(--radius);color:var(--muted-2);transition:all .18s ease;position:relative}
+.nav-btn:hover{background:var(--panel);color:var(--fg-2)}
+.nav-btn--active{background:var(--accent-soft);color:var(--accent)}
+.nav-btn svg{width:18px;height:18px}
+.nav-btn__badge{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-2)}
+
+/* ── Main area ── */
+.main{grid-column:2;overflow:hidden;position:relative}
+.panel{display:none;height:100%;overflow:hidden}
+.panel--active{display:flex;flex-direction:column}
+
+/* ── Config panel (right) ── */
+.config{grid-column:3;background:var(--bg-2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.config--hidden{display:none}
+.config__head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.config__head-title{font-family:var(--heading);font-weight:600;font-size:13px;flex:1}
+.config__close{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--muted-2);transition:all .15s}
+.config__close:hover{background:var(--card-hover);color:var(--fg)}
+.config__body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:14px}
+.config__empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--muted-2);font-size:13px;text-align:center;padding:20px}
+.config__empty svg{width:32px;height:32px;opacity:.4}
+
+/* form fields */
+.field{display:flex;flex-direction:column;gap:5px}
+.field__label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.field__input{height:32px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);padding:0 10px;font-size:13px;outline:none;transition:border-color .18s ease}
+.field__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.field__textarea{min-height:72px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);padding:8px 10px;font-size:13px;outline:none;resize:vertical;transition:border-color .18s ease}
+.field__textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.field__select{height:32px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);padding:0 10px;font-size:13px;outline:none;cursor:pointer;transition:border-color .18s ease}
+.field__select:focus{border-color:var(--accent)}
+
+/* ── Chat panel ── */
+.chat{display:flex;flex-direction:column;height:100%}
+.chat__messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.chat__welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted-2)}
+.chat__welcome svg{width:40px;height:40px;opacity:.3}
+.chat__welcome-title{font-family:var(--heading);font-size:16px;font-weight:600;color:var(--fg-2)}
+.chat__welcome-desc{font-size:13px;text-align:center;max-width:320px}
+.chat-bubble{max-width:720px;animation:msg-in .25s ease}
+@keyframes msg-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.chat-bubble--user{align-self:flex-end}
+.chat-bubble__inner{padding:10px 14px;border-radius:var(--radius-lg);font-size:13.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.chat-bubble--user .chat-bubble__inner{background:var(--accent-soft);color:var(--fg);border:1px solid oklch(68% .16 38/.2)}
+.chat-bubble--ai .chat-bubble__inner{background:var(--card);color:var(--fg-2);border:1px solid var(--border)}
+.chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
+.chat-bubble--user .chat-bubble__meta{text-align:right}
+.chat__input-bar{border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;background:var(--bg)}
+.chat__input{flex:1;height:36px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--card);padding:0 12px;font-size:13px;outline:none;transition:border-color .18s ease}
+.chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.chat__input::placeholder{color:var(--muted-2)}
+.chat__send{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius);background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
+.chat__send:hover{transform:scale(1.05)}
+.chat__send:disabled{background:var(--panel-2);color:var(--muted);cursor:default;transform:none}
+.chat__send svg{width:16px;height:16px}
+.cursor{display:inline-block;width:2px;height:1.1em;background:var(--accent);vertical-align:text-bottom;margin-left:2px;animation:blink 1s steps(2,start) infinite}
+@keyframes blink{to{visibility:hidden}}
+
+/* ── Pipeline editor ── */
+.pipeline{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.pipeline__toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg-2);flex-wrap:wrap}
+.pipeline__toolbar .sep{width:1px;height:18px;background:var(--border)}
+.pipe-btn{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--fg-2);font-size:12px;transition:all .18s ease}
+.pipe-btn:hover{background:var(--panel);color:var(--fg);border-color:var(--border-strong)}
+.pipe-btn--accent{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.pipe-btn--accent:hover{background:oklch(68% .16 38/.25)}
+.pipe-btn--danger{background:var(--danger-soft);color:var(--danger);border-color:transparent}
+.pipe-btn svg{width:13px;height:13px}
+.pipeline__canvas-wrap{flex:1;overflow:auto;position:relative;background:var(--bg);background-image:radial-gradient(circle,oklch(30% .008 275/.4) 1px,transparent 1px);background-size:24px 24px}
+.pipeline__canvas{position:relative;width:3000px;height:2000px}
+.pipeline__svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+.pipeline__svg path{fill:none;stroke:var(--border-strong);stroke-width:2;pointer-events:stroke;cursor:pointer}
+.pipeline__svg path:hover{stroke:var(--accent);stroke-width:2.5}
+.pipeline__svg path.edge--active{stroke:var(--accent);stroke-width:2.5}
+.pipeline__svg .flow-dot{fill:var(--accent);r:3}
+.pipeline__svg .arrowhead{fill:var(--border-strong)}
+.pipeline__svg .loop-boundary{fill:color-mix(in srgb,var(--accent) 5%,transparent);stroke:var(--accent);stroke-width:1.5;stroke-dasharray:8 6;pointer-events:none}
+.pipeline__svg .loopback{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:7 5;opacity:.9;pointer-events:none}
+.pipeline__svg .loop-label{fill:var(--accent);font-size:12px;font-weight:600;pointer-events:none}
+.pipeline__svg .loop-arrowhead{fill:var(--accent)}
+
+/* node cards */
+.node{position:absolute;z-index:2;width:180px;background:var(--card);border:2px solid var(--border);border-radius:var(--radius-lg);cursor:grab;transition:box-shadow .18s ease,border-color .18s ease;user-select:none}
+.node:hover{box-shadow:var(--shadow-md)}
+.node--selected{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.node--architect{border-left:3px solid var(--blue)}
+.node--reviewer{border-left:3px solid var(--green)}
+.node--executor{border-left:3px solid var(--red)}
+.node--running{animation:node-pulse 1.5s ease-in-out infinite}
+@keyframes node-pulse{0%,100%{box-shadow:0 0 0 0 var(--accent-soft)}50%{box-shadow:0 0 0 8px transparent}}
+.node--done{border-color:var(--success)}
+.node--failed{border-color:var(--danger)}
+.node--interrupted{border-color:var(--warning, #d97706)}
+.node__head{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border)}
+.node__type-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:999px;font-family:var(--mono);font-size:10px;font-weight:600;white-space:nowrap}
+.node__type-badge--architect{background:var(--blue-soft);color:var(--blue)}
+.node__type-badge--reviewer{background:var(--green-soft);color:var(--green)}
+.node__type-badge--executor{background:var(--red-soft);color:var(--red)}
+.node__name{font-weight:600;font-size:12px;color:var(--fg);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node__status{width:8px;height:8px;border-radius:50%;background:var(--muted-2);flex-shrink:0}
+.node__status--idle{background:var(--muted-2)}
+.node__status--running{background:var(--accent);animation:pulse 1s ease-in-out infinite}
+.node__status--done{background:var(--success)}
+.node__status--failed{background:var(--danger)}
+.node__status--interrupted{background:var(--warning, #d97706)}
+.node__detail-btn{cursor:pointer;font-size:11px;color:var(--muted-2);margin-left:4px;opacity:0.6;transition:opacity .15s}
+.node:hover .node__detail-btn{opacity:1}
+.node__detail-btn:hover{color:var(--accent)}
+.node__body{padding:6px 10px 8px;font-size:11px;color:var(--muted)}
+.node__model{font-family:var(--mono);font-size:10.5px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node__skill{font-size:10.5px;color:var(--muted-2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* port circles for edge dragging */
+.node__port{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--panel-2);border:2px solid var(--border-strong);z-index:3;cursor:crosshair;transition:all .15s ease}
+.node__port-badge{position:absolute;top:-8px;right:-8px;background:var(--accent);color:#fff;font-size:9px;padding:1px 5px;border-radius:4px;cursor:pointer;z-index:10;font-family:var(--mono);white-space:nowrap;transition:opacity .15s}
+.node__port-badge:hover{opacity:.8}
+.node__port-badge--idle{background:#e6a800}
+.node__port-badge--stopped{background:var(--muted-2);cursor:default}
+.node__port:hover{background:var(--accent);border-color:var(--accent);transform:scale(1.3)}
+.node__port--out{right:-7px;top:50%;margin-top:-6px}
+.node__port--in{left:-7px;top:50%;margin-top:-6px}
+
+/* edge label */
+.edge-label{position:absolute;z-index:2;font-family:var(--mono);font-size:10px;color:var(--muted-2);background:var(--bg-2);padding:1px 6px;border-radius:4px;border:1px solid var(--border);pointer-events:none}
+
+/* ── Stats / Dashboard ── */
+.stats{overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+.stats__overview{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stats__card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;transition:border-color .18s ease}
+.stats__card:hover{border-color:var(--border-strong)}
+.stats__card-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.stats__card-value{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--fg);margin-top:4px}
+.stats__card-value.acc{color:var(--accent)}
+.stats__card-value.ok{color:var(--success)}
+.stats__card-unit{font-size:11px;color:var(--muted);font-weight:400;margin-left:2px}
+.stats__section-title{font-family:var(--heading);font-size:14px;font-weight:600;color:var(--fg)}
+.stats__table{width:100%;border-collapse:collapse;font-size:12.5px}
+.stats__table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.stats__table td{padding:8px 10px;border-bottom:1px solid oklch(30% .008 275/.3);color:var(--fg-2)}
+.stats__table tr:hover td{background:var(--card-hover)}
+.stats__table .mono{font-family:var(--mono)}
+
+/* ── Data panel ── */
+.data-panel{overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+.runs-list{display:flex;flex-direction:column;gap:8px}
+.run-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;transition:all .18s ease}
+.run-card:hover{border-color:var(--border-strong);background:var(--card-hover)}
+.run-card__head{display:flex;align-items:center;gap:8px}
+.run-card__id{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.run-card__status{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:500}
+.run-card__status--running{background:var(--accent-soft);color:var(--accent)}
+.run-card__status--completed{background:var(--success-soft);color:var(--success)}
+.run-card__status--failed{background:var(--danger-soft);color:var(--danger)}
+.run-card__status--cancelled{background:var(--warning-soft);color:var(--warning)}
+.run-card__meta{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-top:4px}
+.run-card__spacer{flex:1}
+.run-card__actions{display:flex;gap:4px}
+.run-card__btn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--muted);transition:all .15s}
+.run-card__btn:hover{background:var(--panel);color:var(--fg)}
+
+/* ── History panel ── */
+.history{height:100%;display:flex;flex-direction:column;overflow:hidden}
+.history__header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)}
+.history__list{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
+.history__back{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--accent);cursor:pointer;padding:4px 8px;border-radius:6px;transition:background .15s}
+.history__back:hover{background:var(--accent-soft)}
+.session-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;transition:all .18s ease;display:flex;align-items:center;gap:10px}
+.session-card:hover{border-color:var(--border-strong);background:var(--card-hover)}
+.session-card--current{border-color:var(--accent)}
+.session-card__info{flex:1;min-width:0}
+.session-card__name{font-family:var(--mono);font-size:11px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-card__title{font-size:13px;color:var(--fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-card__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:2px}
+.session-card__actions{display:flex;gap:4px;flex-shrink:0}
+.session-card__btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--muted);transition:all .15s}
+.session-card__btn:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.session-card__btn--danger:hover{background:var(--danger-soft);color:var(--danger);border-color:var(--danger)}
+.history-msg{padding:8px 12px;border-radius:var(--radius-lg);font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;animation:msg-in .2s ease}
+.history-msg--user{background:var(--accent-soft);color:var(--fg);border:1px solid oklch(68% .16 38/.2);align-self:flex-end;max-width:80%}
+.history-msg--assistant{background:var(--card);color:var(--fg-2);border:1px solid var(--border);align-self:flex-start;max-width:85%}
+.history-msg--tool{background:var(--bg-2);color:var(--muted);border:1px solid var(--border);font-family:var(--mono);font-size:11px;align-self:flex-start;max-width:90%;padding:6px 10px}
+.history-msg__role{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;font-weight:600}
+.history-msg--user .history-msg__role{color:var(--accent)}
+.history-msg--assistant .history-msg__role{color:var(--success)}
+.history-msg__tool{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:4px}
+.history-empty{text-align:center;color:var(--muted-2);padding:40px 20px;font-size:13px}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:20px;right:20px;z-index:999;padding:10px 16px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--border-strong);color:var(--fg);font-size:13px;box-shadow:var(--shadow-lg);animation:toast-in .3s ease;display:flex;align-items:center;gap:8px;max-width:360px}
+@keyframes toast-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.toast--success{border-color:var(--success);background:var(--success-soft);color:var(--success)}
+.toast--error{border-color:var(--danger);background:var(--danger-soft);color:var(--danger)}
+
+/* ── Modal overlay ── */
+.modal-overlay{position:fixed;inset:0;background:oklch(0% 0 0/.55);display:flex;align-items:center;justify-content:center;z-index:100;animation:msg-in .15s ease}
+.modal{background:var(--panel);border:1px solid var(--border-strong);border-radius:var(--radius-lg);width:min(520px,90vw);max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal__head{padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--heading);font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}
+.modal__close{margin-left:auto;cursor:pointer;color:var(--muted-2);width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .15s}
+.modal__close:hover{background:var(--card-hover);color:var(--fg)}
+.modal__body{padding:14px 16px}
+.modal__foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* ── Animations for data flow ── */
+@keyframes flow{0%{stroke-dashoffset:20}100%{stroke-dashoffset:0}}
+.edge--flowing{stroke-dasharray:6 4;animation:flow .6s linear infinite}
+@keyframes dot-flow{0%{offset-distance:0%}100%{offset-distance:100%}}
+
+/* ── Utility ── */
+.hidden{display:none!important}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar__brand">
+      <div class="topbar__logo">R</div>
+      <span>Reasonix</span>
+    </div>
+    <div class="topbar__sep"></div>
+    <div class="topbar__title">多Agent编排控制台</div>
+    <div class="topbar__spacer"></div>
+    <div class="topbar__cwd" style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;color:var(--muted);white-space:nowrap">工作目录:</span>
+      <span id="cwd-display" style="font-family:var(--mono);font-size:11px;color:var(--fg-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid var(--border)" title="点击修改工作目录" onclick="showCwdEditor()"></span>
+      <input id="cwd-input" type="text" style="display:none;height:22px;width:220px;font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:4px;background:var(--bg);color:var(--fg);padding:0 6px;outline:none" />
+      <button id="cwd-confirm" class="topbar__btn" style="display:none;height:22px;padding:0 6px;font-size:11px" onclick="confirmCwd()">确定</button>
+    </div>
+    <div class="topbar__preset">
+      <select id="preset-select" title="加载预设模板">
+        <option value="">加载预设...</option>
+      </select>
+    </div>
+    <div class="topbar__status">
+      <span class="topbar__dot" id="sse-dot"></span>
+      <span id="sse-status">未连接</span>
+    </div>
+    <div class="topbar__sep"></div>
+    <button class="topbar__btn" id="btn-save-pipeline" title="保存管道">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      保存
+    </button>
+    <button class="topbar__btn topbar__btn--accent" id="btn-execute" title="执行当前管道">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      执行
+    </button>
+  </header>
+
+  <!-- Left sidebar nav -->
+  <nav class="sidebar">
+    <button class="nav-btn nav-btn--active" data-panel="chat" title="对话">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </button>
+    <button class="nav-btn" data-panel="pipeline" title="管道编辑器">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+    </button>
+    <button class="nav-btn" data-panel="data" title="执行记录">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </button>
+    <button class="nav-btn" data-panel="history" title="历史对话">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </button>
+  </nav>
+
+  <!-- Main content area -->
+  <main class="main" id="main">
+    <!-- Chat panel -->
+    <div class="panel panel--active" id="panel-chat">
+      <div class="chat">
+        <div class="chat__messages" id="chat-messages">
+          <div class="chat__welcome" id="chat-welcome">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+            <div class="chat__welcome-title">多Agent编排控制台</div>
+            <div class="chat__welcome-desc">编排多 Agent (架构师 / 执行者 / 审查者) 协作：架构→实现→审查。
+              <br>💡 顶部选择预设加载 DAG，或点击左侧管道图标查看示例。</div>
+          </div>
+        </div>
+        <div class="chat__input-bar">
+          <input class="chat__input" id="chat-input" type="text" placeholder="输入需求... (Enter 记录)" autocomplete="off" />
+          <button class="chat__send" id="btn-new-session" title="新建会话" style="background:var(--panel-2);color:var(--fg-2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button class="chat__send" id="chat-send" title="记录消息">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline editor panel -->
+    <div class="panel" id="panel-pipeline">
+      <div class="pipeline">
+        <div class="pipeline__toolbar">
+          <button class="pipe-btn" id="add-node-pro" title="添加架构师">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block"></span>
+            + 架构师
+          </button>
+          <button class="pipe-btn" id="add-node-flash" title="添加审查者">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
+            + 审查者
+          </button>
+          <button class="pipe-btn" id="add-node-mimo" title="添加执行者">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>
+            + 执行者
+          </button>
+          <div class="sep"></div>
+          <button class="pipe-btn" id="btn-auto-layout" title="自动布局">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            自动布局
+          </button>
+          <button class="pipe-btn" id="btn-delete-node" title="删除选中节点">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            删除
+          </button>
+          <div class="sep"></div>
+          <button class="pipe-btn" id="btn-clear-pipeline" title="清空管道">
+            清空
+          </button>
+        </div>
+        <div class="pipeline__canvas-wrap" id="canvas-wrap">
+          <div class="pipeline__canvas" id="canvas">
+            <svg class="pipeline__svg" id="svg-edges">
+              <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                  <polygon points="0 0, 8 3, 0 6" class="arrowhead"/>
+                </marker>
+              </defs>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats panel -->
+    <div class="panel" id="panel-stats">
+      <div class="stats">
+        <div class="stats__overview">
+          <div class="stats__card">
+            <div class="stats__card-label">总 Token</div>
+            <div class="stats__card-value acc" id="stat-total-tokens">0</div>
+          </div>
+          <div class="stats__card">
+            <div class="stats__card-label">总成本</div>
+            <div class="stats__card-value" id="stat-total-cost">¥0.00</div>
+          </div>
+          <div class="stats__card">
+            <div class="stats__card-label">总耗时</div>
+            <div class="stats__card-value ok" id="stat-total-time">0s</div>
+          </div>
+        </div>
+        <div class="stats__section-title">节点类型统计</div>
+        <table class="stats__table">
+          <thead>
+            <tr>
+              <th>类型</th>
+              <th>执行次数</th>
+              <th>总 Token</th>
+              <th>总成本</th>
+            </tr>
+          </thead>
+          <tbody id="stats-node-body">
+            <tr><td colspan="4" style="text-align:center;color:var(--muted-2)">暂无数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Data panel (runs history) -->
+    <div class="panel" id="panel-data">
+      <div class="data-panel">
+        <div class="stats__section-title">执行记录</div>
+        <div class="runs-list" id="runs-list">
+          <div style="text-align:center;color:var(--muted-2);padding:20px;font-size:13px">暂无执行记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History panel -->
+    <div class="panel" id="panel-history">
+      <div class="history">
+        <div class="history__header">
+          <div class="stats__section-title">历史对话</div>
+          <button class="topbar__btn" onclick="refreshHistory()" title="刷新">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            刷新
+          </button>
+        </div>
+        <div class="history__list" id="history-list">
+          <div style="text-align:center;color:var(--muted-2);padding:20px;font-size:13px">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right config panel -->
+  <aside class="config config--hidden" id="config-panel">
+    <div class="config__head">
+      <div class="config__head-title" id="config-title">节点配置</div>
+      <button class="config__close" id="config-close" title="关闭">&times;</button>
+    </div>
+    <div class="config__body" id="config-body">
+      <div class="config__empty" id="config-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <div>点击节点查看配置</div>
+      </div>
+      <div id="config-fields" class="hidden">
+        <div class="field">
+          <label class="field__label">节点名称</label>
+          <input class="field__input" id="cfg-name" type="text" placeholder="输入节点名称" />
+        </div>
+        <div class="field">
+          <label class="field__label">节点类型</label>
+          <select class="field__select" id="cfg-type">
+            <option value="architect">架构师（蓝色）</option>
+            <option value="reviewer">审查者（绿色）</option>
+            <option value="executor">执行者（红色）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label">模型</label>
+          <select class="field__select" id="cfg-model">
+            <option value="">选择模型...</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label">Agent</label>
+          <input class="field__input" id="cfg-agent" type="text" placeholder="mimo agent，如 coder" />
+        </div>
+        <div class="field">
+          <label class="field__label">Skill</label>
+          <select class="field__select" id="cfg-skill">
+            <option value="">无</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label">执行器</label>
+          <select class="field__select" id="cfg-executor">
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label">运行模式</label>
+          <select class="field__select" id="cfg-mode">
+            <option value="serve">serve</option>
+            <option value="run">run</option>
+          </select>
+        </div>
+        <div class="field" id="reasoning-effort-field" style="display:none">
+          <label class="field__label">思考强度</label>
+          <select class="field__select" id="cfg-reasoning-effort">
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label">职责描述</label>
+          <textarea class="field__textarea" id="cfg-role" placeholder="描述该节点的职责..."></textarea>
+        </div>
+      </div>
+      <!-- Loop Configuration (pipeline-level) -->
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+        <div class="field">
+          <label class="field__label">Loop 循环</label>
+          <select class="field__select" id="cfg-loop-enabled">
+            <option value="false">关闭</option>
+            <option value="true">开启</option>
+          </select>
+        </div>
+        <div class="field" id="loop-mode-field" style="display:none">
+          <label class="field__label">循环模式</label>
+          <select class="field__select" id="cfg-loop-mode">
+            <option value="review_decides">审查者决定</option>
+            <option value="fixed">固定次数</option>
+          </select>
+        </div>
+        <div class="field" id="loop-iterations-field" style="display:none">
+          <label class="field__label">最大轮数</label>
+          <input type="number" class="field__select" id="cfg-loop-max" min="1" max="10" value="3">
+        </div>
+        <div class="field" id="loop-reviewer-field" style="display:none">
+          <label class="field__label">审查节点</label>
+          <select class="field__select" id="cfg-loop-reviewer">
+            <option value="">选择审查节点...</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- Requirement confirmation modal -->
+<div class="modal-overlay" id="confirm-modal" style="display:none">
+  <div class="modal" style="width:min(600px,90vw)">
+    <div class="modal__head">
+      <span>确认执行需求</span>
+      <span class="modal__close" id="confirm-modal-close">&times;</span>
+    </div>
+    <div class="modal__body">
+      <label style="font-size:12px;color:var(--muted-2);display:block;margin-bottom:6px">需求描述（可编辑）</label>
+      <textarea id="confirm-task" rows="6" style="width:100%;background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:13px;font-family:var(--mono);resize:vertical"></textarea>
+      <div style="margin-top:14px">
+        <label style="font-size:12px;color:var(--muted-2);display:block;margin-bottom:6px">流水线节点</label>
+        <div id="confirm-nodes" style="font-size:12px;color:var(--fg-2)"></div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" id="confirm-cancel">取消</button>
+      <button class="btn btn--primary" id="confirm-ok">确认执行</button>
+    </div>
+  </div>
+</div>
+
+<!-- Node detail modal -->
+<div class="modal-overlay" id="node-detail-modal" style="display:none">
+  <div class="modal" style="width:min(700px,90vw);max-height:85vh">
+    <div class="modal__head">
+      <span id="node-detail-title">节点详情</span>
+      <span class="modal__close" id="node-detail-close">&times;</span>
+    </div>
+    <div class="modal__body" id="node-detail-body" style="max-height:60vh;overflow-y:auto">
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+const state = {
+  activePanel: 'chat',
+  nodes: [
+    { id: 1, name: '架构师', type: 'architect', model: 'deepseek-pro', skill: 'brainstorming', mode: 'serve', role: '设计系统架构', x: 60, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+    { id: 2, name: '执行者', type: 'executor', model: 'mimo-v2.5-pro', skill: '', mode: 'serve', role: '编码实现', x: 310, y: 160, status: 'idle', executor: 'mimo', agent: '' },
+    { id: 3, name: '审查者', type: 'reviewer', model: 'deepseek-flash', skill: 'review', mode: 'serve', role: '审查代码', x: 560, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+  ],
+  edges: [
+    { from: 1, to: 2, mode: 'linear' },
+    { from: 2, to: 3, mode: 'linear' },
+  ],
+  selectedNode: null,
+  draggingNode: null,
+  dragOffset: { x: 0, y: 0 },
+  connectingFrom: null,
+  tempEdge: null,
+  pipelineId: null,
+  pipelineName: '新管道',
+  runId: null,
+  runStatus: null,
+  chatMessages: [],
+  requirementMessages: [], // 用户需求 + Flash 分析结果（用于 /requirements/analyze history）
+  pipelineMessages: [],   // 流水线执行日志（工具调用、节点状态等）
+  nodeOutputs: {},  // nodeId → { input, output, error, startedAt, doneAt }
+  rewrittenTask: '', // Flash 改写后的需求文本
+  runtimeStates: {}, // { runtimeID: runtime } — serve runtime 状态
+  sessionID: '',    // 当前会话 ID（用于保存/加载状态）
+  // Pipeline hydration is a guard against stale UI state overwriting the
+  // revision that is still being loaded. LoopConfig is kept separately from
+  // the controls so an automatic save can never fall back to the HTML defaults.
+  pipelineHydrated: false,
+  pipelineRevisionID: '',
+  loadedLoopConfig: { enabled: false },
+  loopConfigDirty: false,
+  nodeTypes: [],
+  models: [],
+  skills: [],
+  skillCatalog: [],
+  presets: [],
+  stats: null,
+  runs: [],
+  runIterations: {},
+  agents: [],
+  sseConnection: null,
+  nextNodeId: 4,
+  canvasOffset: { x: 0, y: 0 },
+};
+
+function edgeId(edge, index) {
+  if (edge && edge.id) return String(edge.id);
+  const from = edge?.from ?? 'x';
+  const to = edge?.to ?? 'y';
+  return `e-${from}-${to}-${index}`;
+}
+
+function normalizeNode(raw) {
+  return {
+    id: raw.id,
+    name: raw.name,
+    type: raw.type,
+    model: raw.model || '',
+    providerRoute: raw.providerRoute || ((raw.executor === 'codex' && ['ccs', 'ccswitch'].includes(String(raw.model || '').toLowerCase())) ? 'ccswitch' : ''),
+    agent: raw.agent || '',
+    skill: raw.skill || '',
+    mode: raw.mode || 'serve',
+    executor: raw.executor || 'reasonix',
+    role: raw.role || '',
+    x: raw.x || 60,
+    y: raw.y || 60,
+    status: raw.status || 'idle',
+  };
+}
+
+function normalizeEdge(raw, index) {
+  return {
+    id: edgeId(raw, index),
+    from: raw.from,
+    to: raw.to,
+    mode: raw.mode || 'linear',
+  };
+}
+
+function findRuntimeForNode(node) {
+  if (!Array.isArray(state.agents)) return null;
+  return state.agents.find(a =>
+    (a.label === node.name && (!a.executor || a.executor === (node.executor || 'reasonix'))) ||
+    (a.model === node.model && a.label === node.name)
+  ) || null;
+}
+
+function inferExecutorFromModel(model) {
+  const m = String(model || '').toLowerCase();
+  if (m.includes('/mimo-') || m.startsWith('mimo')) return 'mimo';
+  if (m === 'ccs' || m === 'ccswitch' || m === 'o3' || m === 'codex-default' || m.includes('codex')) return 'codex';
+  return 'reasonix';
+}
+
+function isMimoModel(model) {
+  const m = String(model || '').toLowerCase();
+  return m.startsWith('mimo') || m.includes('/mimo-');
+}
+
+function modelSupportsExecutor(model, executor) {
+  const m = String(model || '').trim();
+  if (!m) return true;
+  const node = state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null;
+  const typeInfo = state.nodeTypes.find(t => t.type === (node?.type || 'executor'));
+  const byExec = typeInfo?.modelsByExecutor || {};
+  const allowed = byExec[executor] || [];
+  if (allowed.length > 0) return allowed.includes(m);
+  const mimo = isMimoModel(m);
+  if (executor === 'mimo') return mimo;
+  if (executor === 'codex') return m === 'ccs' || m === 'ccswitch' || m === 'o3' || m === 'codex-default' || m.includes('codex');
+  if (executor === 'reasonix') return true;
+  return false;
+}
+
+function compatibleModelsForNode(node, executorOverride) {
+  const activeType = node?.type || 'executor';
+  const activeExecutor = executorOverride || node?.executor || 'reasonix';
+  const typeInfo = state.nodeTypes.find(t => t.type === activeType);
+  const byExec = typeInfo?.modelsByExecutor || {};
+  const models = byExec[activeExecutor] || [];
+  return [...new Set(models.filter(Boolean))];
+}
+
+function allModelsForNodeType(node) {
+  const activeType = node?.type || 'executor';
+  const typeInfo = state.nodeTypes.find(t => t.type === activeType);
+  const byExec = typeInfo?.modelsByExecutor || {};
+  const models = [];
+  Object.values(byExec).forEach(items => {
+    (items || []).forEach(item => models.push(item));
+  });
+  if (models.length === 0) {
+    (typeInfo?.models || []).forEach(item => models.push(item));
+  }
+  return [...new Set(models.filter(Boolean))];
+}
+
+function firstCompatibleModelForNode(node, executorOverride) {
+  const models = compatibleModelsForNode(node, executorOverride);
+  return models[0] || '';
+}
+
+function syncExecutorOptionsForNode(node) {
+  const sel = $('#cfg-executor');
+  const options = Array.from(sel.options);
+  const typeInfo = state.nodeTypes.find(t => t.type === node?.type);
+  const allowedExecutors = (typeInfo?.executors || []).map(String);
+
+  // Enable/disable options based on what the node type supports
+  options.forEach(opt => {
+    if (allowedExecutors.length > 0) {
+      opt.disabled = !allowedExecutors.includes(opt.value);
+    } else {
+      opt.disabled = false;
+    }
+  });
+
+  // If current executor is not allowed, pick the first allowed one
+  if (allowedExecutors.length > 0 && !allowedExecutors.includes(node.executor)) {
+    node.executor = allowedExecutors[0];
+  }
+  sel.value = node.executor || 'reasonix';
+
+  // Codex forces mode=run and disables mode selector
+  const isCodex = node.executor === 'codex';
+  const modeSelect = $('#cfg-mode');
+  if (isCodex) {
+    node.mode = 'run';
+    modeSelect.value = 'run';
+    modeSelect.disabled = true;
+    modeSelect.title = 'Codex executor 强制使用 run 模式';
+  } else {
+    modeSelect.disabled = false;
+    modeSelect.title = '';
+  }
+}
+
+function enforceNodeConstraints(node) {
+  if (!node.executor) node.executor = inferExecutorFromModel(node.model);
+  // Codex executor forces mode=run
+  if (node.executor === 'codex') {
+    node.mode = 'run';
+    if (!node.model) {
+      node.model = 'ccs';
+      node.providerRoute = 'ccswitch';
+    }
+  } else if (!node.mode) {
+    node.mode = 'serve';
+  }
+  if (!node.agent) node.agent = '';
+  if (!node.skill) node.skill = '';
+  if (!node.model || !modelSupportsExecutor(node.model, node.executor || 'reasonix')) {
+    node.model = firstCompatibleModelForNode(node) || node.model || '';
+  }
+  if (!modelSupportsExecutor(node.model, node.executor || 'reasonix')) {
+    const typeInfo = state.nodeTypes.find(t => t.type === node?.type);
+    const fallbackExecutor = (typeInfo?.executors || []).find(ex => modelSupportsExecutor(node.model, ex));
+    if (fallbackExecutor) {
+      node.executor = fallbackExecutor;
+      node.model = firstCompatibleModelForNode(node, fallbackExecutor) || node.model || '';
+    }
+  }
+}
+
+function syncConfigFieldState(node) {
+  const isMimo = node?.executor === 'mimo';
+  const isCodex = node?.executor === 'codex';
+
+  syncExecutorOptionsForNode(node);
+  populateModelSelect(node);
+  populateSkillSelect(node);
+
+  // Show/hide ReasoningEffort for Codex
+  const reasoningField = $('#reasoning-effort-field');
+  if (reasoningField) {
+    reasoningField.style.display = isCodex ? '' : 'none';
+    if (isCodex && !node.reasoningEffort) {
+      node.reasoningEffort = 'high';
+    }
+    if (node.reasoningEffort) {
+      $('#cfg-reasoning-effort').value = node.reasoningEffort;
+    }
+  }
+
+  $('#cfg-executor').disabled = false;
+  $('#cfg-agent').disabled = isCodex; // Codex doesn't use agent config
+  $('#cfg-skill').disabled = false; // All executors can use skill (Codex injects via prompt)
+
+  $('#cfg-executor').title = isCodex ? 'Codex executor: 非交互式 exec 模式' : '可手动选择执行器';
+  $('#cfg-agent').title = isCodex ? 'Codex 不使用 agent 配置' : (isMimo ? 'mimo executor 会传递 agent 配置；留空最稳妥' : 'reasonix executor 当前不会使用 agent');
+  $('#cfg-skill').title = isCodex ? 'Codex 通过 Prompt 注入 Skill 内容' : (isMimo ? 'mimo executor 当前不会使用 skill，但可保留配置' : 'reasonix executor 可使用 skill');
+}
+
+// ── DOM refs ──
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const chatMessages = $('#chat-messages');
+const chatInput = $('#chat-input');
+const chatSend = $('#chat-send');
+const chatWelcome = $('#chat-welcome');
+const canvas = $('#canvas');
+const svgEdges = $('#svg-edges');
+const canvasWrap = $('#canvas-wrap');
+const configPanel = $('#config-panel');
+const configBody = $('#config-body');
+const configEmpty = $('#config-empty');
+const configFields = $('#config-fields');
+const configTitle = $('#config-title');
+const presetSelect = $('#preset-select');
+const sseDot = $('#sse-dot');
+const sseStatus = $('#sse-status');
+const cwdDisplay = $('#cwd-display');
+const cwdInput = $('#cwd-input');
+const cwdConfirm = $('#cwd-confirm');
+
+// ── Working directory ──
+function showCwdEditor() {
+  cwdDisplay.style.display = 'none';
+  cwdInput.style.display = '';
+  cwdConfirm.style.display = '';
+  cwdInput.value = cwdDisplay.textContent;
+  cwdInput.focus();
+  cwdInput.select();
+}
+async function confirmCwd() {
+  const val = cwdInput.value.trim();
+  if (!val) return;
+  try {
+    const res = await fetch('/orchestrator/api/cwd', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cwd: val })
+    });
+    const data = await res.json();
+    const workspace = data.cwd || val;
+    cwdDisplay.textContent = workspace;
+    cwdDisplay.title = workspace;
+    // /cwd is only a process-level compatibility endpoint. Persist the
+    // selected directory on the active orchestration session as well, so the
+    // next Run snapshots it instead of silently using the server cwd.
+    if (state.sessionID) {
+      await apiPut('/orch-sessions/' + encodeURIComponent(state.sessionID), { workspace });
+    }
+    toast('工作目录已切换，并已绑定当前会话', 'success');
+  } catch (err) {
+    toast('切换失败: ' + err.message, 'error');
+  }
+  cwdInput.style.display = 'none';
+  cwdConfirm.style.display = 'none';
+  cwdDisplay.style.display = '';
+}
+cwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmCwd(); if (e.key === 'Escape') { cwdInput.style.display = 'none'; cwdConfirm.style.display = 'none'; cwdDisplay.style.display = ''; } });
+async function fetchCwd() {
+  try {
+    const data = await apiGet('/cwd');
+    cwdDisplay.textContent = data.cwd || '-';
+    cwdDisplay.title = data.cwd || '';
+  } catch (_) {}
+}
+fetchCwd();
+
+// ── API helpers ──
+// Most orchestrator APIs are local CRUD calls and should fail quickly.  LLM
+// backed requirement analysis is different: the server starts a model
+// subprocess and may legitimately need several minutes before it returns the
+// structured pipeline.  Giving every endpoint the same 15s deadline caused
+// the browser to abort the request, which also cancelled the server-side
+// subprocess through r.Context(). SSE being "connected" does not change that;
+// SSE and ordinary fetch requests have independent lifecycles.
+const API_TIMEOUTS = {
+  '/requirements/analyze': 180000,
+  '/requirements/expand': 120000,
+  '/requirements/understand': 120000,
+};
+
+function apiTimeoutMs(path) {
+  return API_TIMEOUTS[path] || 15000;
+}
+
+async function api(method, path, body) {
+  const controller = new AbortController();
+  const timeoutMs = apiTimeoutMs(path);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const opts = {
+    method,
+    headers: { 'content-type': 'application/json' },
+    signal: controller.signal
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch('/orchestrator/api' + path, opts);
+    if (!res.ok) throw new Error(`API ${method} ${path}: ${res.status} ${res.statusText}`);
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      const seconds = Math.round(timeoutMs / 1000);
+      throw new Error(`API ${method} ${path}: 请求超时（${seconds}秒），请确认 orchestrator 服务仍在运行或模型仍在响应`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// For main server endpoints (e.g. /history, /status, /submit)
+async function mainApi(method, path, body) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  const opts = {
+    method,
+    headers: { 'content-type': 'application/json' },
+    signal: controller.signal
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(path, opts);
+    if (!res.ok) throw new Error(`API ${method} ${path}: ${res.status} ${res.statusText}`);
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw new Error(`API ${method} ${path}: 请求超时（15秒），请确认主服务仍在运行`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function apiGet(path) { return api('GET', path); }
+async function apiPost(path, body) { return api('POST', path, body); }
+async function apiPut(path, body) { return api('PUT', path, body); }
+async function apiDelete(path) { return api('DELETE', path); }
+
+// Keep the current canvas and execution bound to the orchestration session.
+// The legacy pipeline API is used only when the page has no session yet.
+async function saveCurrentPipelineRevision(pipeline) {
+  if (state.sessionID && !state.pipelineHydrated) {
+    throw new Error('当前会话流水线仍在加载，已跳过保存以避免覆盖 Loop 配置');
+  }
+  const loopConfig = normalizeLoopConfigForSave(pipeline?.loopConfig);
+  if (!state.sessionID) {
+    // Keep the legacy fallback payload compatible with the complete save
+    // shape as well. Legacy handlers may ignore source, but loopConfig must
+    // never disappear merely because a session has not been created yet.
+    const legacyPayload = {
+      name: pipeline.name,
+      nodes: pipeline.nodes,
+      edges: pipeline.edges,
+      loopConfig,
+      source: 'manual_edit'
+    };
+    if (!state.pipelineId) {
+      const saved = await apiPost('/pipelines', legacyPayload);
+      state.pipelineId = saved.id;
+    } else {
+      await apiPost('/pipelines/' + state.pipelineId, legacyPayload);
+    }
+    return state.pipelineId;
+  }
+  const payload = {
+    name: pipeline.name,
+    nodes: pipeline.nodes,
+    edges: pipeline.edges,
+    loopConfig,
+    source: 'manual_edit'
+  };
+  if (state.pipelineRevisionID || state.pipelineId) {
+    payload.baseRevisionID = state.pipelineRevisionID || state.pipelineId;
+  }
+  const revision = await apiPut('/orch-sessions/' + state.sessionID + '/pipelines/current', payload);
+  if (!revision || !revision.id) throw new Error('服务端未返回 pipeline revision ID');
+  state.pipelineId = revision.id;
+  state.pipelineRevisionID = revision.id;
+  state.loadedLoopConfig = normalizeLoopConfigForSave(revision.loopConfig || loopConfig);
+  state.loopConfigDirty = false;
+  state.pipelineHydrated = true;
+  return revision.id;
+}
+
+// ── Toast notifications ──
+function toast(msg, type = 'default') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type !== 'default' ? ' toast--' + type : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ── History panel ──
+const historyList = document.getElementById('history-list');
+let historyView = 'list'; // 'list' or 'detail'
+let historyRefreshInFlight = null;
+let historyRefreshGeneration = 0;
+
+function orchestratorSessionKey(sessionPath) {
+  if (!sessionPath) return 'orchestrator-main';
+  return 'orchestrator-' + btoa(unescape(encodeURIComponent(sessionPath))).replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+async function migrateNativeSession(path, name) {
+  if (!path) return null;
+  const sess = await apiPost('/orch-sessions/migrate', {
+    nativeSessionPath: path,
+    nativeSessionName: name || '',
+    workspace: cwdDisplay && cwdDisplay.textContent !== '-' ? cwdDisplay.textContent : '',
+    title: name || '历史会话'
+  });
+  if (!sess || !sess.id) throw new Error('迁移会话失败：服务端未返回会话 ID');
+  state.sessionID = sess.id;
+  localStorage.setItem('orchestrator-session-id', sess.id);
+  return sess;
+}
+
+async function resolveCurrentSessionID() {
+  const sessions = await mainApi('GET', '/sessions');
+  const list = Array.isArray(sessions) ? sessions : [];
+  if (list.length === 0) return 'orchestrator-main';
+  const current = list.find(s => s.current) || list[0];
+  return orchestratorSessionKey(current && current.path);
+}
+
+async function refreshHistory() {
+  // Switching to the history panel can fire more than once (navigation,
+  // explicit refresh, and a post-delete refresh). Reuse the in-flight request
+  // and ignore stale responses so an older, slower response cannot repaint the
+  // list after a newer one.
+  if (historyRefreshInFlight) return historyRefreshInFlight;
+  const generation = ++historyRefreshGeneration;
+  historyView = 'list';
+  historyList.innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:20px;font-size:13px">加载中...</div>';
+  const request = (async () => {
+    try {
+      const [nativeResult, orchestrationResult] = await Promise.allSettled([
+        mainApi('GET', '/sessions?limit=200'),
+        apiGet('/orch-sessions?limit=200')
+      ]);
+      if (generation !== historyRefreshGeneration) return;
+      if (nativeResult.status === 'rejected' && orchestrationResult.status === 'rejected') {
+        const nativeMessage = nativeResult.reason?.message || '主会话 API 不可用';
+        const orchestrationMessage = orchestrationResult.reason?.message || '编排 API 不可用';
+        throw new Error(nativeMessage + '；' + orchestrationMessage);
+      }
+      const nativeSessions = nativeResult.status === 'fulfilled' && Array.isArray(nativeResult.value)
+        ? nativeResult.value : [];
+      const orchestrationSessions = orchestrationResult.status === 'fulfilled' && Array.isArray(orchestrationResult.value)
+        ? orchestrationResult.value.filter(s => s && String(s.status || '').toLowerCase() !== 'archived') : [];
+      const byPath = new Map(nativeSessions.filter(s => s && s.path).map(s => [s.path, s]));
+      const merged = orchestrationSessions.map(s => {
+        const native = byPath.get(s.nativeSessionPath || '');
+        return {
+          ...(native || {}),
+          name: native?.name || s.nativeSessionName || s.title || s.id,
+          path: s.nativeSessionPath || native?.path || '',
+          modTime: s.updatedAt ? Date.parse(s.updatedAt) : native?.modTime,
+          orchestrationSessionID: s.id,
+          orchestrationTitle: s.title,
+          current: !!state.sessionID && state.sessionID === s.id
+        };
+      });
+      const knownPaths = new Set(merged.map(s => s.path).filter(Boolean));
+      renderSessionList(merged.concat(nativeSessions.filter(s => !knownPaths.has(s.path))));
+    } catch (err) {
+      if (generation !== historyRefreshGeneration) return;
+      historyList.innerHTML = '<div class="history-empty">加载失败: ' + escHtml(err.message) + '</div>';
+    }
+  })();
+  historyRefreshInFlight = request;
+  try { await request; } finally {
+    if (historyRefreshInFlight === request) historyRefreshInFlight = null;
+  }
+}
+
+async function deleteOrchestrationSession(sessionID, title, nativeName, nativePath) {
+  if (!sessionID) return;
+  if (state.sessionID && state.sessionID === sessionID) {
+    toast('当前会话不能删除，请先切换到其他会话', 'error');
+    return;
+  }
+  const label = title || sessionID;
+  if (!confirm('确定删除会话“' + label + '”吗？\n\n会话将从历史列表中隐藏，相关数据会保留在归档状态。')) return;
+  try {
+    await apiDelete('/orch-sessions/' + encodeURIComponent(sessionID));
+    // A migrated orchestration session may also have a native .jsonl entry.
+    // Remove that entry too, otherwise refreshHistory would immediately add
+    // it back as a native-only history card after the orchestration record is
+    // archived. Never attempt this for the current native session.
+    if (nativeName && nativePath && !(state.sessionID && state.sessionID === sessionID)) {
+      try { await mainApi('POST', '/delete-session', { name: nativeName }); } catch (nativeErr) {
+        console.warn('[history] orchestration deleted, native session cleanup failed:', nativeErr);
+      }
+    }
+    toast('会话已删除', 'success');
+    await refreshHistory();
+  } catch (err) {
+    toast('删除失败: ' + err.message, 'error');
+  }
+}
+
+async function deleteNativeSession(name, title) {
+  if (!name) return;
+  const label = title || name;
+  if (!confirm('确定删除会话“' + label + '”吗？\n\n这会永久删除本地会话记录。')) return;
+  try {
+    await mainApi('POST', '/delete-session', { name });
+    toast('会话已删除', 'success');
+    await refreshHistory();
+  } catch (err) {
+    toast('删除失败: ' + err.message, 'error');
+  }
+}
+
+function renderSessionList(sessions) {
+  if (!sessions || sessions.length === 0) {
+    historyList.innerHTML = '<div class="history-empty">暂无历史会话</div>';
+    return;
+  }
+  const sorted = sessions.slice().sort((a, b) => (Number(b.modTime) || 0) - (Number(a.modTime) || 0));
+  const maxVisible = 200;
+  const visible = sorted.slice(0, maxVisible);
+  historyList.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+  for (const s of visible) {
+    const card = document.createElement('div');
+    card.className = 'session-card' + (s.current ? ' session-card--current' : '');
+    const name = s.name || 'unknown';
+    const date = s.modTime ? new Date(s.modTime).toLocaleString() : '';
+    const size = s.size ? (s.size / 1024).toFixed(1) + ' KB' : '';
+    const meta = [date, size].filter(Boolean).join(' · ');
+
+    const info = document.createElement('div');
+    info.className = 'session-card__info';
+    info.innerHTML = '<div class="session-card__name">' + escHtml(name) + '</div>'
+      + (meta ? '<div class="session-card__meta">' + escHtml(meta) + '</div>' : '');
+    card.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'session-card__actions';
+    if (s.current) {
+      const span = document.createElement('span');
+      span.style.cssText = 'font-size:10px;color:var(--accent);padding:0 6px';
+      span.textContent = '当前';
+      actions.appendChild(span);
+    } else {
+      if (s.orchestrationSessionID || s.name) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'session-card__btn session-card__btn--danger';
+        deleteBtn.title = '删除会话';
+        deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>';
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (s.orchestrationSessionID) {
+            deleteOrchestrationSession(s.orchestrationSessionID, s.orchestrationTitle || name, s.name, s.path);
+          } else {
+            deleteNativeSession(s.name, name);
+          }
+        });
+        actions.appendChild(deleteBtn);
+      }
+      const btn = document.createElement('button');
+      btn.className = 'session-card__btn';
+      btn.title = s.orchestrationSessionID ? '切换到此编排会话' : '恢复此会话';
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      const sessionPath = s.path;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (s.orchestrationSessionID) switchOrchestrationSession(s.orchestrationSessionID, s.orchestrationTitle || name);
+        else resumeSession(sessionPath);
+      });
+      actions.appendChild(btn);
+    }
+    card.appendChild(actions);
+    if (!s.current) {
+      const sessionName = s.name;
+      const sessionTitle = s.orchestrationTitle || name;
+      const sessionPath = s.path;
+      card.addEventListener('click', () => {
+        if (s.orchestrationSessionID) switchOrchestrationSession(s.orchestrationSessionID, sessionTitle);
+        else loadSessionMessages(sessionName, sessionTitle, sessionPath);
+      });
+    }
+    fragment.appendChild(card);
+  }
+  historyList.appendChild(fragment);
+  if (sorted.length > maxVisible) {
+    const note = document.createElement('div');
+    note.className = 'history-empty';
+    note.style.padding = '12px';
+    note.textContent = `仅显示最近 ${maxVisible} 条历史记录，共 ${sorted.length} 条`;
+    historyList.appendChild(note);
+  }
+}
+
+async function switchOrchestrationSession(sessionID, title) {
+  if (!sessionID) return;
+  if (state.sessionID === sessionID) {
+    switchPanel('chat');
+    return;
+  }
+  if (!confirm('确定切换到会话“' + (title || sessionID) + '”吗？当前编排状态将先保存。')) return;
+  try {
+    if (state.sessionID) await saveOrchestratorState(state.sessionID);
+    // Invalidate the current canvas before binding the new session. This
+    // makes any save triggered during load a no-op instead of a stale write.
+    state.pipelineHydrated = false;
+    state.pipelineRevisionID = '';
+    state.pipelineId = null;
+    state.nodes = [];
+    state.edges = [];
+    state.loadedLoopConfig = { enabled: false };
+    state.loopConfigDirty = false;
+    state.sessionID = sessionID;
+    localStorage.setItem('orchestrator-session-id', sessionID);
+    await loadOrchestratorState(sessionID);
+    await loadRuns();
+    switchPanel('chat');
+    toast('已切换到历史编排会话', 'success');
+  } catch (err) {
+    toast('切换失败: ' + err.message, 'error');
+  }
+}
+
+async function loadOrchestrationSessionDetail(sessionID, title, nativePath) {
+  historyView = 'detail';
+  historyList.innerHTML = '<div style="padding:12px">加载中...</div>';
+  try {
+    const [conversation, session] = await Promise.all([
+      apiGet('/orch-sessions/' + sessionID + '/conversation'),
+      apiGet('/orch-sessions/' + sessionID)
+    ]);
+    const messages = conversation.chatMessages || [];
+    historyList.innerHTML = '';
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:12px;display:flex;align-items:center;gap:8px';
+    const back = document.createElement('span');
+    back.className = 'history__back'; back.textContent = '← 返回'; back.onclick = refreshHistory;
+    header.appendChild(back);
+    const titleEl = document.createElement('span');
+    titleEl.style.cssText = 'font-size:13px;color:var(--fg-2);flex:1'; titleEl.textContent = title;
+    header.appendChild(titleEl);
+    const switchBtn = document.createElement('button');
+    switchBtn.className = 'topbar__btn topbar__btn--accent';
+    switchBtn.textContent = '切换到此会话';
+    switchBtn.onclick = () => switchOrchestrationSession(sessionID, title);
+    header.appendChild(switchBtn);
+    if (nativePath) {
+      const btn = document.createElement('button');
+      btn.className = 'topbar__btn topbar__btn--accent'; btn.textContent = '恢复此会话';
+      btn.onclick = () => resumeSession(nativePath); header.appendChild(btn);
+    }
+    historyList.appendChild(header);
+    if (!messages.length) {
+      historyList.insertAdjacentHTML('beforeend', '<div class="history-empty">暂无编排消息</div>');
+      return;
+    }
+    // Build the detail view off-DOM and attach it once. Large orchestration
+    // conversations otherwise trigger a layout/repaint for every message.
+    const messageFragment = document.createDocumentFragment();
+    for (const m of messages) {
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;white-space:pre-wrap';
+      item.innerHTML = '<b>' + escHtml(m.meta || m.role || '') + '</b><br>' + escHtml(m.text || '');
+      messageFragment.appendChild(item);
+    }
+    historyList.appendChild(messageFragment);    void session;
+  } catch (err) {
+    historyList.innerHTML = '<div class="history-empty">加载失败: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+async function resumeSession(path) {
+  if (!confirm('确定要切换到这个会话吗？当前会话将被保存。')) return;
+  try {
+    if (state.sessionID) {
+      await saveOrchestratorState(state.sessionID);
+    }
+    if (!path || !String(path).trim()) throw new Error('该历史记录没有可恢复的原生会话路径，请使用“切换到此编排会话”');
+    const resp = await fetch('/resume', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: path })
+    });
+    if (!resp.ok) {
+      const detail = (await resp.text()).trim();
+      throw new Error(resp.status + ' ' + (detail || resp.statusText));
+    }
+    await migrateNativeSession(path, path.split(/[\\/]/).pop());
+    await refreshChatHistory();
+    toast('会话已切换，正在加载...', 'success');
+    await refreshHistory();
+    setTimeout(() => location.reload(), 300);
+  } catch (err) {
+    toast('切换失败: ' + err.message, 'error');
+  }
+}
+
+async function loadSessionMessages(name, title, path) {
+  historyView = 'detail';
+  historyList.innerHTML = '';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'padding:12px;display:flex;align-items:center;gap:8px';
+
+  const back = document.createElement('span');
+  back.className = 'history__back';
+  back.textContent = '← 返回';
+  back.addEventListener('click', refreshHistory);
+  header.appendChild(back);
+
+  const titleEl = document.createElement('span');
+  titleEl.style.cssText = 'font-size:13px;color:var(--fg-2);flex:1';
+  titleEl.textContent = title;
+  header.appendChild(titleEl);
+
+  if (path) {
+    const resumeBtn = document.createElement('button');
+    resumeBtn.className = 'topbar__btn topbar__btn--accent';
+    resumeBtn.style.cssText = 'font-size:11px;height:24px';
+    resumeBtn.textContent = '恢复此会话';
+    const sessionPath = path;
+    resumeBtn.addEventListener('click', () => resumeSession(sessionPath));
+    header.appendChild(resumeBtn);
+  }
+
+  historyList.appendChild(header);
+
+  const loading = document.createElement('div');
+  loading.style.cssText = 'text-align:center;color:var(--muted-2);padding:20px;font-size:12px';
+  loading.textContent = '加载中...';
+  historyList.appendChild(loading);
+
+  try {
+    const resp = await fetch('/sessions/' + encodeURIComponent(name) + '/messages');
+    if (!resp.ok) throw new Error(resp.status + ' ' + resp.statusText);
+    const msgs = await resp.json();
+    renderSessionMessages(msgs, name, title, path);
+  } catch (err) {
+    historyList.innerHTML = '<div style="padding:12px"><span class="history__back" onclick="refreshHistory()">← 返回</span></div>'
+      + '<div class="history-empty">加载失败: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+function renderSessionMessages(msgs, name, title, path) {
+  historyList.innerHTML = '';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'padding:12px;display:flex;align-items:center;gap:8px';
+
+  const back = document.createElement('span');
+  back.className = 'history__back';
+  back.textContent = '← 返回';
+  back.addEventListener('click', refreshHistory);
+  header.appendChild(back);
+
+  const titleEl = document.createElement('span');
+  titleEl.style.cssText = 'font-size:13px;color:var(--fg-2);flex:1';
+  titleEl.textContent = title;
+  header.appendChild(titleEl);
+
+  if (path) {
+    const resumeBtn = document.createElement('button');
+    resumeBtn.className = 'topbar__btn topbar__btn--accent';
+    resumeBtn.style.cssText = 'font-size:11px;height:24px';
+    resumeBtn.textContent = '恢复此会话';
+    const sessionPath = path;
+    resumeBtn.addEventListener('click', () => resumeSession(sessionPath));
+    header.appendChild(resumeBtn);
+  }
+
+  historyList.appendChild(header);
+
+  if (!msgs || msgs.length === 0) {
+    historyList.innerHTML += '<div class="history-empty">暂无消息</div>';
+    return;
+  }
+
+  const container = document.createElement('div');
+  container.style.cssText = 'display:flex;flex-direction:column;gap:8px;padding:0 12px 12px;flex:1;overflow-y:auto';
+
+  for (const m of msgs) {
+    const role = m.role || 'unknown';
+    // Skip system messages
+    if (role === 'system') continue;
+    // Skip tool results (too noisy)
+    if (role === 'tool') continue;
+
+    const div = document.createElement('div');
+    div.className = 'history-msg history-msg--' + role;
+
+    let html = '<div class="history-msg__role">' + escHtml(role) + '</div>';
+    if (m.content) html += '<div>' + escHtml(m.content) + '</div>';
+    if (m.toolCalls && m.toolCalls.length > 0) {
+      for (const tc of m.toolCalls) {
+        html += '<div class="history-msg__tool">→ ' + escHtml(tc.name) + '(' + escHtml((tc.arguments || '').substring(0, 100)) + ')</div>';
+      }
+    }
+    div.innerHTML = html;
+    container.appendChild(div);
+  }
+
+  historyList.appendChild(container);
+  historyList.scrollTop = historyList.scrollHeight;
+}
+
+// Auto-refresh when switching to history panel
+const origSwitchPanel = switchPanel;
+switchPanel = function(name) {
+  origSwitchPanel(name);
+  if (name === 'history') refreshHistory();
+};
+
+// ── Panel navigation ──
+function switchPanel(name) {
+  state.activePanel = name;
+  $$('.nav-btn').forEach(b => b.classList.toggle('nav-btn--active', b.dataset.panel === name));
+  $$('.panel').forEach(p => p.classList.toggle('panel--active', p.id === 'panel-' + name));
+  if (name === 'data') loadRuns();
+}
+
+$$('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
+});
+
+// ── Config panel ──
+function showConfig(nodeId) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  state.selectedNode = nodeId;
+  configPanel.classList.remove('config--hidden');
+  $('#app').classList.remove('app--no-config');
+  configEmpty.classList.add('hidden');
+  configFields.classList.remove('hidden');
+  configTitle.textContent = '节点: ' + node.name;
+  $('#cfg-name').value = node.name;
+  $('#cfg-type').value = node.type;
+  $('#cfg-model').value = node.model || '';
+  $('#cfg-agent').value = node.agent || '';
+  $('#cfg-skill').value = node.skill || '';
+  $('#cfg-executor').value = node.executor || 'reasonix';
+  $('#cfg-mode').value = node.mode || 'serve';
+  $('#cfg-role').value = node.role || '';
+  syncConfigFieldState(node);
+  // highlight node
+  $$('.node').forEach(n => n.classList.remove('node--selected'));
+  const el = document.getElementById('node-' + nodeId);
+  if (el) el.classList.add('node--selected');
+}
+
+function hideConfig() {
+  state.selectedNode = null;
+  configPanel.classList.add('config--hidden');
+  $('#app').classList.add('app--no-config');
+  $$('.node').forEach(n => n.classList.remove('node--selected'));
+}
+
+$('#config-close').addEventListener('click', hideConfig);
+
+// Config field change handlers
+['cfg-name', 'cfg-type', 'cfg-model', 'cfg-agent', 'cfg-skill', 'cfg-executor', 'cfg-mode', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
+  const el = $('#' + id);
+  el.addEventListener('change', () => {
+    if (!state.selectedNode) return;
+    const node = state.nodes.find(n => n.id === state.selectedNode);
+    if (!node) return;
+    if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = '节点: ' + el.value; }
+    if (id === 'cfg-type') node.type = el.value;
+    if (id === 'cfg-model') {
+      node.model = el.value;
+      if (node.executor === 'codex' && ['ccs', 'ccswitch'].includes(String(node.model).toLowerCase())) {
+        node.model = 'ccs';
+        node.providerRoute = 'ccswitch';
+      } else if (node.executor === 'codex') {
+        node.providerRoute = '';
+      }
+      if (!modelSupportsExecutor(node.model, node.executor || 'reasonix')) {
+        const typeInfo = state.nodeTypes.find(t => t.type === node?.type);
+        node.executor = (typeInfo?.executors || []).find(ex => modelSupportsExecutor(node.model, ex)) || inferExecutorFromModel(node.model);
+      }
+      if (!isMimoModel(node.model)) {
+        node.agent = '';
+      }
+    }
+    if (id === 'cfg-agent') node.agent = el.value;
+    if (id === 'cfg-skill') node.skill = el.value;
+    if (id === 'cfg-executor') {
+      node.executor = el.value;
+      if (node.executor === 'codex' && !node.model) {
+        node.model = 'ccs';
+        node.providerRoute = 'ccswitch';
+      }
+      if (!modelSupportsExecutor(node.model, el.value)) {
+        const nextModel = firstCompatibleModelForNode(node, el.value);
+        if (!nextModel) {
+          toast('当前节点类型没有可用于该执行器的模型', 'error');
+          showConfig(node.id);
+          return;
+        }
+        node.model = nextModel;
+      }
+    }
+    if (id === 'cfg-mode') node.mode = el.value;
+    if (id === 'cfg-role') node.role = el.value;
+    if (id === 'cfg-reasoning-effort') node.reasoningEffort = el.value;
+    enforceNodeConstraints(node);
+    syncConfigFieldState(node);
+    showConfig(node.id);
+    renderNodes();
+  });
+  if (id === 'cfg-name' || id === 'cfg-role') {
+    el.addEventListener('input', () => {
+      if (!state.selectedNode) return;
+      const node = state.nodes.find(n => n.id === state.selectedNode);
+      if (!node) return;
+      if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = '节点: ' + el.value; }
+      if (id === 'cfg-role') node.role = el.value;
+      renderNodes();
+    });
+  }
+});
+
+// ── Node management ──
+function createNode(type, x, y) {
+  const typeNames = { architect: '架构师', reviewer: '审查者', executor: '执行者' };
+  const node = {
+    id: state.nextNodeId++,
+    name: typeNames[type] + '-' + state.nextNodeId,
+    type: type,
+    model: '',
+    agent: '',
+    skill: '',
+    executor: type === 'executor' ? 'mimo' : 'reasonix',
+    mode: 'serve',
+    role: '',
+    x: x,
+    y: y,
+    status: 'idle',
+  };
+  enforceNodeConstraints(node);
+  state.nodes.push(node);
+  renderNodes();
+  return node;
+}
+
+function deleteNode(id) {
+  state.nodes = state.nodes.filter(n => n.id !== id);
+  state.edges = state.edges.filter(e => e.from !== id && e.to !== id);
+  if (state.selectedNode === id) hideConfig();
+  syncLoopConfigUI();
+  renderNodes();
+  renderEdges();
+}
+
+$('#add-node-pro').addEventListener('click', () => createNode('architect', 60 + Math.random() * 200, 60 + Math.random() * 200));
+$('#add-node-flash').addEventListener('click', () => createNode('reviewer', 60 + Math.random() * 200, 60 + Math.random() * 200));
+$('#add-node-mimo').addEventListener('click', () => createNode('executor', 60 + Math.random() * 200, 60 + Math.random() * 200));
+$('#btn-delete-node').addEventListener('click', () => { if (state.selectedNode) deleteNode(state.selectedNode); });
+$('#btn-clear-pipeline').addEventListener('click', () => {
+  if (!confirm('确定清空管道？')) return;
+  state.nodes = []; state.edges = []; state.nextNodeId = 1;
+  hideConfig(); syncLoopConfigUI(); renderNodes(); renderEdges();
+});
+
+// ── Render nodes on canvas ──
+function renderNodes() {
+  console.log('[nodes] rendering', state.nodes.length, 'nodes, canvas visible:', canvas.offsetParent !== null, 'canvas dims:', canvas.offsetWidth, 'x', canvas.offsetHeight);
+  canvas.querySelectorAll('.node').forEach(n => n.remove());
+  state.nodes.forEach(node => {
+    const el = document.createElement('div');
+    el.id = 'node-' + node.id;
+    el.className = 'node node--' + node.type;
+    if (node.status === 'running') el.classList.add('node--running');
+    if (node.status === 'done') el.classList.add('node--done');
+    if (node.status === 'failed') el.classList.add('node--failed');
+    if (node.status === 'interrupted') el.classList.add('node--interrupted');
+    if (node.id === state.selectedNode) el.classList.add('node--selected');
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+    const typeLabel = { architect: '架构师', executor: '执行者', reviewer: '审查者' }[node.type] || node.type;
+    el.innerHTML = `
+      <div class="node__port node__port--in" data-port="in" data-node="${node.id}"></div>
+      <div class="node__port node__port--out" data-port="out" data-node="${node.id}"></div>
+      <div class="node__head">
+        <span class="node__type-badge node__type-badge--${node.type}">${typeLabel}</span>
+        <span class="node__name">${escHtml(node.name)}</span>
+        <span class="node__status node__status--${node.status}"></span>
+        <span class="node__detail-btn" data-node-id="${node.id}" title="查看详情">ℹ</span>
+      </div>
+      <div class="node__body">
+        <div class="node__model">${escHtml(node.model || '未选择模型')}</div>
+        <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || '默认 Agent') : (node.skill || '无 Skill'))}</div>
+      </div>
+    `;
+    // Drag handling
+    el.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('node__port')) return;
+      e.preventDefault();
+      state.draggingNode = node.id;
+      const rect = el.getBoundingClientRect();
+      state.dragOffset.x = e.clientX - rect.left;
+      state.dragOffset.y = e.clientY - rect.top;
+      el.style.cursor = 'grabbing';
+      showConfig(node.id);
+    });
+    // Double-click to show node detail
+    el.addEventListener('dblclick', e => {
+      if (e.target.classList.contains('node__port')) return;
+      e.preventDefault();
+      showNodeDetail(node);
+    });
+    // Detail button click
+    el.querySelector('.node__detail-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      showNodeDetail(node);
+    });
+    // Port connection
+    el.querySelectorAll('.node__port').forEach(port => {
+      port.addEventListener('mousedown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const portType = port.dataset.port;
+        if (portType === 'out') {
+          state.connectingFrom = node.id;
+          // Create temp edge line
+          const svg = svgEdges;
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          line.id = 'temp-edge';
+          line.setAttribute('stroke', 'var(--accent)');
+          line.setAttribute('stroke-width', '2');
+          line.setAttribute('stroke-dasharray', '6 4');
+          line.setAttribute('fill', 'none');
+          svg.appendChild(line);
+        }
+      });
+      port.addEventListener('mouseup', e => {
+        e.stopPropagation();
+        const portType = port.dataset.port;
+        if (portType === 'in' && state.connectingFrom && state.connectingFrom !== node.id) {
+          // Check for duplicate
+          const exists = state.edges.some(ed => ed.from === state.connectingFrom && ed.to === node.id);
+          if (!exists) {
+            state.edges.push({
+              from: state.connectingFrom,
+              to: node.id,
+            });
+            renderEdges();
+          }
+        }
+        cancelConnect();
+      });
+    });
+    // Port badge for serve runtime — show for starting/ready/idle/busy, gray for stopped/error
+    if (node.runtime && node.runtime.port) {
+      const badge = document.createElement('div');
+      badge.className = 'node__port-badge';
+      badge.textContent = ':' + node.runtime.port;
+      const s = node.runtime.status;
+      const canOpen = (s === 'starting' || s === 'ready' || s === 'idle' || s === 'busy') && node.runtime.endpoint && node.runtime.executor !== 'mimo';
+      badge.style.background = s === 'ready' ? 'var(--success)' :
+                               s === 'idle' ? '#e6a800' :
+                               s === 'busy' ? 'var(--accent)' :
+                               s === 'starting' ? '#e6a800' :
+                               'var(--muted-2)';
+      badge.title = s === 'starting' ? 'Runtime 正在启动，点击可提前打开' :
+                    canOpen ? (node.runtime.executor === 'mimo' ? '本地 mimo 历史会话' : '点击打开 agent 页面') :
+                    (s === 'stopped' ? 'Runtime 已停止' : 'Runtime 不可用');
+      if (canOpen) {
+        badge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.open(node.runtime.endpoint, '_blank');
+        });
+      }
+      el.appendChild(badge);
+    }
+    canvas.appendChild(el);
+  });
+}
+
+function cancelConnect() {
+  state.connectingFrom = null;
+  const temp = document.getElementById('temp-edge');
+  if (temp) temp.remove();
+}
+
+// Global mouse handlers for drag and connect
+document.addEventListener('mousemove', e => {
+  if (state.draggingNode) {
+    const node = state.nodes.find(n => n.id === state.draggingNode);
+    if (!node) return;
+    const wrapRect = canvasWrap.getBoundingClientRect();
+    const scrollLeft = canvasWrap.scrollLeft;
+    const scrollTop = canvasWrap.scrollTop;
+    node.x = e.clientX - wrapRect.left + scrollLeft - state.dragOffset.x;
+    node.y = e.clientY - wrapRect.top + scrollTop - state.dragOffset.y;
+    node.x = Math.max(0, node.x);
+    node.y = Math.max(0, node.y);
+    const el = document.getElementById('node-' + node.id);
+    if (el) { el.style.left = node.x + 'px'; el.style.top = node.y + 'px'; }
+    renderEdges();
+  }
+  if (state.connectingFrom) {
+    const fromNode = state.nodes.find(n => n.id === state.connectingFrom);
+    if (!fromNode) return;
+    const wrapRect = canvasWrap.getBoundingClientRect();
+    const x1 = fromNode.x + 180;
+    const y1 = fromNode.y + 40;
+    const x2 = e.clientX - wrapRect.left + canvasWrap.scrollLeft;
+    const y2 = e.clientY - wrapRect.top + canvasWrap.scrollTop;
+    const temp = document.getElementById('temp-edge');
+    if (temp) {
+      temp.setAttribute('d', calcEdgePath(x1, y1, x2, y2));
+    }
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (state.draggingNode) {
+    const el = document.getElementById('node-' + state.draggingNode);
+    if (el) el.style.cursor = 'grab';
+    state.draggingNode = null;
+  }
+  cancelConnect();
+});
+
+// Click on canvas to deselect
+canvasWrap.addEventListener('click', e => {
+  if (e.target === canvasWrap || e.target === canvas) {
+    hideConfig();
+  }
+});
+
+// ── Edge rendering ──
+function calcEdgePath(x1, y1, x2, y2) {
+  const dx = Math.abs(x2 - x1) * 0.5;
+  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+}
+
+function renderEdges() {
+  // Remove old edges (keep defs and temp)
+  svgEdges.querySelectorAll('.edge-group').forEach(g => g.remove());
+  state.edges.forEach((edge, i) => {
+    const fromNode = state.nodes.find(n => n.id === edge.from);
+    const toNode = state.nodes.find(n => n.id === edge.to);
+    if (!fromNode || !toNode) return;
+    const x1 = fromNode.x + 180;
+    const y1 = fromNode.y + 40;
+    const x2 = toNode.x;
+    const y2 = toNode.y + 40;
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.classList.add('edge-group');
+    g.dataset.edgeIdx = i;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', calcEdgePath(x1, y1, x2, y2));
+    path.setAttribute('marker-end', 'url(#arrowhead)');
+    path.style.pointerEvents = 'stroke';
+    path.style.cursor = 'pointer';
+    path.addEventListener('click', e => {
+      e.stopPropagation();
+      if (confirm('删除此连线？')) {
+        state.edges.splice(i, 1);
+        renderEdges();
+      }
+    });
+    g.appendChild(path);
+    // Flow animation dot
+    if (edge.flowing) {
+      path.classList.add('edge--flowing');
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.classList.add('flow-dot');
+      circle.setAttribute('r', '3');
+      const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+      anim.setAttribute('dur', '1.5s');
+      anim.setAttribute('repeatCount', 'indefinite');
+      anim.setAttribute('path', calcEdgePath(x1, y1, x2, y2));
+      circle.appendChild(anim);
+      g.appendChild(circle);
+    }
+    g.appendChild(path);
+    svgEdges.appendChild(g);
+  });
+  renderLoopOverlay();
+}
+
+// Loop is a runtime repetition of the same base DAG. Do not add a real edge
+// back into state.edges: that would turn the execution graph into a cycle and
+// make the backend topological scheduler reject it. This overlay is visual
+// only, so the Canvas explains the loop without changing execution semantics.
+function renderLoopOverlay() {
+  svgEdges.querySelectorAll('.loop-overlay').forEach(g => g.remove());
+  const cfg = getLoopConfig();
+  if (!cfg.enabled || !cfg.reviewNodeID) return;
+  const reviewer = state.nodes.find(n => String(n.id) === String(cfg.reviewNodeID));
+  if (!reviewer) return;
+  const target = state.nodes.find(n => n.type === 'executor') || state.nodes.find(n => n.type !== 'architect');
+  if (!target || target.id === reviewer.id) return;
+
+  const pad = 22;
+  const minX = Math.min(...state.nodes.map(n => n.x)) - pad;
+  const minY = Math.min(...state.nodes.map(n => n.y)) - pad;
+  const maxX = Math.max(...state.nodes.map(n => n.x + 180)) + pad;
+  const maxY = Math.max(...state.nodes.map(n => n.y + 80)) + pad;
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.classList.add('loop-overlay');
+
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.classList.add('loop-boundary');
+  rect.setAttribute('x', minX);
+  rect.setAttribute('y', minY);
+  rect.setAttribute('width', Math.max(0, maxX - minX));
+  rect.setAttribute('height', Math.max(0, maxY - minY));
+  rect.setAttribute('rx', 12);
+  g.appendChild(rect);
+
+  const startX = reviewer.x + 90;
+  const startY = reviewer.y + 80;
+  const endX = target.x + 90;
+  const endY = target.y;
+  const loopY = maxY + 28;
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.classList.add('loopback');
+  path.setAttribute('d', `M ${startX} ${startY} C ${startX} ${loopY}, ${endX} ${loopY}, ${endX} ${endY}`);
+  path.setAttribute('marker-end', 'url(#loop-arrowhead)');
+  g.appendChild(path);
+
+  const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  label.classList.add('loop-label');
+  label.setAttribute('x', minX + 12);
+  label.setAttribute('y', minY + 18);
+  const max = cfg.mode === 'fixed' ? (cfg.fixedIterations || cfg.maxIterations || 0) : (cfg.maxIterations || 0);
+  label.textContent = `Loop 运行时回到执行者 · ${cfg.mode} · ${max} 轮`;
+  g.appendChild(label);
+  svgEdges.appendChild(g);
+}
+
+// ── Auto layout ──
+$('#btn-auto-layout').addEventListener('click', () => {
+  if (state.nodes.length === 0) return;
+  // Simple left-to-right topological layout
+  const levels = {};
+  const visited = new Set();
+  function getLevel(id) {
+    if (levels[id] !== undefined) return levels[id];
+    const incoming = state.edges.filter(e => e.to === id);
+    if (incoming.length === 0) { levels[id] = 0; return 0; }
+    let maxL = 0;
+    incoming.forEach(e => { maxL = Math.max(maxL, getLevel(e.from) + 1); });
+    levels[id] = maxL;
+    return maxL;
+  }
+  state.nodes.forEach(n => getLevel(n.id));
+  const byLevel = {};
+  state.nodes.forEach(n => {
+    const l = levels[n.id] || 0;
+    if (!byLevel[l]) byLevel[l] = [];
+    byLevel[l].push(n);
+  });
+  Object.keys(byLevel).forEach(l => {
+    byLevel[l].forEach((n, i) => {
+      n.x = 60 + parseInt(l) * 240;
+      n.y = 40 + i * 120;
+    });
+  });
+  renderNodes();
+  renderEdges();
+});
+
+// ── Chat ──
+function addChatMessage(role, text, meta, persist = true) {
+  chatWelcome.style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'chat-bubble chat-bubble--' + role;
+  div.innerHTML = `
+    <div class="chat-bubble__inner">${escHtml(text)}</div>
+    ${meta ? `<div class="chat-bubble__meta">${escHtml(meta)}</div>` : ''}
+  `;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  if (!persist) return;
+  state.chatMessages.push({ role, text, meta });
+  // Categorize: requirement messages vs pipeline logs
+  const isPipelineLog = meta === '流水线' || meta === '工具' || meta === '工具结果' || meta === '通知';
+  if (role === 'user' || (!isPipelineLog && meta !== '分析中' && meta !== '错误')) {
+    state.requirementMessages.push({ role, text, meta });
+  } else {
+    state.pipelineMessages.push({ role, text, meta });
+  }
+}
+
+async function refreshChatHistory() {
+  try {
+    const msgs = await mainApi('GET', '/history');
+    chatMessages.innerHTML = '';
+    state.chatMessages = [];
+    state.requirementMessages = [];
+    state.pipelineMessages = [];
+    if (!Array.isArray(msgs) || msgs.length === 0) {
+      chatWelcome.style.display = '';
+      return;
+    }
+    for (const m of msgs) {
+      if (!m || !m.role || m.role === 'system' || m.role === 'tool') continue;
+      const role = m.role === 'assistant' ? 'ai' : m.role;
+      const text = [m.reasoning, m.content].filter(Boolean).join(m.reasoning && m.content ? '\n\n' : '');
+      addChatMessage(role, text || '', m.toolName || m.toolCallId || '');
+    }
+  } catch (err) {
+    console.warn('refreshChatHistory failed:', err);
+  }
+}
+
+async function loadOrchestrationConversation(sessionID) {
+  if (!sessionID) return false;
+  const data = await apiGet('/orch-sessions/' + sessionID + '/conversation');
+  chatMessages.innerHTML = '';
+  state.chatMessages = [];
+  state.requirementMessages = data.requirementMessages || [];
+  state.pipelineMessages = data.pipelineMessages || [];
+  const messages = data.chatMessages || [];
+  if (messages.length === 0) {
+    chatWelcome.style.display = '';
+    return true;
+  }
+  chatWelcome.style.display = 'none';
+  for (const m of messages) {
+    addChatMessage(m.role, m.text || '', m.meta || '', false);
+    state.chatMessages.push({ role: m.role, text: m.text || '', meta: m.meta || '' });
+  }
+  return true;
+}
+
+// Models may identify a step through agent/type/role/name/label and often add
+// a round suffix (for example "架构师2"). Keep one canonical classifier for
+// Loop normalization and Canvas materialization; otherwise the normalizer can
+// collapse the graph but the Canvas type mapper may turn "架构师1" into a
+// reviewer by falling through to its default.
+function generatedStepRoleKey(step) {
+  const raw = String(step?.agent || step?.type || step?.role || step?.name || step?.label || '').trim().toLowerCase();
+  if (/审查者|审查|reviewer|review/.test(raw)) return 'reviewer';
+  if (/架构师|architect/.test(raw)) return 'architect';
+  if (/执行者|executor|implementer|developer/.test(raw)) return 'executor';
+  return raw.replace(/[0-9一二三四五六七八九十]+$/g, '');
+}
+
+function generatedStepNodeType(step) {
+  const role = generatedStepRoleKey(step);
+  if (role === 'architect' || role === 'executor' || role === 'reviewer') return role;
+  return 'reviewer';
+}
+
+function normalizeGeneratedLoopAnalysis(analysis, sourceText = '') {
+  if (!analysis || !Array.isArray(analysis.steps)) return analysis;
+  const loopRequested = !!(analysis.loopConfig && analysis.loopConfig.enabled) ||
+    /循环|loop|迭代|反复执行|重复执行|审查后修改|直到.*通过|最多.*轮/i.test(sourceText);
+  if (!loopRequested) return analysis;
+  const steps = analysis.steps;
+  const isReviewer = step => generatedStepRoleKey(step) === 'reviewer';
+  const reviewerIndexes = steps
+    .map((step, index) => isReviewer(step) ? index : -1)
+    .filter(index => index >= 0);
+  if (reviewerIndexes.length <= 1) {
+    if (reviewerIndexes.length === 1 && loopRequested) {
+      const reviewer = steps[reviewerIndexes[0]];
+      return {
+        ...analysis,
+        loopConfig: {
+          ...(analysis.loopConfig || {}),
+          enabled: true,
+          mode: analysis.loopConfig?.mode || 'review_decides',
+          maxIterations: Number(analysis.loopConfig?.maxIterations || 3),
+          reviewNodeID: analysis.loopConfig?.reviewNodeID || reviewer.id,
+          protocol: 'loop-review-v1',
+        },
+      };
+    }
+    return analysis;
+  }
+
+  // The common malformed output is [architect, executor, reviewer] repeated
+  // N times. Only collapse when every chunk has exactly the same role pattern;
+  // otherwise do not guess and disable Loop so the user can correct the graph.
+  const firstRoundEnd = reviewerIndexes[0] + 1;
+  const firstRound = steps.slice(0, firstRoundEnd);
+  const pattern = firstRound.map(step => generatedStepRoleKey(step));
+  let cursor = 0;
+  let repeated = true;
+  let rounds = 0;
+  while (cursor < steps.length) {
+    const chunk = steps.slice(cursor, cursor + pattern.length);
+    if (chunk.length !== pattern.length || chunk.some((step, i) => generatedStepRoleKey(step) !== pattern[i])) {
+      repeated = false;
+      break;
+    }
+    cursor += pattern.length;
+    rounds++;
+  }
+  if (!repeated || rounds < 2 || cursor !== steps.length) {
+    return {
+      ...analysis,
+      loopConfig: { enabled: false },
+      suggestion: (analysis.suggestion || '') + '\n⚠️ 检测到多个审查者，无法安全收缩为一个 Loop；已关闭 Loop，请在 Canvas 保留一组基础节点。',
+    };
+  }
+
+  const keptIDs = new Set(firstRound.map(step => String(step.id)));
+  const edges = (analysis.edges || []).filter(edge => keptIDs.has(String(edge.from)) && keptIDs.has(String(edge.to)));
+  return {
+    ...analysis,
+    // Canonicalize the role discriminator while preserving the model's
+    // descriptive fields, so Canvas creation is deterministic.
+    steps: firstRound.map(step => ({
+      ...step,
+      agent: generatedStepRoleKey(step),
+    })),
+    edges,
+    loopConfig: {
+      ...analysis.loopConfig,
+      enabled: true,
+      reviewNodeID: firstRound[firstRound.length - 1].id,
+      protocol: 'loop-review-v1',
+      maxIterations: Number(analysis.loopConfig.maxIterations || 3),
+    },
+    suggestion: (analysis.suggestion || '') + `\n✅ 已将模型展开的 ${rounds} 组节点收缩为一组基础节点，Loop 将在运行时重复执行。`,
+  };
+}
+
+async function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  chatInput.value = '';
+  addChatMessage('user', text);
+
+  // Ensure we have an orchestration session
+  if (!state.sessionID) {
+    try {
+      const sess = await apiPost('/orch-sessions', { title: text.substring(0, 50) });
+      state.sessionID = sess.id;
+      state.pipelineHydrated = true;
+      state.pipelineRevisionID = '';
+      state.pipelineId = null;
+      state.loadedLoopConfig = { enabled: false };
+      state.loopConfigDirty = false;
+      localStorage.setItem('orchestrator-session-id', state.sessionID);
+      console.log('[orch:init] created session id:', sess.id);
+    } catch (e) {
+      console.warn('failed to create orchestration session:', e);
+    }
+  }
+
+  // Save requirement message to session
+  if (state.sessionID) {
+    try { await saveOrchestratorState(state.sessionID); } catch (e) { /* ignore */ }
+  }
+
+  // 构建需求对话历史（仅用户消息 + Flash 分析，不含流水线日志）
+  const history = state.requirementMessages
+    .filter(m => m.role === 'user' || (m.role === 'ai' && m.meta !== '分析中'))
+    .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
+
+  // 如果已有流水线，附加当前配置信息让Flash知道
+  let pipelineInfo = '';
+  if (state.nodes.length > 0) {
+    pipelineInfo = '\n\n当前已配置的流水线节点：\n';
+    state.nodes.forEach((n, i) => {
+      pipelineInfo += `${i + 1}. ${n.name} (${n.type}, ${n.model || '未指定'}) — ${n.role || '未设置职责'}\n`;
+    });
+  }
+
+  try {
+    addChatMessage('ai', '⏳ 正在分析需求...', '分析中');
+    const analysis = await apiPost('/requirements/analyze', { text, history, pipelineInfo });
+    console.log('[sendChat] analysis result:', JSON.stringify(analysis).substring(0, 500));
+    // Loop is a runtime repetition of one base DAG. If the model still
+    // expands identical rounds, collapse only an unambiguous repeated
+    // role-pattern before drawing the Canvas.
+    const normalizedAnalysis = normalizeGeneratedLoopAnalysis(analysis, text);
+    if (normalizedAnalysis !== analysis) {
+      console.warn('[sendChat] collapsed expanded Loop analysis to one base DAG');
+    }
+    const generated = normalizedAnalysis;
+    // 移除"分析中"消息
+    const msgs = chatMessages.querySelectorAll('.chat-bubble--ai');
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg && lastMsg.textContent.includes('分析中')) lastMsg.remove();
+
+    // 显示分析结果
+    if (generated.analysis) {
+      addChatMessage('ai', '📋 **需求分析**\n\n' + generated.analysis, 'Flash');
+    }
+
+    // 保存改写后的需求（供确认弹窗使用）
+    if (generated.rewritten) {
+      state.rewrittenTask = generated.rewritten;
+      addChatMessage('ai', '📝 **需求已改写**\n\n' + generated.rewritten, 'Flash');
+    }
+
+    // 自动配置流水线节点和DAG拓扑
+    console.log('[sendChat] steps:', generated.steps, 'edges:', generated.edges);
+    if (generated.steps && generated.steps.length > 0) {
+      state.nodes = [];
+      state.edges = [];
+      state.nextNodeId = 1;
+
+      // 步骤1：创建节点，记录 stepId → nodeId 映射
+      const stepIdMap = {};
+      for (const step of generated.steps) {
+        const nodeType = generatedStepNodeType(step);
+        const node = createNode(nodeType, 0, 0);
+        node.name = step.agent;
+        node.role = step.roleDesc;
+        node.model = step.model || '';
+        node.executor = step.executor || 'reasonix';
+        node.mode = step.mode || 'serve';
+        node.agent = step.agentProfile || '';
+        node.skill = canonicalSkillForNode(step.skill || '', nodeType, text, step.roleDesc || step.step || '');
+        enforceNodeConstraints(node);
+        stepIdMap[step.id] = node.id;
+      }
+
+      // 步骤2：根据 edges 创建连接
+      if (generated.edges && generated.edges.length > 0) {
+        for (const edge of generated.edges) {
+          const fromId = stepIdMap[edge.from];
+          const toId = stepIdMap[edge.to];
+          if (fromId !== undefined && toId !== undefined) {
+            state.edges.push({ from: fromId, to: toId });
+          }
+        }
+      } else {
+        // 无 edges 时退化为串行
+        for (let i = 1; i < state.nodes.length; i++) {
+          state.edges.push({ from: state.nodes[i - 1].id, to: state.nodes[i].id });
+        }
+      }
+
+      // Loop 配置只引用这一轮基础 DAG 中唯一的 Reviewer。
+      if (generated.loopConfig && generated.loopConfig.enabled) {
+        const reviewerSteps = generated.steps.filter(s => generatedStepRoleKey(s) === 'reviewer');
+        const reviewStepID = generated.loopConfig.reviewNodeID || (reviewerSteps.length === 1 ? reviewerSteps[0].id : '');
+        const reviewNodeID = reviewStepID !== '' ? stepIdMap[reviewStepID] : undefined;
+        if (reviewNodeID !== undefined && reviewerSteps.length === 1) {
+          restoreLoopConfigUI({
+            ...generated.loopConfig,
+            enabled: true,
+            reviewNodeID: String(reviewNodeID),
+            protocol: 'loop-review-v1',
+          });
+        } else {
+          restoreLoopConfigUI({ enabled: false });
+          generated.suggestion = (generated.suggestion || '') + '\n⚠️ Loop 必须且只能有一个审查者节点，已保持关闭。';
+        }
+      } else {
+        restoreLoopConfigUI({ enabled: false });
+      }
+
+      // 步骤3：拓扑布局（按层级排列）
+      layoutPipeline();
+
+      renderNodes();
+      renderEdges();
+
+      // 显示配置摘要
+      let configMsg = '✅ 已自动配置流水线（' + state.edges.length + ' 条连接）：\n';
+      generated.steps.forEach((s, i) => {
+        configMsg += `${i + 1}. **${s.agent}** — ${s.roleDesc}\n`;
+      });
+      if (generated.suggestion) {
+        configMsg += '\n💡 ' + generated.suggestion;
+      }
+      addChatMessage('ai', configMsg, '配置建议');
+
+      switchPanel('pipeline');
+      toast('流水线已自动配置', 'success');
+    }
+    // Persist the rewritten requirement and the generated pipeline together.
+    // Saving earlier and again after node generation creates two racing PUTs;
+    // the older request can overwrite the freshly analyzed task.
+    if (state.sessionID) await saveOrchestratorState(state.sessionID);
+  } catch (err) {
+    addChatMessage('ai', '分析失败: ' + err.message, '错误');
+  }
+}
+
+// 拓扑布局：计算每个节点的层级，同层垂直排列，不同层水平排列
+function layoutPipeline() {
+  if (state.nodes.length === 0) return;
+  // 计算入度
+  const inDeg = {};
+  const adj = {};
+  state.nodes.forEach(n => { inDeg[n.id] = 0; adj[n.id] = []; });
+  state.edges.forEach(e => {
+    adj[e.from].push(e.to);
+    inDeg[e.to]++;
+  });
+  // BFS 分层
+  const levels = {};
+  const queue = [];
+  state.nodes.forEach(n => {
+    if (inDeg[n.id] === 0) { levels[n.id] = 0; queue.push(n.id); }
+  });
+  while (queue.length > 0) {
+    const u = queue.shift();
+    for (const v of adj[u]) {
+      inDeg[v]--;
+      if (levels[v] === undefined || levels[v] < levels[u] + 1) {
+        levels[v] = levels[u] + 1;
+      }
+      if (inDeg[v] === 0) queue.push(v);
+    }
+  }
+  // 按层级分组
+  const byLevel = {};
+  state.nodes.forEach(n => {
+    const l = levels[n.id] || 0;
+    if (!byLevel[l]) byLevel[l] = [];
+    byLevel[l].push(n);
+  });
+  // 放置
+  const LEVEL_W = 250;
+  const NODE_H = 80;
+  Object.keys(byLevel).forEach(l => {
+    const nodes = byLevel[l];
+    const totalH = nodes.length * NODE_H;
+    const startY = (200 - totalH) / 2;
+    nodes.forEach((n, i) => {
+      n.x = 60 + parseInt(l) * LEVEL_W;
+      n.y = startY + i * (NODE_H + 40);
+    });
+  });
+}
+
+chatSend.addEventListener('click', sendChat);
+chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+
+// New session button
+// 保存当前 orchestrator 状态到会话
+async function saveOrchestratorState(sessionID) {
+  if (!sessionID) return;
+  // Never let an autosave from the previous canvas write into a session whose
+  // pipeline is still being hydrated. The GET response is the source of truth
+  // until it finishes; callers can retry after hydration completes.
+  if (!state.pipelineHydrated) {
+    console.debug('[orch:save] skipped while pipeline is hydrating', sessionID);
+    return;
+  }
+  try {
+    const nodes = state.nodes.map(n => ({
+      id: String(n.id), name: n.name, type: n.type, model: n.model,
+      agent: n.agent, skill: canonicalSkillForNode(n.skill || '', n.type, state.rewrittenTask || '', n.role || ''), mode: n.mode, executor: n.executor, role: n.role,
+      x: n.x, y: n.y,
+    }));
+    const edges = state.edges.map((e, index) => ({ id: edgeId(e, index), from: String(e.from), to: String(e.to) }));
+    const loopConfig = getLoopConfig();
+    const payload = {
+      name: state.pipelineName,
+      nodes,
+      edges,
+      loopConfig,
+      source: 'manual_edit'
+    };
+    if (state.pipelineRevisionID || state.pipelineId) {
+      payload.baseRevisionID = state.pipelineRevisionID || state.pipelineId;
+    }
+    const revision = await apiPut('/orch-sessions/' + sessionID + '/pipelines/current', payload);
+    if (!revision || !revision.id) throw new Error('服务端未返回 pipeline revision ID');
+    state.pipelineId = revision.id;
+    state.pipelineRevisionID = revision.id;
+    state.loadedLoopConfig = normalizeLoopConfigForSave(revision.loopConfig || loopConfig);
+    state.loopConfigDirty = false;
+    await apiPut('/orch-sessions/' + sessionID + '/conversation', {
+      chatMessages: state.chatMessages || [],
+      requirementMessages: state.requirementMessages || [],
+      pipelineMessages: state.pipelineMessages || []
+    });
+    // Update session title if we have a rewritten task
+    if (state.rewrittenTask) {
+      await apiPut('/orch-sessions/' + sessionID, {
+        task: state.rewrittenTask,
+        rewrittenTask: state.rewrittenTask
+      });
+    }
+  } catch (err) {
+    toast('保存失败: ' + err.message, 'error');
+    throw err;
+  }
+}
+
+// 加载会话的 orchestrator 状态
+async function loadOrchestratorState(sessionID) {
+  if (!sessionID) return;
+  // Reset the hydration guard before changing the session binding. Any
+  // autosave fired during the async GET must be ignored until this function
+  // has installed the new canvas and its persisted LoopConfig.
+  state.pipelineHydrated = false;
+  state.pipelineRevisionID = '';
+  state.pipelineId = null;
+  state.nodes = [];
+  state.edges = [];
+  state.loadedLoopConfig = { enabled: false };
+  state.loopConfigDirty = false;
+  console.log('[orch:init] requested session id:', sessionID);
+  try {
+    // Try new API first
+    let data;
+    try {
+      data = await apiGet('/orch-sessions/' + sessionID);
+      console.log('[orch:init] loaded session id:', sessionID);
+    } catch (e) {
+      // A Reasonix history session predates OrchestrationSession. Migrate its
+      // saved canvas once, then continue with the new session ID.
+      if (!String(e.message || '').includes('404')) throw e;
+      if (String(sessionID).startsWith('orchestrator-')) {
+        if (state.sessionID === sessionID) state.sessionID = null;
+        if (localStorage.getItem('orchestrator-session-id') === sessionID) {
+          localStorage.removeItem('orchestrator-session-id');
+        }
+        return;
+      }
+      if (String(sessionID).startsWith('orch_')) {
+        console.warn('[orch:init] orchestration session not found:', sessionID);
+        if (state.sessionID === sessionID) state.sessionID = null;
+        if (localStorage.getItem('orchestrator-session-id') === sessionID) {
+          localStorage.removeItem('orchestrator-session-id');
+        }
+        return;
+      }
+      const legacy = await apiGet('/sessions/' + sessionID + '/state');
+      const migrated = await migrateNativeSession(sessionID, sessionID);
+      if (!migrated || !migrated.id) throw new Error('迁移旧会话失败：服务端未返回新会话 ID');
+      state.sessionID = migrated.id;
+      localStorage.setItem('orchestrator-session-id', state.sessionID);
+      data = legacy || {};
+      if (data.nodes || data.edges) {
+        const revision = await apiPost('/orch-sessions/' + state.sessionID + '/pipelines', {
+          nodes: data.nodes || [], edges: data.edges || [], source: 'migration',
+          loopConfig: { enabled: false }
+        });
+        state.pipelineId = revision && revision.id;
+        state.pipelineRevisionID = state.pipelineId || '';
+      }
+      if (data.rewrittenTask) {
+        try { await apiPut('/orch-sessions/' + state.sessionID, { task: data.rewrittenTask }); } catch (_) {}
+      }
+      if (data.chatMessages || data.requirementMessages || data.pipelineMessages) {
+        await apiPut('/orch-sessions/' + state.sessionID + '/conversation', {
+          chatMessages: data.chatMessages || [],
+          requirementMessages: data.requirementMessages || [],
+          pipelineMessages: data.pipelineMessages || []
+        });
+      }
+    }
+    if (data) {
+      // A session workspace is the authoritative UI value. The process-level
+      // /cwd endpoint remains only a legacy compatibility mechanism.
+      if (data.session && data.session.workspace) {
+        cwdDisplay.textContent = data.session.workspace;
+        cwdDisplay.title = data.session.workspace;
+      }
+      // Handle new API response format
+      if (data.currentPipeline) {
+        state.pipelineId = data.currentPipeline.id || null;
+        state.pipelineRevisionID = state.pipelineId || '';
+        if (data.currentPipeline.nodes) state.nodes = data.currentPipeline.nodes.map(normalizeNode);
+        if (data.currentPipeline.edges) state.edges = data.currentPipeline.edges.map((e, index) => normalizeEdge(e, index));
+        console.log('[orch:init] loaded pipeline revision id:', state.pipelineId, 'nodes:', state.nodes.length);
+        // The persisted revision is authoritative. Do not mark this as a user
+        // edit merely because the controls had to be populated.
+        restoreLoopConfigUI(data.currentPipeline.loopConfig || { enabled: false }, { markDirty: false });
+      } else if (data.nodes) {
+        // Legacy format
+        state.nodes = data.nodes.map(normalizeNode);
+        state.edges = (data.edges || []).map((e, index) => normalizeEdge(e, index));
+        state.pipelineRevisionID = state.pipelineId || '';
+        restoreLoopConfigUI({ enabled: false }, { markDirty: false });
+      } else {
+        // A session without a revision must not retain the previous session's
+        // canvas. The empty state is rendered below.
+        state.nodes = [];
+        state.edges = [];
+        restoreLoopConfigUI({ enabled: false }, { markDirty: false });
+      }
+      state.loadedLoopConfig = normalizeLoopConfigForSave(
+        data.currentPipeline?.loopConfig || { enabled: false }
+      );
+      if (data.session && data.session.requirementMessages) {
+        state.requirementMessages = data.session.requirementMessages;
+      }
+      await loadOrchestrationConversation(state.sessionID);
+      if (data.rewrittenTask || (data.session && data.session.rewrittenTask)) {
+        state.rewrittenTask = data.rewrittenTask || (data.session && data.session.rewrittenTask) || '';
+      }
+      if (data.runtimeStates && typeof data.runtimeStates === 'object') {
+        state.runtimeStates = data.runtimeStates;
+      }
+      state.nextNodeId = Math.max(1, ...state.nodes.map(n => Number(n.id) || 0)) + 1;
+      backfillRuntimeToNodes();
+      renderNodes();
+      renderEdges();
+      state.loopConfigDirty = false;
+      state.pipelineHydrated = true;
+    }
+  } catch (err) {
+    state.pipelineHydrated = false;
+    if (String(err.message || '').includes('404')) {
+      if (state.sessionID === sessionID) state.sessionID = null;
+      if (localStorage.getItem('orchestrator-session-id') === sessionID) {
+        localStorage.removeItem('orchestrator-session-id');
+      }
+      return;
+    }
+    console.warn('load orchestrator state failed:', err);
+  }
+}
+
+async function loadPreferredOrchestrationSession(preferredID = '') {
+  // Check the session index before requesting a specific session. A stale
+  // localStorage/URL ID is common after the server data directory changes;
+  // probing it first only creates a noisy 404 and delays loading the real
+  // latest session.
+  const sessions = await apiGet('/orch-sessions?limit=200');
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    if (preferredID && localStorage.getItem('orchestrator-session-id') === preferredID) {
+      localStorage.removeItem('orchestrator-session-id');
+    }
+    if (state.sessionID === preferredID) state.sessionID = null;
+    return false;
+  }
+  let selected;
+  if (preferredID) {
+    selected = sessions.find(s => s && s.id === preferredID);
+    if (!selected) {
+      // Do not silently switch to another session when the cached ID is stale.
+      // That made a rebuild look like history had rolled back.
+      if (localStorage.getItem('orchestrator-session-id') === preferredID) {
+        localStorage.removeItem('orchestrator-session-id');
+      }
+      if (state.sessionID === preferredID) state.sessionID = null;
+      toast('原编排会话不存在，请从历史记录中选择', 'error');
+      return false;
+    }
+  } else {
+    selected = sessions[0];
+  }
+  if (!selected || !selected.id) return false;
+  state.sessionID = selected.id;
+  localStorage.setItem('orchestrator-session-id', selected.id);
+  await loadOrchestratorState(selected.id);
+  return state.sessionID === selected.id;
+}
+
+async function loadLatestOrchestrationSession() {
+  return loadPreferredOrchestrationSession('');
+}
+
+// 执行完成后自动保存
+function autoSaveState() {
+  if (state.sessionID) saveOrchestratorState(state.sessionID);
+}
+
+$('#btn-new-session').addEventListener('click', async () => {
+  if (state.chatMessages.length > 0 && !confirm('创建新编排会话并清空当前内容？')) return;
+  try {
+    if (state.sessionID) {
+      try {
+        await saveOrchestratorState(state.sessionID);
+      } catch (saveErr) {
+        // The current session may have been removed by another server
+        // instance. Creating a new session should still be possible.
+        if (!String(saveErr.message || '').includes('404')) throw saveErr;
+        state.sessionID = null;
+        localStorage.removeItem('orchestrator-session-id');
+      }
+    }
+    // Create new orchestration session via new API
+    const title = prompt('请输入会话标题:', '新编排会话') || '新编排会话';
+    const sess = await apiPost('/orch-sessions', {
+      title,
+      workspace: cwdDisplay && cwdDisplay.textContent !== '-' ? cwdDisplay.textContent : ''
+    });
+    state.sessionID = sess.id;
+    state.pipelineHydrated = true;
+    state.pipelineRevisionID = '';
+    state.pipelineId = null;
+    state.loadedLoopConfig = { enabled: false };
+    state.loopConfigDirty = false;
+    restoreLoopConfigUI({ enabled: false }, { markDirty: false });
+    localStorage.setItem('orchestrator-session-id', state.sessionID);
+    console.log('[orch:init] new session id:', sess.id);
+
+    chatMessages.innerHTML = '';
+    chatWelcome.style.display = '';
+    state.chatMessages = [];
+    state.nodeOutputs = {};
+    state.rewrittenTask = '';
+    state.nodes.forEach(n => n.status = 'idle');
+    renderNodes();
+    renderEdges();
+    await refreshHistory();
+    toast('新会话已创建: ' + title, 'success');
+  } catch (err) {
+    toast('创建新会话失败: ' + err.message, 'error');
+  }
+});
+
+// ── SSE connection ──
+function connectSSE() {
+  if (state.sseConnection) { state.sseConnection.close(); }
+  const ev = new EventSource('/orchestrator/api/events');
+  state.sseConnection = ev;
+  ev.onopen = () => {
+    sseDot.classList.add('topbar__dot--live');
+    sseStatus.textContent = '已连接';
+  };
+  ev.onerror = () => {
+    sseDot.classList.remove('topbar__dot--live');
+    sseStatus.textContent = '重连中...';
+  };
+  // Use onmessage to handle all event kinds (same pattern as main frontend)
+  ev.onmessage = (evt) => {
+    try {
+      const e = JSON.parse(evt.data);
+      switch (e.kind) {
+        case 'text':
+          handleChatStream({ delta: e.text || '' });
+          break;
+        case 'message':
+          handleChatStream({ end: true });
+          break;
+        case 'turn_started':
+          handleChatStream({ start: true });
+          break;
+        case 'turn_done':
+          handleChatStream({ end: true });
+          if (e.err) addChatMessage('ai', '错误: ' + e.err);
+          break;
+        case 'usage':
+          if (e.usage) updateTokenStats(e.usage);
+          break;
+        case 'notice':
+          if (e.text) addChatMessage('ai', e.text, '通知');
+          break;
+        case 'tool_dispatch':
+          if (e.tool) addChatMessage('ai', '调用工具: ' + (e.tool.name || ''), '工具');
+          break;
+        case 'tool_result':
+          if (e.tool && e.tool.output) {
+            addChatMessage('ai', e.tool.output.substring(0, 500), '工具结果');
+          }
+          break;
+        case 'pipeline_node_start':
+          addChatMessage('ai', '⏳ ' + (e.text || '节点') + ' 开始执行...', '流水线');
+          if (e.text) updateNodeStatus(e.text, 'running');
+          break;
+        case 'pipeline_node_done':
+          addChatMessage('ai', '✅ ' + (e.text || '节点') + ' 完成\n' + (e.detail || '').substring(0, 500), '流水线');
+          if (e.text) state.nodeOutputs[e.text] = { output: e.detail || '', status: 'done' };
+          if (e.text) updateNodeStatus(e.text, 'done');
+          break;
+        case 'pipeline_node_failed':
+          addChatMessage('ai', '❌ ' + (e.text || '节点') + ' 失败: ' + (e.detail || e.err || ''), '流水线');
+
+          if (e.text) state.nodeOutputs[e.text] = { error: e.detail || e.err || '', status: 'failed' };
+          if (e.text) updateNodeStatus(e.text, 'failed');
+          break;
+        case 'pipeline_node_runtime':
+          if (e.text && e.detail) {
+            try {
+              const rt = JSON.parse(e.detail);
+              // 用 runtimeID 或 nodeID 匹配节点
+              let node = null;
+              if (rt.nodeID) {
+                node = state.nodes.find(n => String(n.id) === String(rt.nodeID));
+              }
+              if (!node) {
+                node = state.nodes.find(n => n.name === e.text);
+              }
+              if (node) {
+                node.runtime = rt;
+                // 同步到 runtimeStates
+                const runtimeKey = rt.runtimeID || ('node_' + node.id);
+                state.runtimeStates[runtimeKey] = rt;
+                renderNodes();
+              }
+            } catch (_) {}
+          }
+          break;
+        case 'pipeline_done':
+          addChatMessage('ai', '🎉 流水线执行完成！', '流水线');
+
+          loadStats();
+          autoSaveState();
+          handlePipelineDone(e);
+          break;
+      }
+    } catch (_) {}
+  };
+}
+
+let streamTarget = null;
+function ensureStreamTarget() {
+  if (!streamTarget) {
+    streamTarget = { el: null, text: '' };
+    chatWelcome.style.display = 'none';
+    const div = document.createElement('div');
+    div.className = 'chat-bubble chat-bubble--ai';
+    div.innerHTML = '<div class="chat-bubble__inner"><span class="cursor"></span></div>';
+    chatMessages.appendChild(div);
+    streamTarget.el = div.querySelector('.chat-bubble__inner');
+  }
+  return streamTarget;
+}
+function handleChatStream(data) {
+  if (data.start) {
+    ensureStreamTarget();
+  } else if (data.delta) {
+    const t = ensureStreamTarget();
+    t.text += data.delta;
+    t.el.innerHTML = escHtml(t.text) + '<span class="cursor"></span>';
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  } else if (data.end && streamTarget && streamTarget.el) {
+    streamTarget.el.innerHTML = escHtml(streamTarget.text);
+    streamTarget = null;
+  }
+}
+
+function updateNodeStatus(nodeId, status, result) {
+  const node = state.nodes.find(n => String(n.id) === String(nodeId) || n.name === nodeId);
+  if (!node) return;
+  node.status = status;
+  renderNodes();
+  // Update exec overlay step
+  const step = document.getElementById('exec-step-' + nodeId);
+  if (step) {
+    const icon = step.querySelector('.exec-step__icon');
+    icon.className = 'exec-step__icon exec-step__icon--' + status;
+    icon.textContent = status === 'done' ? '✓' : status === 'failed' ? '✗' : status === 'interrupted' ? 'Ⅱ' : status === 'running' ? '...' : '○';
+    if (result) {
+      const time = step.querySelector('.exec-step__time');
+      if (time && result.duration) time.textContent = formatDuration(result.duration);
+    }
+  }
+  // Mark edges flowing
+  if (status === 'running') {
+    state.edges.forEach(e => {
+      if (e.to === nodeId) { e.flowing = true; }
+    });
+    renderEdges();
+  } else if (status === 'done' || status === 'failed' || status === 'interrupted') {
+    state.edges.forEach(e => {
+      if (e.to === nodeId) { e.flowing = false; }
+    });
+    renderEdges();
+  }
+}
+
+function animateDataFlow(fromId, toId) {
+  state.edges.forEach(e => {
+    if ((e.from === fromId || e.from === fromId) && (e.to === toId || e.to === toId)) {
+      e.flowing = true;
+      setTimeout(() => { e.flowing = false; renderEdges(); }, 2000);
+    }
+  });
+  renderEdges();
+}
+
+function handlePipelineDone(data) {
+  state.runId = null;
+  state.runStatus = null;
+  state.nodes.forEach(n => {
+    n.status = 'idle';
+    // 不删除 runtime — retained runtime 仍然可用
+  });
+  // idle 是已完成且可复用的 runtime，不应再显示为“仍处于活动状态”。
+  const activeRuntimeStatuses = new Set(['starting', 'ready', 'busy']);
+  const activeRuntimes = state.nodes.filter(n => n.runtime && n.runtime.port && activeRuntimeStatuses.has(n.runtime.status)).length;
+  if (activeRuntimes > 0) {
+    addChatMessage('ai', '🎉 流水线执行完成！\n\n' + activeRuntimes + ' 个 serve runtime 仍处于活动状态，可在节点详情中查看端口并进入交互。', '流水线');
+  } else {
+    addChatMessage('ai', '🎉 流水线执行完成！', '流水线');
+  }
+
+  renderNodes();
+  loadStats();
+  loadRuns();
+}
+
+function updateTokenStats(data) {
+  if (data.node_id) {
+    // Per-node stats will be aggregated
+  }
+  if (data.total_tokens !== undefined) {
+    $('#stat-total-tokens').textContent = formatNumber(data.total_tokens);
+  }
+  if (data.total_cost !== undefined) {
+    $('#stat-total-cost').textContent = '¥' + data.total_cost.toFixed(4);
+  }
+}
+
+// ── Pipeline execution ──
+$('#btn-execute').addEventListener('click', () => {
+  if (state.nodes.length === 0) { toast('请先添加节点', 'error'); return; }
+  // 优先使用 Flash 改写后的需求，否则用原始输入
+  const task = state.rewrittenTask || (state.chatMessages.filter(m => m.role === 'user').pop() || {}).text || '';
+  if (!task) { toast('请先在对话框中输入需求', 'error'); return; }
+  // Show confirmation modal
+  $('#confirm-task').value = task;
+  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  $('#confirm-nodes').innerHTML = state.nodes.map(n =>
+    `<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0">${escHtml(n.name)} <span style="color:var(--muted-2)">(${escHtml(typeLabels[n.type] || n.type)} · ${escHtml(n.model || '-')})</span></span>`
+  ).join('');
+  $('#confirm-modal').style.display = 'flex';
+});
+
+// Confirm modal handlers
+$('#confirm-modal-close').addEventListener('click', () => { $('#confirm-modal').style.display = 'none'; });
+$('#confirm-cancel').addEventListener('click', () => { $('#confirm-modal').style.display = 'none'; });
+$('#confirm-ok').addEventListener('click', async () => {
+  const task = $('#confirm-task').value.trim();
+  if (!task) { toast('需求不能为空', 'error'); return; }
+  $('#confirm-modal').style.display = 'none';
+  const pipeline = buildPipelinePayload();
+  try {
+    await saveCurrentPipelineRevision(pipeline);
+    let run;
+    if (state.sessionID) {
+      run = await apiPost('/orch-sessions/' + state.sessionID + '/runs', {
+        task,
+        rewrittenTask: state.rewrittenTask || task,
+        trigger: 'manual',
+        reuseAgentSessions: true,
+        contextPolicy: 'reuse'
+      });
+    } else {
+      run = await apiPost('/pipelines/' + state.pipelineId + '/execute', { task });
+    }
+    if (run && run.id) state.runId = run.id;
+    addChatMessage('user', task);
+    toast('流水线开始执行', 'success');
+
+  } catch (err) {
+    toast('执行失败: ' + err.message, 'error');
+  }
+});
+
+// Node detail modal handlers
+$('#node-detail-close').addEventListener('click', () => { $('#node-detail-modal').style.display = 'none'; });
+
+async function showNodeDetail(node) {
+  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  $('#node-detail-title').textContent = node.name + ' (' + (typeLabels[node.type] || node.type) + ')';
+
+  // Try to fetch full run data from API for stderr
+  let output = state.nodeOutputs[String(node.id)] || state.nodeOutputs[node.name] || {};
+  if (state.runId) {
+    try {
+      const runData = await apiGet('/runs/' + state.runId);
+      if (runData && runData.nodeStates && runData.nodeStates[node.id]) {
+        const ns = runData.nodeStates[node.id];
+        const hasOutput = !!String(ns.output || output.output || '').trim();
+        const hasError = !!String(ns.error || output.error || '').trim();
+        let status = ns.status;
+        if (status === 'complete' && !hasOutput && !hasError) status = 'empty';
+        output = {
+          output: ns.output || output.output || '',
+          error: ns.error || output.error || '',
+          stderr: ns.stderr || '',
+          status: status === 'complete' ? 'done' : status === 'failed' ? 'failed' : status === 'interrupted' ? 'interrupted' : status === 'empty' ? 'empty' : 'running',
+        };
+      }
+    } catch (_) {}
+  }
+  const statusIcon = output.status === 'done' ? '✅' : output.status === 'failed' ? '❌' : output.status === 'interrupted' ? '⏸️' : output.status === 'empty' ? '⚠️' : '⏳';
+  const statusText = output.status === 'done' ? '已完成' : output.status === 'failed' ? '失败' : output.status === 'interrupted' ? '已中断' : output.status === 'empty' ? '完成但无输出' : '待执行';
+  
+  // Build HTML with node config info
+  let html = `
+    <div style="margin-bottom:16px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+        <div><span style="color:var(--muted-2)">类型：</span>${escHtml(typeLabels[node.type] || node.type)}</div>
+        <div><span style="color:var(--muted-2)">模型：</span><span class="mono">${escHtml(node.model || '-')}</span></div>
+        <div><span style="color:var(--muted-2)">状态：</span>${statusIcon} ${statusText}</div>
+        <div><span style="color:var(--muted-2)">${node.executor === 'mimo' ? 'Agent' : 'Skill'}：</span>${escHtml(node.executor === 'mimo' ? (node.agent || '默认') : (node.skill || '无'))}</div>
+        <div style="grid-column:span 2"><span style="color:var(--muted-2)">角色：</span>${escHtml(node.role || '未设置')}</div>
+      </div>
+    </div>
+  `;
+  // Runtime status section
+  if (node.runtime) {
+    const rt = node.runtime;
+    const rtStatus = rt.status === 'ready' ? '🟢 运行中' :
+                     rt.status === 'idle' ? '🟡 空闲（可进入）' :
+                     rt.status === 'busy' ? '🔵 忙碌中' :
+                     rt.status === 'stopped' ? '⚫ 已停止' :
+                     '⏳ ' + (rt.status || '未知');
+    const canOpen = (rt.status === 'ready' || rt.status === 'idle' || rt.status === 'busy') && rt.endpoint;
+    const canStop = rt.status && rt.status !== 'stopped' && rt.status !== 'error';
+    html += `
+      <div style="margin-bottom:12px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px">Runtime</div>
+        <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 8px">
+          <span style="color:var(--muted-2)">状态：</span><span>${rtStatus}</span>
+          <span style="color:var(--muted-2)">端口：</span><span class="mono">${rt.port || '-'}</span>
+          <span style="color:var(--muted-2)">端点：</span><span class="mono" style="font-size:10px">${rt.endpoint || '-'}</span>
+          <span style="color:var(--muted-2)">策略：</span><span>retained（保留至手动停止）</span>
+          <span style="color:var(--muted-2)">访问方式：</span><span>${rt.accessMode === 'local_history' ? '本地历史会话' : '浏览器'}</span>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${canOpen && rt.executor !== 'mimo' ? `<a href="${escHtml(rt.endpoint)}" target="_blank" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;text-decoration:none">Open</a>` : ''}
+          ${canOpen && rt.executor === 'mimo' ? `<span style="font-size:11px;color:var(--muted-2)">无网页入口 — 使用本地 mimo 历史会话</span>` : ''}
+          ${canStop ? `<button onclick="stopRuntime('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;padding:4px 8px;border:1px solid var(--danger);border-radius:4px;background:none;color:var(--danger);cursor:pointer">Stop</button>` : ''}
+          <button disabled title="后续版本支持" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--muted-2);cursor:not-allowed">Interrupt（保留 runtime）</button>
+        </div>
+      </div>
+    `;
+  } else if (node.status === 'done' || node.status === 'failed') {
+    html += `
+      <div style="margin-bottom:12px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px">Runtime</div>
+        <div style="font-size:11px;color:var(--muted-2)">无运行时实例（一次性执行，已结束）</div>
+      </div>
+    `;
+  }
+
+  if (output.output) {
+    html += `
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--muted-2);margin-bottom:4px;font-weight:600">输出内容</div>
+        <pre style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:12px;font-family:var(--mono);white-space:pre-wrap;max-height:400px;overflow-y:auto">${escHtml(output.output)}</pre>
+      </div>
+    `;
+  }
+  if (output.error) {
+    html += `
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--red);margin-bottom:4px;font-weight:600">错误信息</div>
+        <pre style="background:var(--card);border:1px solid var(--red);border-radius:var(--radius);padding:10px;font-size:12px;font-family:var(--mono);white-space:pre-wrap;color:var(--red)">${escHtml(output.error)}</pre>
+      </div>
+    `;
+  }
+  if (output.stderr) {
+    html += `
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--muted-2);margin-bottom:4px;font-weight:600">思考/工具日志</div>
+        <pre style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:11px;font-family:var(--mono);white-space:pre-wrap;max-height:300px;overflow-y:auto;color:var(--muted-2)">${escHtml(output.stderr)}</pre>
+      </div>
+    `;
+  }
+  if (output.status === 'empty') {
+    html += `
+      <div style="color:var(--yellow);text-align:center;padding:20px;border:1px dashed var(--yellow);border-radius:var(--radius)">
+        <div style="font-size:14px;margin-bottom:8px">⚠️ 执行完成但没有返回正文</div>
+        <div style="font-size:12px">这通常表示执行器没有真正产出内容，或输出被吞掉了。请优先查看下方日志。</div>
+      </div>
+    `;
+  } else if (!output.output && !output.error) {
+    html += `
+      <div style="color:var(--muted-2);text-align:center;padding:20px;border:1px dashed var(--border);border-radius:var(--radius)">
+        <div style="font-size:14px;margin-bottom:8px">⏳ 尚未执行</div>
+        <div style="font-size:12px">执行流水线后，此节点的输出将显示在这里</div>
+      </div>
+    `;
+  }
+  $('#node-detail-body').innerHTML = html;
+  $('#node-detail-modal').style.display = 'flex';
+}
+
+// 回填 runtime 到各节点：遍历 state.runtimeStates，按 nodeID 找到对应 node 设置 node.runtime
+function backfillRuntimeToNodes() {
+  // 先清理所有 node.runtime
+  state.nodes.forEach(n => { delete n.runtime; });
+  // 优先级：busy > ready > idle > starting > stopped > error
+  const priority = { busy: 5, ready: 4, idle: 3, starting: 2, stopped: 1, error: 0 };
+  // 遍历 runtimeStates，按 nodeID 回填
+  Object.values(state.runtimeStates).forEach(rt => {
+    if (!rt || !rt.nodeID) return;
+    const node = state.nodes.find(n => String(n.id) === String(rt.nodeID));
+    if (!node) return;
+    // 如果已经有 runtime，保留优先级更高的那个
+    const existing = node.runtime;
+    if (existing && existing.status && (priority[existing.status] || 0) > (priority[rt.status] || 0)) {
+      return;
+    }
+    node.runtime = rt;
+  });
+}
+
+// Stop a runtime by ID
+async function stopRuntime(runtimeID) {
+  if (!runtimeID) return;
+  try {
+    await apiPost('/runtimes/' + runtimeID + '/stop', {});
+    // Find the node and clear its runtime
+    const node = state.nodes.find(n => n.runtime && n.runtime.runtimeID === runtimeID);
+    if (node) {
+      delete node.runtime;
+      renderNodes();
+    }
+    toast('Runtime 已停止', 'success');
+  } catch (err) {
+    toast('停止失败: ' + err.message, 'error');
+  }
+}
+
+function buildPipelinePayload() {
+  const payload = {
+    name: state.pipelineName,
+    nodes: state.nodes.map(n => ({
+      id: String(n.id),
+      name: n.name,
+      type: n.type,
+      model: n.model,
+      agent: n.agent,
+      skill: canonicalSkillForNode(n.skill || '', n.type, state.rewrittenTask || '', n.role || ''),
+      skillPolicy: n.skillPolicy || '',
+      reasoningEffort: n.reasoningEffort || '',
+      mode: n.mode || 'serve',
+      executor: n.executor || 'reasonix',
+      role: n.role,
+      x: n.x,
+      y: n.y,
+    })),
+    edges: state.edges.map((e, index) => ({
+      id: edgeId(e, index),
+      from: String(e.from),
+      to: String(e.to),
+    })),
+    loopConfig: getLoopConfig(),
+  };
+  console.log('[orch:pipeline] payload:', JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+// ── Loop config UI ──
+function normalizeLoopConfigForSave(loopConfig) {
+  if (!loopConfig || !loopConfig.enabled) return { enabled: false };
+  const mode = loopConfig.mode === 'fixed' ? 'fixed' : 'review_decides';
+  const rawIterations = mode === 'fixed'
+    ? (loopConfig.fixedIterations ?? loopConfig.maxIterations)
+    : loopConfig.maxIterations;
+  const iterations = Math.min(10, Math.max(1, Number(rawIterations) || 3));
+  const normalized = {
+    enabled: true,
+    mode,
+    reviewNodeID: loopConfig.reviewNodeID == null ? '' : String(loopConfig.reviewNodeID),
+    protocol: 'loop-review-v1',
+  };
+  if (mode === 'fixed') normalized.fixedIterations = iterations;
+  else normalized.maxIterations = iterations;
+  return normalized;
+}
+
+function markLoopConfigDirty() {
+  if (state.pipelineHydrated) state.loopConfigDirty = true;
+}
+
+function syncLoopConfigUI() {
+  const enabled = $('#cfg-loop-enabled')?.value === 'true';
+  $('#loop-mode-field').style.display = enabled ? '' : 'none';
+  $('#loop-iterations-field').style.display = enabled ? '' : 'none';
+  $('#loop-reviewer-field').style.display = enabled ? '' : 'none';
+  const reviewerSel = $('#cfg-loop-reviewer');
+  const prevReviewer = reviewerSel.value;
+  reviewerSel.innerHTML = '<option value="">选择审查节点...</option>';
+  state.nodes.filter(n => n.type === 'reviewer').forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n.id;
+    opt.textContent = n.name || n.id;
+    reviewerSel.appendChild(opt);
+  });
+  if (prevReviewer && state.nodes.some(n => String(n.id) === String(prevReviewer))) {
+    reviewerSel.value = String(prevReviewer);
+  }
+  if (typeof renderLoopOverlay === 'function') renderLoopOverlay();
+}
+
+function getLoopConfig() {
+  // Before hydration the persisted value is safer than whatever the controls
+  // currently happen to contain (usually the HTML default or the previous
+  // session). After hydration, a dirty control is an intentional edit; an
+  // untouched control continues to use the revision value.
+  if (!state.pipelineHydrated) return normalizeLoopConfigForSave(state.loadedLoopConfig);
+  if (state.pipelineRevisionID && !state.loopConfigDirty) {
+    return normalizeLoopConfigForSave(state.loadedLoopConfig);
+  }
+  const enabled = $('#cfg-loop-enabled')?.value === 'true';
+  if (!enabled) return { enabled: false };
+  const mode = $('#cfg-loop-mode')?.value === 'fixed' ? 'fixed' : 'review_decides';
+  const iterations = parseInt($('#cfg-loop-max')?.value, 10) || 3;
+  return normalizeLoopConfigForSave({
+    enabled: true,
+    mode,
+    reviewNodeID: $('#cfg-loop-reviewer')?.value || '',
+    protocol: 'loop-review-v1',
+    ...(mode === 'fixed' ? { fixedIterations: iterations } : { maxIterations: iterations }),
+  });
+}
+
+function restoreLoopConfigUI(loopConfig, options = {}) {
+  const normalized = normalizeLoopConfigForSave(loopConfig);
+  $('#cfg-loop-enabled').value = normalized.enabled ? 'true' : 'false';
+  $('#cfg-loop-mode').value = normalized.mode || 'review_decides';
+  $('#cfg-loop-max').value = normalized.mode === 'fixed'
+    ? (normalized.fixedIterations || 3)
+    : (normalized.maxIterations || 3);
+  syncLoopConfigUI();
+  if (normalized.reviewNodeID) {
+    $('#cfg-loop-reviewer').value = String(normalized.reviewNodeID);
+  }
+  if (options.markDirty === false) {
+    state.loadedLoopConfig = normalized;
+    state.loopConfigDirty = false;
+  } else {
+    markLoopConfigDirty();
+  }
+}
+
+// Loop config event listeners
+$('#cfg-loop-enabled')?.addEventListener('change', () => {
+  markLoopConfigDirty();
+  syncLoopConfigUI();
+});
+$('#cfg-loop-mode')?.addEventListener('change', () => {
+  markLoopConfigDirty();
+  syncLoopConfigUI();
+});
+$('#cfg-loop-max')?.addEventListener('change', markLoopConfigDirty);
+$('#cfg-loop-reviewer')?.addEventListener('change', markLoopConfigDirty);
+
+// ── Save pipeline ──
+$('#btn-save-pipeline').addEventListener('click', async () => {
+  const pipeline = buildPipelinePayload();
+  try {
+    await saveCurrentPipelineRevision(pipeline);
+    toast(state.sessionID ? '当前会话管道已保存' : '管道已保存', 'success');
+  } catch (err) {
+    toast('保存失败: ' + err.message, 'error');
+  }
+});
+
+// ── Load presets ──
+async function loadPresets() {
+  console.log('[presets] loading...');
+  try {
+    const presets = await apiGet('/presets');
+    console.log('[presets] got', presets?.length, 'presets');
+    state.presets = presets || [];
+    presetSelect.innerHTML = '<option value="">加载预设...</option>';
+    state.presets.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      presetSelect.appendChild(opt);
+    });
+    console.log('[presets] dropdown populated with', presetSelect.options.length, 'options');
+  } catch (err) { console.error('[presets] FAILED:', err); }
+}
+
+presetSelect.addEventListener('change', async () => {
+  const id = presetSelect.value;
+  console.log('[preset-change] selected id:', id, 'presets count:', state.presets.length);
+  if (!id) return;
+  const preset = state.presets.find(p => p.id === id);
+  console.log('[preset-change] found preset:', preset?.name, 'pipeline nodes:', preset?.pipeline?.nodes?.length);
+  if (!preset) return;
+  if (state.nodes.length > 0 && !confirm('加载预设将替换当前管道，继续？')) {
+    presetSelect.value = '';
+    return;
+  }
+  state.nodes = [];
+  state.edges = [];
+  state.nextNodeId = 1;
+  state.pipelineId = null;
+  const pipe = preset.pipeline || {};
+  const idMap = {};
+  if (pipe.nodes) {
+    pipe.nodes.forEach(n => {
+      const newId = state.nextNodeId++;
+      idMap[n.id] = newId;
+      state.nodes.push({
+        id: newId,
+        name: n.name,
+        type: n.type,
+        model: n.model || '',
+        providerRoute: n.providerRoute || ((n.executor === 'codex' && ['ccs', 'ccswitch'].includes(String(n.model || '').toLowerCase())) ? 'ccswitch' : ''),
+        agent: n.agent || '',
+        skill: n.skill || '',
+        mode: n.mode || 'serve',
+        executor: n.executor || 'reasonix',
+        role: n.role || '',
+        x: n.x || 60,
+        y: n.y || 60,
+        status: 'idle',
+      });
+    });
+  }
+  if (pipe.edges) {
+    pipe.edges.forEach(e => {
+      const fromId = idMap[e.from];
+      const toId = idMap[e.to];
+      if (fromId != null && toId != null) {
+        state.edges.push({ id: edgeId(e, state.edges.length), from: fromId, to: toId, mode: 'linear' });
+      }
+    });
+  }
+  state.pipelineName = preset.name || '预设管道';
+  console.log('[preset-change] state.nodes now:', state.nodes.length, 'rendering...');
+  switchPanel('pipeline');
+  requestAnimationFrame(() => {
+    renderNodes();
+    renderEdges();
+    console.log('[preset-change] done, canvas children:', canvas.children.length, 'canvas dims:', canvas.offsetWidth, 'x', canvas.offsetHeight);
+  });
+  toast('已加载预设: ' + preset.name, 'success');
+  presetSelect.value = '';
+});
+
+// ── Load models, skills ──
+function autoSkillForStep(step, nodeType, taskText = '') {
+  const catalog = Array.isArray(state.skillCatalog) ? state.skillCatalog : [];
+  const names = new Set(catalog.map(x => String(x?.name || x).toLowerCase()));
+  const text = String(taskText || '') + ' ' + String(step?.roleDesc || step?.role || '') + ' ' + String(step?.step || '');
+  const lower = text.toLowerCase();
+  let preferred = nodeType === 'reviewer'
+    ? ['review-agent', 'code-review', 'code-reviewer']
+    : nodeType === 'architect'
+      ? ['brainstorming', 'design-blueprint', 'json-canvas', 'executing-plans']
+      : ['executing-plans', 'frontend-design', 'playwright', 'pdf'];
+  if (/论文|学术|文献|research/i.test(lower)) preferred = ['deep-research', 'nature-academic-search', ...preferred];
+  const hit = preferred.find(name => names.has(name.toLowerCase()));
+  return hit || '';
+}
+
+// Convert model-generated aliases/invalid names to a real catalog entry. The
+// backend performs the same safety resolution at execution time, but doing it
+// here makes the assignment visible on the Canvas and in the node inspector.
+function canonicalSkillForNode(skill, nodeType, taskText = '', roleText = '') {
+  const catalog = Array.isArray(state.skillCatalog) ? state.skillCatalog : [];
+  const requested = String(skill || '').trim();
+  if (!catalog.length) return requested;
+  const exact = catalog.find(item => String(item?.name || item).toLowerCase() === requested.toLowerCase());
+  if (exact) return String(exact.name || exact);
+  return autoSkillForStep({ roleDesc: roleText, step: taskText }, nodeType, taskText);
+}
+async function loadNodeTypes() {
+  try {
+    const types = await apiGet('/nodes/types');
+    state.nodeTypes = types || [];
+    try {
+      const catalog = await apiGet('/skills');
+      state.skillCatalog = Array.isArray(catalog) ? catalog : [];
+      state.skills = state.skillCatalog.map(x => x.name).filter(Boolean);
+      // Repair defaults and older/generated nodes after the catalog is known.
+      state.nodes.forEach(node => {
+        node.skill = canonicalSkillForNode(node.skill, node.type, state.rewrittenTask || '', node.role || '');
+      });
+    } catch (_) {
+      state.skillCatalog = [];
+    }
+    console.log('[orch:config] nodeTypes loaded:', types?.map(t => t.type).join(', '), 'skills:', state.skills.length);
+    // Dynamically rebuild executor dropdown from backend capabilities
+    const allExecutors = [...new Set(types?.flatMap(t => (t.executors || []).map(String)) || [])];
+    console.log('[orch:config] executors:', allExecutors);
+    const execSel = $('#cfg-executor');
+    const prevVal = execSel.value;
+    execSel.innerHTML = '';
+    allExecutors.forEach(ex => {
+      const opt = document.createElement('option');
+      opt.value = ex;
+      opt.textContent = ex;
+      execSel.appendChild(opt);
+    });
+    if (prevVal && allExecutors.includes(prevVal)) execSel.value = prevVal;
+    populateModelSelect();
+    populateSkillSelect();
+  } catch (err) { console.warn('loadNodeTypes failed:', err); }
+}
+
+function populateModelSelect(node) {
+  const sel = $('#cfg-model');
+  sel.innerHTML = '<option value="">选择模型...</option>';
+  const activeNode = node || (state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null);
+  // 按当前 executor 过滤模型
+  const executor = activeNode?.executor || 'reasonix';
+  const models = compatibleModelsForNode(activeNode, executor);
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    sel.appendChild(opt);
+  });
+}
+
+function populateSkillSelect(node) {
+  const sel = $('#cfg-skill');
+  sel.innerHTML = '<option value="">无</option>';
+  const activeNode = node || (state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null);
+  const activeType = activeNode?.type || 'executor';
+  const typeInfo = state.nodeTypes.find(t => t.type === activeType);
+  const skills = state.skillCatalog.length
+    ? state.skillCatalog.map(x => x.name).filter(Boolean)
+    : (typeInfo?.skills || state.nodeTypes.flatMap(t => t.skills || []));
+  const unique = [...new Set(skills)];
+  unique.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    sel.appendChild(opt);
+  });
+  if (activeNode) {
+    activeNode.skill = canonicalSkillForNode(activeNode.skill, activeNode.type, state.rewrittenTask || '', activeNode.role || '');
+    sel.value = activeNode.skill || '';
+  }
+}
+
+// ── Load stats ──
+async function loadStats() {
+  try {
+    const stats = await apiGet('/stats');
+    state.stats = stats;
+    if (stats) {
+      $('#stat-total-tokens').textContent = formatNumber(stats.totalTokens || 0);
+      $('#stat-total-cost').textContent = '¥' + (stats.totalCostYuan || 0).toFixed(4);
+      $('#stat-total-time').textContent = formatDuration(stats.totalDurationMs || 0);
+      renderNodeStats(stats.perNode || []);
+    }
+  } catch (err) { console.warn('loadStats failed:', err); }
+}
+
+function renderNodeStats(nodes) {
+  const tbody = $('#stats-node-body');
+  if (!nodes.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted-2)">暂无数据</td></tr>';
+    return;
+  }
+  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  tbody.innerHTML = nodes.map(n => `
+    <tr>
+      <td>${escHtml(typeLabels[n.type] || n.type)}</td>
+      <td class="mono">${n.runCount || 0}</td>
+      <td class="mono">${formatNumber(n.tokenSum || 0)}</td>
+      <td class="mono">¥${(n.costYuan || 0).toFixed(4)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Load runs ──
+async function loadAgents() {
+  try {
+    const agents = await apiGet('/agents');
+    state.agents = agents || [];
+  } catch (err) { console.warn('loadAgents failed:', err); }
+}
+
+async function loadRuns() {
+  const list = $('#runs-list');
+  if (!state.sessionID) {
+    state.runs = [];
+    state.runIterations = {};
+    list.innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:20px;font-size:13px">请先选择一个会话</div>';
+    return;
+  }
+  try {
+    state.runs = await apiGet('/orch-sessions/' + encodeURIComponent(state.sessionID) + '/runs');
+    state.runs = Array.isArray(state.runs) ? state.runs : [];
+    state.runIterations = {};
+    await Promise.all(state.runs.map(async r => {
+      if (!r?.id || !r.loopConfig?.enabled) return;
+      try {
+        const iterations = await apiGet('/orch-sessions/' + encodeURIComponent(state.sessionID) + '/runs/' + encodeURIComponent(r.id) + '/iterations');
+        state.runIterations[r.id] = Array.isArray(iterations) ? iterations : [];
+      } catch (_) { state.runIterations[r.id] = []; }
+    }));
+  } catch (e) {
+    state.runs = [];
+    state.runIterations = {};
+  }
+  renderRuns();
+}
+
+async function resumeLoopRun(runID) {
+  if (!state.sessionID || !runID) return;
+  try {
+    await apiPost('/orch-sessions/' + encodeURIComponent(state.sessionID) + '/runs', {
+      resumeRunID: runID,
+      trigger: 'resume'
+    });
+    toast('Loop 已继续执行', 'success');
+    await loadRuns();
+  } catch (err) {
+    toast('继续 Loop 失败: ' + err.message, 'error');
+  }
+}
+
+async function cancelOrchRun(runID) {
+  if (!state.sessionID || !runID) return;
+  try {
+    await apiPost('/orch-sessions/' + encodeURIComponent(state.sessionID) + '/runs/' + encodeURIComponent(runID) + '/cancel', {});
+    toast('已请求停止当前 Loop', 'success');
+    await loadRuns();
+  } catch (err) {
+    toast('停止 Loop 失败: ' + err.message, 'error');
+  }
+}
+
+function renderRuns() {
+  const list = $('#runs-list');
+  const runs = state.runs || [];
+  if (!runs.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:20px;font-size:13px">暂无执行记录</div>';
+    return;
+  }
+  const statusIcons = { running: '⏳', complete: '✅', failed: '❌', canceled: '🚫', blocked: '⛔', interrupted: '⏸️' };
+  list.innerHTML = runs.map(r => {
+    const icon = statusIcons[r.status] || '⏳';
+    const taskPreview = (r.task || '').substring(0, 60);
+    const nodeCount = r.nodeStates ? Object.keys(r.nodeStates).length : 0;
+    const successCount = r.nodeStates ? Object.values(r.nodeStates).filter(ns => ns.status === 'complete').length : 0;
+    const failCount = r.nodeStates ? Object.values(r.nodeStates).filter(ns => ns.status === 'failed').length : 0;
+    const started = r.startedAt ? new Date(r.startedAt).toLocaleTimeString() : '';
+    const finished = r.finishedAt ? new Date(r.finishedAt).toLocaleTimeString() : '';
+    const trigger = r.trigger || 'manual';
+    const cfg = r.loopConfig || {};
+    const iterations = state.runIterations[r.id] || [];
+    const mode = cfg.enabled ? (cfg.mode || 'review_decides') : '';
+    const max = mode === 'fixed' ? (cfg.fixedIterations || cfg.maxIterations || 0) : (cfg.maxIterations || 0);
+    const current = r.currentIteration || (iterations.length ? iterations[iterations.length - 1].number : 0);
+    const finalDecision = r.finalReview?.decision || (iterations.length ? iterations[iterations.length - 1].decision : '');
+    const resumeButton = r.status === 'interrupted' && cfg.enabled
+      ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">继续 Loop</button>` : '';
+    const cancelButton = r.status === 'running'
+      ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">停止</button>` : '';
+    return `
+    <div class="run-card" style="cursor:pointer;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">${icon}</span>
+        <span style="font-weight:600;font-size:12px;flex:1">${escHtml(r.id || '')}</span>
+        <span style="font-size:11px;color:var(--muted-2)">${escHtml(r.status)}</span>
+      </div>
+      ${taskPreview ? `<div style="font-size:11px;color:var(--muted-2);margin-top:4px">${escHtml(taskPreview)}</div>` : ''}
+      <div style="font-size:11px;color:var(--muted-2);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap">
+        <span>节点: ${successCount}/${nodeCount}</span>
+        ${failCount > 0 ? `<span style="color:var(--danger)">失败: ${failCount}</span>` : ''}
+        <span>触发: ${escHtml(trigger)}</span>
+        ${started ? `<span>${started}${finished ? ' → ' + finished : ''}</span>` : ''}
+      </div>
+      ${cfg.enabled ? `<div style="font-size:11px;color:var(--muted-2);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap">
+        <span>Loop：第 ${current} / ${max} 轮</span><span>模式：${escHtml(mode)}</span>
+        ${r.terminationReason ? `<span>终止原因：${escHtml(r.terminationReason)}</span>` : ''}
+        ${finalDecision ? `<span>最终 Review：${escHtml(finalDecision)}</span>` : ''}
+      </div>` : ''}
+      ${r.error ? `<div style="font-size:11px;color:var(--danger);margin-top:4px">${escHtml(r.error.substring(0, 100))}</div>` : ''}
+      ${resumeButton}${cancelButton}
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-resume-run]').forEach(btn => {
+    btn.addEventListener('click', event => {
+      event.stopPropagation();
+      resumeLoopRun(btn.getAttribute('data-resume-run'));
+    });
+  });
+  list.querySelectorAll('[data-cancel-run]').forEach(btn => {
+    btn.addEventListener('click', event => {
+      event.stopPropagation();
+      cancelOrchRun(btn.getAttribute('data-cancel-run'));
+    });
+  });
+}
+
+function showSessionDetail(session, runs) {
+  const statusIcons = { running: '⏳', complete: '✅', failed: '❌', canceled: '🚫', blocked: '⛔', interrupted: '⏸️' };
+  let html = `<div style="margin-bottom:12px"><b>需求：</b>${escHtml(session.task || '')}</div>`;
+  if (runs.length) {
+    html += '<div style="font-size:12px;color:var(--muted-2);margin-bottom:8px">执行记录：</div>';
+    html += runs.map(r => {
+      const tokens = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.totalTokens || 0), 0) : 0);
+      const cost = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.costYuan || 0), 0) : 0);
+      return `<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:12px">
+        <div>${statusIcons[r.status] || '⏳'} ${r.id} <span style="color:var(--muted-2)">${r.status}</span></div>
+        <div style="color:var(--muted-2);margin-top:4px">Token: ${formatNumber(tokens)} · ¥${cost.toFixed(4)}</div>
+      </div>`;
+    }).join('');
+  }
+  // Show in node detail modal
+  $('#node-detail-title').textContent = '会话详情';
+  $('#node-detail-body').innerHTML = html;
+  $('#node-detail-modal').style.display = 'flex';
+}
+
+// ── Utilities ──
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function formatNumber(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
+function formatDuration(ms) {
+  if (typeof ms === 'string') return ms;
+  if (ms >= 60000) return (ms / 60000).toFixed(1) + 'm';
+  if (ms >= 1000) return (ms / 1000).toFixed(1) + 's';
+  return ms + 'ms';
+}
+
+// ── Load chat history on startup ──
+async function loadChatHistory() {
+  await refreshChatHistory();
+}
+
+// ── Init ──
+async function init() {
+  console.log('[init] starting...');
+  connectSSE();
+  console.log('[init] connectSSE called');
+  try { await loadPresets(); } catch (e) { console.error('[init] loadPresets failed:', e); }
+  try { await loadNodeTypes(); } catch (e) { console.error('[init] loadNodeTypes failed:', e); }
+  // Try to load orchestration session from URL or localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  state.sessionID = urlParams.get('session') || localStorage.getItem('orchestrator-session-id') || null;
+  try {
+    // Resolve URL/localStorage through the session index first. A stale ID is
+    // reported instead of silently switching to another historical session.
+    await loadPreferredOrchestrationSession(state.sessionID || '');
+  } catch (e) {
+    console.warn('[init] no orchestration sessions found:', e);
+  }
+  try {
+    // The orchestration transcript is authoritative for this UI. Only use the
+    // native controller history when no orchestration conversation exists.
+    const hasOrchestrationConversation = state.sessionID &&
+      Array.isArray(state.chatMessages) && state.chatMessages.length > 0;
+    if (!hasOrchestrationConversation) await loadChatHistory();
+  } catch (e) { console.warn('[init] loadChatHistory:', e); }
+  try { loadStats(); } catch (e) { console.error('[init] loadStats failed:', e); }
+  try { loadAgents(); } catch (e) { console.error('[init] loadAgents failed:', e); }
+  try { loadRuns(); } catch (e) { console.error('[init] loadRuns failed:', e); }
+  console.log('[init] done');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
