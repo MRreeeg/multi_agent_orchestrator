@@ -1591,3 +1591,127 @@ func TestLoopReviewerToolOutputGetsOneProtocolCorrection(t *testing.T) {
 		t.Fatalf("final reviewer output is not valid review JSON: %v; output=%q", err, att.Output)
 	}
 }
+
+// TestCodexServeReviewerReusesPersistedThreadAcrossLoopAttempts ensures the
+// retained Codex App Server gets the same durable Thread for every reviewer
+// iteration. Other reviewer executors may remain fresh, but a Codex serve
+// reviewer must not create a new thread for every Loop iteration.
+func TestCodexServeReviewerReusesPersistedThreadAcrossLoopAttempts(t *testing.T) {
+	store := newLoopTestStore(t)
+	var mu sync.Mutex
+	var specs []ExecSpec
+	old := executors[ExecutorCodex]
+	executors[ExecutorCodex] = &loopStubFunc{fn: func(_ context.Context, spec ExecSpec) (*ExecResult, error) {
+		mu.Lock()
+		specs = append(specs, spec)
+		mu.Unlock()
+		return &ExecResult{
+			FinalText:         `{"schemaVersion":"loop-review-v1","decision":"pass","confidence":0.9,"summary":"ok","blockingIssues":[],"requiredChanges":[],"nextTask":"","evidence":[]}`,
+			ExternalSessionID: "codex-review-thread-1",
+		}, nil
+	}}
+	t.Cleanup(func() { executors[ExecutorCodex] = old })
+
+	sess, err := store.CreateOrchSession("codex serve reviewer thread reuse", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := store.CreatePipelineRevision(sess.ID, PipelineRevision{
+		Name: "codex serve reviewer",
+		Nodes: []AgentNode{{
+			ID: "review", Type: NodeReviewer, Label: "Codex 审查者",
+			Model: "ccs", Executor: ExecutorCodex, Mode: "serve",
+		}},
+		LoopConfig: LoopConfig{Enabled: true, Mode: "fixed", FixedIterations: 2, ReviewNodeID: "review", Protocol: "loop-review-v1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := store.CreateRun(sess.ID, rev.ID, "review task", "", "manual", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pipe := &Pipeline{ID: rev.ID, Name: rev.Name, Nodes: rev.Nodes, Edges: rev.Edges}
+	for number := 1; number <= 2; number++ {
+		iter := LoopIteration{
+			ID:        fmt.Sprintf("iter_codex_review_%d", number),
+			RunID:     run.ID,
+			Number:    number,
+			Status:    IterationRunning,
+			InputTask: "review task",
+			StartedAt: time.Now().UTC().Format(time.RFC3339),
+		}
+		if err := store.CreateIteration(iter); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.executeNodeAttempt(context.Background(), run, pipe, sess.ID, iter.ID, "review", rev.Nodes[0]); err != nil {
+			t.Fatalf("iteration %d executeNodeAttempt: %v", number, err)
+		}
+	}
+
+	mu.Lock()
+	got := append([]ExecSpec(nil), specs...)
+	mu.Unlock()
+	if len(got) != 2 {
+		t.Fatalf("Codex reviewer calls = %d, want 2", len(got))
+	}
+	if got[0].ExternalSessionID != "" {
+		t.Fatalf("first reviewer ExternalSessionID = %q, want empty", got[0].ExternalSessionID)
+	}
+	if got[1].ExternalSessionID != "codex-review-thread-1" {
+		t.Fatalf("second reviewer ExternalSessionID = %q, want persisted Codex thread", got[1].ExternalSessionID)
+	}
+	for i, spec := range got {
+		if spec.ContextPolicy != "reuse" {
+			t.Fatalf("reviewer call %d ContextPolicy = %q, want reuse", i+1, spec.ContextPolicy)
+		}
+	}
+}
+
+// TestCodexServeReviewerInvalidOutputDoesNotStartACorrectionTurn verifies the
+// retained App Server contract: one orchestrator node attempt maps to exactly
+// one Codex Turn. A malformed reviewer response is handled by the Loop parser,
+// not by silently issuing a second provider turn.
+func TestCodexServeReviewerInvalidOutputDoesNotStartACorrectionTurn(t *testing.T) {
+	store := newLoopTestStore(t)
+	var mu sync.Mutex
+	calls := 0
+	old := executors[ExecutorCodex]
+	executors[ExecutorCodex] = &loopStubFunc{fn: func(_ context.Context, _ ExecSpec) (*ExecResult, error) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		return &ExecResult{FinalText: `{"command":"Get-ChildItem"}`, ExternalSessionID: "codex-review-thread-1"}, nil
+	}}
+	t.Cleanup(func() { executors[ExecutorCodex] = old })
+
+	sess, err := store.CreateOrchSession("codex one turn reviewer", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := store.CreatePipelineRevision(sess.ID, PipelineRevision{
+		Name: "codex one turn reviewer",
+		Nodes: []AgentNode{{
+			ID: "review", Type: NodeReviewer, Label: "Codex 审查者",
+			Model: "ccs", Executor: ExecutorCodex, Mode: "serve",
+		}},
+		LoopConfig: LoopConfig{Enabled: true, Mode: "fixed", FixedIterations: 1, ReviewNodeID: "review", Protocol: "loop-review-v1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := store.ExecutePipelineV2(context.Background(), sess.ID, rev.ID, "review task", "", ExecutionOptions{Trigger: "manual"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := waitRunTerminal(t, store, run.ID)
+	if got.Status != "blocked" || got.TerminationReason != "blocked" {
+		t.Fatalf("run = status %q reason %q error %q, want blocked invalid review", got.Status, got.TerminationReason, got.Error)
+	}
+	mu.Lock()
+	gotCalls := calls
+	mu.Unlock()
+	if gotCalls != 1 {
+		t.Fatalf("Codex reviewer calls = %d, want exactly 1 retained Turn", gotCalls)
+	}
+}

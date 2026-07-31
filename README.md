@@ -144,6 +144,9 @@ commands, `@` references, and two-model setup are all in the
   TypeScript releases to the 1.0 Go rewrite.
 - **[Checkpoints & rewind](./docs/CHECKPOINTS.md)** — the snapshot-based edit
   safety net (Esc-Esc / `/rewind`).
+- **[Multi-Agent Orchestrator Pack](./MULTI_AGENT_README.md)** — local
+  Architect/Executor/Reviewer pipelines, Loop iterations, retained Codex
+  `app-server` Runtime Console, and portable Windows startup guidance.
 
 <br/>
 

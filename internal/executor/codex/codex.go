@@ -4,8 +4,9 @@
 // processes (`codex exec`), send prompts, read outputs, and handle cancellation.
 // It supports both fresh execution and session resumption via `codex exec resume`.
 //
-// Codex CLI v0.145.0 uses `codex exec` for non-interactive execution.
-// There is no `serve` subcommand — Codex does not provide a long-running HTTP service.
+// One-shot orchestration uses `codex exec` (and `codex exec resume`). Retained
+// orchestration uses `codex app-server` over a loopback WebSocket; this executor
+// package itself does not expose an HTTP service.
 package codex
 
 import (

@@ -145,3 +145,31 @@ func TestLoadAllDataRecoversSessionReferencesFromEntityFiles(t *testing.T) {
 		t.Fatalf("recovered runs = %+v", runs)
 	}
 }
+
+func TestMarkInterruptedStopsPersistedCodexRuntimeButPreservesThread(t *testing.T) {
+	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("REASONIX_ORCHESTRATOR_DATA_DIR", t.TempDir())
+
+	store := NewStore()
+	sess, err := store.CreateOrchSession("codex recovery", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateRuntimeState(RuntimeState{
+		RuntimeID: "codex_rt_stale", SessionID: sess.ID, Executor: string(ExecutorCodex),
+		Status: RuntimeIdle, Endpoint: "ws://127.0.0.1:61234", Port: 61234, ThreadID: "thread-persisted",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.markInterrupted(); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := store.GetRuntimeState("codex_rt_stale")
+	if !ok {
+		t.Fatal("runtime missing")
+	}
+	if got.Status != RuntimeStopped || got.Endpoint != "" || got.Port != 0 || got.ThreadID != "thread-persisted" || got.TurnID != "" {
+		t.Fatalf("recovered runtime = %#v", got)
+	}
+}

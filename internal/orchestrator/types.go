@@ -43,6 +43,10 @@ type ExecSpec struct {
 	Workspace string
 	Prompt    string
 	ModelRef  string
+	// DisplayModel preserves the user-facing model label for runtime metadata.
+	// It may differ from ModelRef when a local route (for example CCSwitch)
+	// intentionally omits --model on the provider command.
+	DisplayModel string
 	// ProviderRoute selects a local/provider routing profile. For Codex,
 	// "ccswitch" means use the Codex CLI's current CCSwitch configuration and
 	// intentionally omit --model.
@@ -303,6 +307,10 @@ type RuntimeState struct {
 	AccessMode     string        `json:"accessMode,omitempty"`    // browser | local_history
 	ApprovalMode   string        `json:"approvalMode,omitempty"`  // ask | auto
 	ExecutionMode  string        `json:"executionMode,omitempty"` // task | goal
+	// ThreadID and TurnID expose retained WebSocket-provider context to the
+	// orchestrator Runtime Console. They are provider identifiers, never tokens.
+	ThreadID string `json:"threadID,omitempty"`
+	TurnID   string `json:"turnID,omitempty"`
 }
 
 // SessionState captures the full orchestrator state for a session (for persistence).

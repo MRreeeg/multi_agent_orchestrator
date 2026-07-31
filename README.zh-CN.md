@@ -205,6 +205,10 @@ provider key 的运行时 fallback，但仍会作为当前 workspace 范围内�
 
 Loop 的 Canvas 只需要 `architect → executor → reviewer` 一组节点；三轮由 Orchestrator 的 Iteration 状态机完成。`fixed` 模式会严格执行配置轮数，Reviewer 的 `pass` 不会提前结束。
 
-Codex 适配使用 `codex exec`，Prompt 通过 stdin 传输以绕过 Windows 命令行长度限制。`codex exec-server` 是协议服务，不等同于 Mimo/Reasonix 的 `serve` runtime。使用 CCSwitch 时，先开启 CCSwitch 路由，再在节点中选择 `executor=codex`、`model=ccs`。
+Codex 的 `run` 使用 `codex exec`，Prompt 经 stdin 传入以绕过 Windows 命令行长度限制；Codex 的 `serve` 使用 `codex app-server --listen ws://127.0.0.1:<port>`，由 Orchestrator 后端保留 WebSocket、Runtime 和 Codex Thread。浏览器只通过 Orchestrator HTTP/SSE 查看 **Runtime Console**，不会直连 Provider WebSocket。人工 Turn 仅用于调试，不推进或改写 Loop 历史。
+
+服务重启不会把旧 App Server 假装为在线，但会保留 Thread ID，以便下一次 `serve` 执行 `thread/resume`。`Interrupt` 保留 Runtime / Thread，`Stop` 才关闭连接与进程。`codex exec-server` 目前未纳入执行路径。 刷新控制台后，持久化 RuntimeState 会重新绑定到 Canvas 节点；Codex retained runtime 始终显示为 Orchestrator Runtime Console，而不是让浏览器直接打开 `ws://` 端点。
+
+使用 CCSwitch 时，先开启 CCSwitch 路由，再在节点中选择 `executor=codex`、`model=ccs`、`providerRoute=ccswitch`。`ccs` 是路由别名，Orchestrator 会省略 Codex 的模型参数，由 CCSwitch 决定真实模型。
 
 提取版的操作、迁移、Loop 验收和已知边界见 [`MULTI_AGENT_README.md`](./MULTI_AGENT_README.md)。

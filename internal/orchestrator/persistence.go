@@ -1927,6 +1927,28 @@ func (s *Store) markInterrupted() error {
 		}
 	}
 
+	// A persisted Codex app-server endpoint only belongs to the process that
+	// launched it. Preserve ThreadID for a later thread/resume, but never show a
+	// historical WebSocket runtime as alive after the orchestrator restarts.
+	for _, rt := range s.runtimeStates {
+		if rt.Executor != string(ExecutorCodex) || rt.Status == RuntimeStopped || rt.Status == RuntimeError {
+			continue
+		}
+		rt.Status = RuntimeStopped
+		rt.Error = "orchestrator restarted; retained Codex runtime is no longer connected"
+		rt.Endpoint = ""
+		rt.Port = 0
+		rt.PID = 0
+		rt.TurnID = ""
+		rt.LastActiveAt = time.Now()
+		if rt.SessionID != "" {
+			rtDir := filepath.Join(sessionDir(rt.SessionID), "runtimes")
+			if err := saveSessionJSON(rtDir, rt.RuntimeID+".json", rt); err != nil {
+				return fmt.Errorf("mark Codex runtime %s stopped: %w", rt.RuntimeID, err)
+			}
+		}
+	}
+
 	// Mark running attempts as interrupted
 	for _, att := range s.attempts {
 		if att.Status == "running" {

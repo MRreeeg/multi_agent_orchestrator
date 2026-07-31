@@ -293,10 +293,90 @@ func (m *MimoRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart 
 	return rt, nil
 }
 
+// runtimeAccessMode describes how the browser should reach a retained runtime.
+// Codex app-server is an internal WebSocket protocol and must be proxied through
+// the Orchestrator Runtime Console rather than opened directly by the browser.
+func runtimeAccessMode(executor ExecutorType, mode string) string {
+	if executor == ExecutorCodex && strings.EqualFold(mode, "serve") {
+		return "runtime_console"
+	}
+	if executor == ExecutorMimo && strings.EqualFold(mode, "serve") {
+		return "local_history"
+	}
+	return "browser"
+}
+
 // emitRuntimeEvent sends a runtime status event for a node.
-func (s *Store) emitRuntimeEvent(nodeID string, endpoint string, port int, status string, executor string) {
-	detail := fmt.Sprintf(`{"endpoint":"%s","port":%d,"status":"%s","nodeID":"%s","executor":"%s"}`, endpoint, port, status, nodeID, executor)
+func (s *Store) emitRuntimeEvent(nodeID string, endpoint string, port int, status string, executor string, accessMode string) {
+	detail := fmt.Sprintf(`{"endpoint":"%s","port":%d,"status":"%s","nodeID":"%s","executor":"%s","accessMode":"%s"}`, endpoint, port, status, nodeID, executor, accessMode)
 	s.emit(event.Event{Kind: event.PipelineNodeRuntime, Text: nodeID, Detail: detail})
+}
+
+// managedRuntimeState returns the live runtime manager view when the runtime is
+// still attached to this process. Persisted RuntimeState records remain the
+// history source after a process restart, so callers must tolerate no live view.
+func managedRuntimeState(runtimeID string) (*RuntimeState, bool) {
+	if runtimeID == "" {
+		return nil, false
+	}
+	if rt, ok := mimoRuntimeMgr.Get(runtimeID); ok {
+		return rt, true
+	}
+	if rt, ok := reasonixRuntimeMgr.Get(runtimeID); ok {
+		return rt, true
+	}
+	if rt, ok := codexRuntimeMgr.Get(runtimeID); ok {
+		return rt, true
+	}
+	return nil, false
+}
+
+// applyLiveRuntimeState overlays provider-owned lifecycle fields while keeping
+// orchestration identifiers (session, binding, run and node) owned by the Store.
+func applyLiveRuntimeState(target *RuntimeState) {
+	if target == nil {
+		return
+	}
+	live, ok := managedRuntimeState(target.RuntimeID)
+	if !ok {
+		return
+	}
+	if live.Executor != "" {
+		target.Executor = live.Executor
+	}
+	if live.Model != "" {
+		target.Model = live.Model
+	}
+	if live.Endpoint != "" {
+		target.Endpoint = live.Endpoint
+	}
+	if live.Port != 0 {
+		target.Port = live.Port
+	}
+	if live.PID != 0 {
+		target.PID = live.PID
+	}
+	if live.Status != "" {
+		target.Status = live.Status
+	}
+	target.Error = live.Error
+	if !live.CreatedAt.IsZero() {
+		target.CreatedAt = live.CreatedAt
+	}
+	if !live.LastActiveAt.IsZero() {
+		target.LastActiveAt = live.LastActiveAt
+	}
+	if live.AccessMode != "" {
+		target.AccessMode = live.AccessMode
+	}
+	if live.ApprovalMode != "" {
+		target.ApprovalMode = live.ApprovalMode
+	}
+	if live.ExecutionMode != "" {
+		target.ExecutionMode = live.ExecutionMode
+	}
+	target.ThreadID = live.ThreadID
+	target.TurnID = live.TurnID
 }
 
 func waitForHTTPStatus(url string, timeout time.Duration, cmd *exec.Cmd) error {
@@ -1616,6 +1696,31 @@ func NewStore() *Store {
 // SetEmitter sets the event emitter for pipeline progress events.
 func (s *Store) SetEmitter(em event.Sink) {
 	s.emitter = em
+	codexRuntimeMgr.SetUpdateSink(func(runtime RuntimeState) {
+		// Runtime manager state is process-local. Mirror its lifecycle fields into
+		// the persisted session record when it exists, then use that record for
+		// SSE so the frontend can still resolve the owning node and session.
+		_ = s.UpdateRuntimeState(runtime.RuntimeID, func(persisted *RuntimeState) {
+			persisted.Endpoint = runtime.Endpoint
+			persisted.Port = runtime.Port
+			persisted.PID = runtime.PID
+			persisted.Status = runtime.Status
+			persisted.Error = runtime.Error
+			persisted.ThreadID = runtime.ThreadID
+			persisted.TurnID = runtime.TurnID
+			if runtime.AccessMode != "" {
+				persisted.AccessMode = runtime.AccessMode
+			}
+		})
+		if persisted, ok := s.GetRuntimeState(runtime.RuntimeID); ok {
+			runtime = persisted
+		}
+		detail, err := json.Marshal(runtime)
+		if err != nil {
+			return
+		}
+		s.emit(event.Event{Kind: event.PipelineNodeRuntime, Text: runtime.RuntimeID, Detail: string(detail)})
+	})
 }
 
 // emit sends an event if an emitter is configured; otherwise no-op.
@@ -2266,6 +2371,9 @@ func (s *Store) executePipelineV2(ctx context.Context, run *PipelineRun, pipe *P
 			if _, ok := reasonixRuntimeMgr.Get(ri.runtimeID); ok {
 				_ = reasonixRuntimeMgr.Release(ri.runtimeID)
 			}
+			if _, ok := codexRuntimeMgr.Get(ri.runtimeID); ok {
+				_ = codexRuntimeMgr.Release(ri.runtimeID)
+			}
 			_ = s.UpdateRuntimeState(ri.runtimeID, func(rt *RuntimeState) {
 				rt.Status = RuntimeIdle
 			})
@@ -2468,27 +2576,6 @@ func (s *Store) executePipelineV2(ctx context.Context, run *PipelineRun, pipe *P
 					pid := 0
 					createdAt := time.Now()
 
-					// Try to get richer info from the RuntimeManager.
-					if rt, ok := mimoRuntimeMgr.Get(nodeRuntimeID); ok {
-						pid = rt.PID
-						if rt.Executor != "" {
-							executorName = rt.Executor
-						}
-						if rt.Model != "" {
-							model = rt.Model
-						}
-						createdAt = rt.CreatedAt
-					} else if rt, ok := reasonixRuntimeMgr.Get(nodeRuntimeID); ok {
-						pid = rt.PID
-						if rt.Executor != "" {
-							executorName = rt.Executor
-						}
-						if rt.Model != "" {
-							model = rt.Model
-						}
-						createdAt = rt.CreatedAt
-					}
-
 					rtState := RuntimeState{
 						RuntimeID:      nodeRuntimeID,
 						SessionID:      sessionID,
@@ -2508,6 +2595,7 @@ func (s *Store) executePipelineV2(ctx context.Context, run *PipelineRun, pipe *P
 						ApprovalMode:   nodeCopy.ApprovalMode,
 						ExecutionMode:  nodeCopy.ExecutionMode,
 					}
+					applyLiveRuntimeState(&rtState)
 					if err := s.CreateRuntimeState(rtState); err != nil {
 						failNode(fmt.Errorf("runtime state creation failed: %w", err))
 						return
@@ -3202,6 +3290,7 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		Workspace:         workspace,
 		Prompt:            task,
 		ModelRef:          resolvedModelRef,
+		DisplayModel:      node.Model,
 		ProviderRoute:     providerRoute,
 		Agent:             node.Agent,
 		Skill:             node.Skill,
@@ -3238,7 +3327,7 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	// Execute — pass onStart callback so the frontend shows the port badge
 	// the moment the serve process starts (before waiting for readiness).
 	onStart := func(endpoint string, port int) {
-		s.emitRuntimeEvent(node.ID, endpoint, port, "starting", string(node.Executor))
+		s.emitRuntimeEvent(node.ID, endpoint, port, "starting", string(node.Executor), runtimeAccessMode(node.Executor, node.Mode))
 	}
 	result, execErr := executor.Execute(ctx, spec, onStart)
 	if result == nil {
@@ -3248,19 +3337,43 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	stderr = result.RawStderr
 	retExternalSessionID = result.ExternalSessionID
 	if result.RuntimeID != "" {
-		port := portFromEndpoint(result.Endpoint)
+		endpoint := result.Endpoint
+		port := portFromEndpoint(endpoint)
+		status := RuntimeReady
+		model := node.Model
+		executorType := node.Executor
+		if live, ok := managedRuntimeState(result.RuntimeID); ok {
+			if live.Endpoint != "" {
+				endpoint = live.Endpoint
+				port = live.Port
+			}
+			if live.Status != "" {
+				status = live.Status
+			}
+			if live.Model != "" {
+				model = live.Model
+			}
+			if live.Executor != "" {
+				executorType = ExecutorType(live.Executor)
+			}
+		}
 		s.RegisterAgent(AgentInstance{
 			ID:       result.RuntimeID,
 			Type:     node.Type,
 			Port:     port,
-			Model:    node.Model,
-			Status:   "running",
+			Model:    model,
+			Status:   string(status),
 			Label:    node.Label,
-			Executor: node.Executor,
-			Endpoint: result.Endpoint,
+			Executor: executorType,
+			Endpoint: endpoint,
 		})
-		// Emit runtime event for frontend canvas badge
-		s.emitRuntimeEvent(node.ID, result.Endpoint, port, "ready", string(node.Executor))
+		// Emit the live provider state instead of always displaying a completed
+		// Codex app-server turn as "ready".
+		accessMode := runtimeAccessMode(executorType, node.Mode)
+		if live, ok := managedRuntimeState(result.RuntimeID); ok && live.AccessMode != "" {
+			accessMode = live.AccessMode
+		}
+		s.emitRuntimeEvent(node.ID, endpoint, port, string(status), string(executorType), accessMode)
 	}
 
 	if execErr != nil {
@@ -3388,11 +3501,10 @@ func validateNodeExecutionConfigAtWorkspaceWithRoute(executor ExecutorType, mode
 			return nil
 		}
 	case ExecutorCodex:
-		if mode == "serve" {
-			return fmt.Errorf("codex executor does not support serve mode; use run")
-		}
-		if mode != "run" {
-			return fmt.Errorf("unsupported codex mode %q; codex only supports run", mode)
+		// `run` is the one-shot `codex exec` path. `serve` is the retained
+		// `codex app-server` WebSocket path owned by CodexRuntimeManager.
+		if mode != "run" && mode != "serve" {
+			return fmt.Errorf("unsupported codex mode %q; supported modes are run and serve", mode)
 		}
 		if providerRoute != "" && !ccswitchRoute {
 			return fmt.Errorf("unsupported codex provider route %q; use ccswitch", providerRoute)

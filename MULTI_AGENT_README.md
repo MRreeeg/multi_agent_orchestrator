@@ -122,13 +122,31 @@ architect → executor → reviewer
 
 ## Codex、Mimo 与 CCSwitch
 
-Codex 节点当前使用一次性非交互命令：
+### Codex：`run` 与 retained `serve` 的明确分工
 
-```text
-codex exec ... -
-```
+| 节点模式 | Orchestrator 命令/协议 | 上下文与生命周期 |
+|---|---|---|
+| `run` | `codex exec ... -` | 一次性执行；完整 Prompt 经 stdin 传入，避免 Windows `The command line is too long`。 |
+| `serve` | `codex app-server --listen ws://127.0.0.1:<port>` | 后端建立 loopback JSON-RPC WebSocket，并在同一 Runtime 中复用 Codex Thread。 |
 
-完整 Prompt 从 stdin 传入，避免 Windows `The command line is too long`。`codex exec resume` 可以延续 Codex thread；`codex exec-server` 是协议/WebSocket 服务入口，不能直接当成 Mimo/Reasonix 的 retained `serve` runtime。
+`serve` 的每一次 Orchestrator 节点执行只创建一个 Codex Turn，随后等待 `turn/completed`。`PipelineRun` / `Iteration` 的推进仍只由 Orchestrator 的 Reviewer JSON 决策控制；Runtime 本身不会自行开始下一轮。
+
+Runtime 的复用键为 `nodeID + model + workspace + providerRoute`。同一 Loop 的后续节点尝试会复用同一 Runtime 与 Thread；`ProviderSession.ExternalSessionID` 持久化 Thread ID。服务重启后，旧进程和 WebSocket **不会被假装恢复为在线**：历史 Runtime 会标为 stopped 并清理失效端点/PID，但保留 Thread ID，下一次 `serve` 会新启 App Server 并执行 `thread/resume`。
+
+Runtime 状态统一为：执行时 `busy`、完成后 `idle`、连接/非预期 Turn 错误为 `error`、显式停止为 `stopped`。**Interrupt** 仅中断当前 Turn，保留 Runtime 与 Thread，完成后重新可发送新 Turn；只有 **Stop** 会关闭 WebSocket 并停止 `codex app-server` 子进程。
+
+### Runtime Console（仅 Codex 第一版）
+
+Canvas 节点的 retained Codex Runtime 可打开 **Runtime Console**：查看状态、端点、Thread/Turn、最终输出和原始事件；空闲时可发送人工新 Turn，运行时可 Interrupt 当前 Turn。
+
+> [!important] 边界
+> 浏览器只访问 Orchestrator 的 HTTP API / SSE，**不会直接连接 Codex Provider WebSocket**。人工 Turn 仅用于调试或补充上下文：不会创建、恢复或推进 `PipelineRun` / `Iteration`，也不会污染 Loop 历史。
+
+App Server 事件通过 Orchestrator SSE 立即唤醒 Console 刷新，并保留 1.2 秒轮询作为断线恢复兜底。第一版协议只适用于 Codex；Mimo 等执行器未来需要各自适配，不复用 Codex JSON-RPC。
+
+页面刷新和节点刚启动时，前端会将 `pipeline_node_runtime` SSE 临时事件与持久化 `RuntimeState` 合并，而不是覆盖。这样 `accessMode=runtime_console`、Runtime ID、Thread ID 不会丢失：Canvas 始终打开 Orchestrator Runtime Console，绝不会尝试由浏览器直接访问 `ws://`。
+
+### Mimo
 
 Mimo 的典型方式是：
 
@@ -137,7 +155,9 @@ mimo serve
 mimo run --attach <runtime-url>
 ```
 
-如果使用 CCSwitch，请先由用户启动 CCSwitch 并开启路由，然后把 Reviewer 配置为：
+### CCSwitch
+
+如果使用 CCSwitch，请先由用户启动 CCSwitch 并开启路由，然后把节点配置为：
 
 ```text
 executor: codex
@@ -145,7 +165,11 @@ model: ccs
 providerRoute: ccswitch
 ```
 
-`ccs` 是路由别名，不是要传给 Codex 的真实模型 ID；不要手工配置一个不存在的 `--model ccs`。
+`ccs` 是路由别名，不是要传给 Codex 的真实模型 ID。Orchestrator 会省略 `--model` / app-server `model` 字段，实际模型由用户已开启的 CCSwitch 路由决定。
+
+### 明确不支持：`codex exec-server`
+
+本版本未将 `codex exec-server` 放入执行路径。它与 `codex app-server` 的 Thread/Turn 生命周期及恢复语义尚未在本项目中独立验证；不能因为二者都使用 WebSocket 就互换使用。
 
 ## 三轮验收怎么看
 

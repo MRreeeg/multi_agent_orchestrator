@@ -577,9 +577,12 @@ func (s *Store) finalizeLoopRuntimes(run *PipelineRun) {
 			_ = stopManagedRuntime(rt.executor, rt.id)
 			s.UnregisterAgent(rt.id)
 		} else {
-			if rt.executor == ExecutorMimo {
+			switch rt.executor {
+			case ExecutorMimo:
 				_ = mimoRuntimeMgr.Release(rt.id)
-			} else {
+			case ExecutorCodex:
+				_ = codexRuntimeMgr.Release(rt.id)
+			default:
 				_ = reasonixRuntimeMgr.Release(rt.id)
 			}
 			s.UpdateAgentStatus(rt.id, "idle", "")
@@ -796,8 +799,15 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 	contextPolicy := run.ExecOptions.ContextPolicy
 	reuseAgentSessions := run.ExecOptions.ReuseAgentSessions
 	externalSessionID := ""
+	// A retained Codex reviewer is still orchestrator-controlled, but its
+	// App Server Thread must persist across Loop iterations. All other loop
+	// reviewers keep the historical fresh-session behavior.
+	codexRetainedReviewer := loopReview && nodeCopy.Executor == ExecutorCodex && strings.EqualFold(nodeCopy.Mode, "serve")
 	if !loopReview {
 		externalSessionID = "" // populated from the ProviderSession below
+	} else if codexRetainedReviewer {
+		contextPolicy = "reuse"
+		reuseAgentSessions = true
 	} else {
 		contextPolicy = "fresh"
 		reuseAgentSessions = false
@@ -846,9 +856,9 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 		return fmt.Errorf("node %q attempt input: %w", nodeCopy.Label, err)
 	}
 
-	// Look up ProviderSession for external session ID. Reviewer sessions are
-	// deliberately fresh and must never resume an old provider thread.
-	if !loopReview && providerSessionID != "" {
+	// Retained Codex reviewers deliberately reuse their ProviderSession Thread.
+	// Other reviewer executors remain fresh to preserve their previous isolation.
+	if (!loopReview || codexRetainedReviewer) && providerSessionID != "" {
 		if ps, ok := s.GetProviderSession(providerSessionID); ok {
 			externalSessionID = ps.ExternalSessionID
 		}
@@ -861,7 +871,10 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 	// call as its final text. This preserves compatibility with providers that
 	// need one final-format correction, while the hard single-retry cap prevents
 	// the unbounded command/evidence replay observed in production.
-	if loopReview && execErr == nil && !validLoopReviewOutput(output) && ctx.Err() == nil {
+	// Codex app-server runs exactly one Turn per orchestrator node attempt.
+	// Keep the legacy one-shot correction for other reviewer executors, but do
+	// not silently start a second retained Codex Turn on malformed output.
+	if loopReview && !codexRetainedReviewer && execErr == nil && !validLoopReviewOutput(output) && ctx.Err() == nil {
 		retryInput := input + `
 
 [系统纠正] 你上一条响应不是合法的 loop-review-v1 审查结果，可能只输出了工具调用参数。请不要再次调用工具，立即只输出一个纯 JSON 对象，严格包含 schemaVersion、decision、confidence、summary、blockingIssues、requiredChanges、nextTask、evidence。decision 只能是 pass、revise 或 blocked。`
@@ -982,6 +995,7 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 			LastActiveAt:   time.Now(),
 			CleanupPolicy:  CleanupRetained,
 		}
+		applyLiveRuntimeState(&rtState)
 		if err := s.CreateRuntimeState(rtState); err != nil {
 			if perr := s.failNode(run, nodeID, nodeCopy.Label, fmt.Errorf("runtime state: %w", err), sessionID, iterationID); perr != nil {
 				return perr
@@ -1098,6 +1112,8 @@ func stopManagedRuntime(executor ExecutorType, runtimeID string) error {
 		return StopMimoRuntime(runtimeID)
 	case ExecutorReasonix, "":
 		return StopReasonixRuntime(runtimeID)
+	case ExecutorCodex:
+		return StopCodexRuntime(runtimeID)
 	default:
 		return nil
 	}

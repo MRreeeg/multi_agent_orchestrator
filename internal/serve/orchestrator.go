@@ -270,6 +270,15 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.loadSessionState(w, r, id)
 	case path == "/runtimes" && r.Method == http.MethodGet:
 		h.listRuntimes(w, r)
+	case strings.HasSuffix(path, "/console") && r.Method == http.MethodGet:
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/console")
+		h.getRuntimeConsole(w, r, id)
+	case strings.HasSuffix(path, "/message") && r.Method == http.MethodPost:
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/message")
+		h.sendRuntimeMessage(w, r, id)
+	case strings.HasSuffix(path, "/interrupt") && r.Method == http.MethodPost:
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/interrupt")
+		h.interruptRuntime(w, r, id)
 	case strings.Count(path, "/") == 2 && strings.HasPrefix(path, "/runtimes/") && r.Method == http.MethodGet:
 		id := strings.TrimPrefix(path, "/runtimes/")
 		h.getRuntime(w, r, id)
@@ -577,6 +586,7 @@ func (h *orchestratorHandler) listRuntimes(w http.ResponseWriter, _ *http.Reques
 	var all []*orchestrator.RuntimeState
 	all = append(all, orchestrator.ListMimoRuntimes()...)
 	all = append(all, orchestrator.ListReasonixRuntimes()...)
+	all = append(all, orchestrator.ListCodexRuntimes()...)
 	writeJSON(w, all)
 }
 
@@ -586,6 +596,10 @@ func (h *orchestratorHandler) getRuntime(w http.ResponseWriter, _ *http.Request,
 		return
 	}
 	if rt, ok := orchestrator.GetReasonixRuntime(id); ok {
+		writeJSON(w, rt)
+		return
+	}
+	if rt, ok := orchestrator.GetCodexRuntime(id); ok {
 		writeJSON(w, rt)
 		return
 	}
@@ -601,7 +615,47 @@ func (h *orchestratorHandler) stopRuntime(w http.ResponseWriter, _ *http.Request
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if err := orchestrator.StopCodexRuntime(id); err == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	writeErr(w, "runtime not found", http.StatusNotFound)
+}
+
+// getRuntimeConsole returns the server-proxied Codex WebSocket console state.
+// Only Codex retained runtimes currently expose this endpoint; other providers
+// keep their existing browser/local-history integrations.
+func (h *orchestratorHandler) getRuntimeConsole(w http.ResponseWriter, _ *http.Request, id string) {
+	snapshot, ok := orchestrator.GetCodexRuntimeConsole(id)
+	if !ok {
+		writeErr(w, "Codex runtime console not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, snapshot)
+}
+
+func (h *orchestratorHandler) sendRuntimeMessage(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Text) == "" {
+		writeErr(w, "text is required", http.StatusBadRequest)
+		return
+	}
+	turnID, err := orchestrator.SendCodexRuntimeMessage(r.Context(), id, body.Text)
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]string{"turnID": turnID})
+}
+
+func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Request, id string) {
+	if err := orchestrator.InterruptCodexRuntime(r.Context(), id); err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func enforceGeneratedRoleBoundary(agent, roleDesc string) string {
@@ -1180,6 +1234,14 @@ func (h *orchestratorHandler) getOrchSession(w http.ResponseWriter, _ *http.Requ
 	result["pipelines"] = h.store.ListPipelineRevisions(id)
 	result["runs"] = h.store.ListRunsForSession(id)
 	result["bindings"] = h.store.ListBindings(id)
+	// RuntimeState is persisted independently from a run so a retained Codex
+	// app-server can be reopened in the Runtime Console after a page refresh.
+	// Return an ID-keyed object because the frontend backfills runtimes by nodeID.
+	runtimes := make(map[string]orchestrator.RuntimeState)
+	for _, runtime := range h.store.ListRuntimeStates(id) {
+		runtimes[runtime.RuntimeID] = runtime
+	}
+	result["runtimeStates"] = runtimes
 	writeJSON(w, result)
 }
 
@@ -1496,9 +1558,59 @@ func (h *orchestratorHandler) forkBinding(w http.ResponseWriter, r *http.Request
 }
 
 func (h *orchestratorHandler) listOrchRuntimes(w http.ResponseWriter, _ *http.Request, sessionID string) {
-	// For now, list all runtimes. In future, filter by session.
-	var all []*orchestrator.RuntimeState
-	all = append(all, orchestrator.ListMimoRuntimes()...)
-	all = append(all, orchestrator.ListReasonixRuntimes()...)
+	if _, ok := h.store.GetOrchSession(sessionID); !ok {
+		writeErr(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	// Runtime identity (session/node/model/access mode) belongs to the persisted
+	// orchestration record. The provider managers only own volatile lifecycle
+	// fields, so returning their raw List() output used to erase nodeID/model and
+	// made a refreshed canvas lose the Runtime Console button.
+	byID := make(map[string]orchestrator.RuntimeState)
+	for _, runtime := range h.store.ListRuntimeStates(sessionID) {
+		byID[runtime.RuntimeID] = runtime
+	}
+	live := make([]*orchestrator.RuntimeState, 0)
+	live = append(live, orchestrator.ListMimoRuntimes()...)
+	live = append(live, orchestrator.ListReasonixRuntimes()...)
+	live = append(live, orchestrator.ListCodexRuntimes()...)
+	for _, runtime := range live {
+		persisted, ok := byID[runtime.RuntimeID]
+		if !ok {
+			// A provider process without a persisted record is not safely attributable
+			// to this session, therefore it must not leak into this session's UI.
+			continue
+		}
+		if runtime.Endpoint != "" {
+			persisted.Endpoint = runtime.Endpoint
+		}
+		if runtime.Port != 0 {
+			persisted.Port = runtime.Port
+		}
+		if runtime.PID != 0 {
+			persisted.PID = runtime.PID
+		}
+		if runtime.Status != "" {
+			persisted.Status = runtime.Status
+		}
+		persisted.Error = runtime.Error
+		if !runtime.LastActiveAt.IsZero() {
+			persisted.LastActiveAt = runtime.LastActiveAt
+		}
+		if runtime.ThreadID != "" {
+			persisted.ThreadID = runtime.ThreadID
+		}
+		persisted.TurnID = runtime.TurnID
+		if runtime.AccessMode != "" {
+			persisted.AccessMode = runtime.AccessMode
+		}
+		byID[runtime.RuntimeID] = persisted
+	}
+
+	all := make([]orchestrator.RuntimeState, 0, len(byID))
+	for _, runtime := range byID {
+		all = append(all, runtime)
+	}
 	writeJSON(w, all)
 }

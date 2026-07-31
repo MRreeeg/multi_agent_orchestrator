@@ -269,3 +269,25 @@ func TestGatherInputForNextIterationIncludesPreviousReview(t *testing.T) {
 		t.Fatalf("next iteration input missing full review JSON: %s", got)
 	}
 }
+
+func TestRuntimeAccessMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		executor ExecutorType
+		mode     string
+		want     string
+	}{
+		{name: "codex serve uses orchestrator runtime console", executor: ExecutorCodex, mode: "serve", want: "runtime_console"},
+		{name: "codex run has no retained console", executor: ExecutorCodex, mode: "run", want: "browser"},
+		{name: "mimo serve opens local history", executor: ExecutorMimo, mode: "serve", want: "local_history"},
+		{name: "reasonix serve retains browser access", executor: ExecutorReasonix, mode: "serve", want: "browser"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := runtimeAccessMode(tt.executor, tt.mode); got != tt.want {
+				t.Fatalf("runtimeAccessMode(%q, %q) = %q, want %q", tt.executor, tt.mode, got, tt.want)
+			}
+		})
+	}
+}

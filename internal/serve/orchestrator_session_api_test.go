@@ -13,6 +13,67 @@ import (
 	"reasonix/internal/orchestrator"
 )
 
+func TestOrchestrationSessionReturnsPersistedRuntimeConsoleState(t *testing.T) {
+	t.Setenv("REASONIX_ORCHESTRATOR_DATA_DIR", t.TempDir())
+	h := &orchestratorHandler{store: orchestrator.NewStore(), loadedSessions: make(map[string]bool)}
+	sess, err := h.store.CreateOrchSession("runtime console", `G:\workspace`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.loadedSessions[sess.ID] = true
+	runtime := orchestrator.RuntimeState{
+		RuntimeID:     "codex_rt_saved",
+		SessionID:     sess.ID,
+		NodeID:        "reviewer",
+		RunID:         "run_saved",
+		Executor:      "codex",
+		Model:         "ccs",
+		Endpoint:      "ws://127.0.0.1:43111",
+		Port:          43111,
+		Status:        orchestrator.RuntimeIdle,
+		CleanupPolicy: orchestrator.CleanupRetained,
+		AccessMode:    "runtime_console",
+		ThreadID:      "thread_saved",
+	}
+	if err := h.store.CreateRuntimeState(runtime); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/orchestrator/api/orch-sessions/"+sess.ID, nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("session detail status = %d: %s", w.Code, w.Body.String())
+	}
+	var detail struct {
+		RuntimeStates map[string]orchestrator.RuntimeState `json:"runtimeStates"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := detail.RuntimeStates[runtime.RuntimeID]
+	if !ok {
+		t.Fatalf("runtimeStates = %#v, want %q", detail.RuntimeStates, runtime.RuntimeID)
+	}
+	if got.NodeID != runtime.NodeID || got.Model != "ccs" || got.AccessMode != "runtime_console" || got.ThreadID != runtime.ThreadID {
+		t.Fatalf("returned runtime = %#v", got)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/orchestrator/api/orch-sessions/"+sess.ID+"/runtimes", nil)
+	listW := httptest.NewRecorder()
+	h.ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("runtime list status = %d: %s", listW.Code, listW.Body.String())
+	}
+	var listed []orchestrator.RuntimeState
+	if err := json.Unmarshal(listW.Body.Bytes(), &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 || listed[0].RuntimeID != runtime.RuntimeID || listed[0].NodeID != runtime.NodeID || listed[0].AccessMode != "runtime_console" {
+		t.Fatalf("runtime list = %#v", listed)
+	}
+}
+
 func TestOrchestrationSessionPipelineSaveAndReloadAPI(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})

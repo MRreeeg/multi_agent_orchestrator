@@ -1,0 +1,599 @@
+package orchestrator
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
+
+	codexclient "reasonix/internal/executor/codex"
+)
+
+// RuntimeConsoleEvent is a provider-neutral record displayed in the browser
+// Runtime Console. Payload is raw JSON-RPC data and is never executed by the
+// browser; the UI renders it as escaped diagnostic text.
+type RuntimeConsoleEvent struct {
+	At      time.Time `json:"at"`
+	Level   string    `json:"level"`
+	Method  string    `json:"method"`
+	Text    string    `json:"text,omitempty"`
+	Payload string    `json:"payload,omitempty"`
+}
+
+// RuntimeConsoleSnapshot is the backend-owned view returned to the browser.
+// The browser never dials provider WebSocket endpoints directly.
+type RuntimeConsoleSnapshot struct {
+	Runtime      RuntimeState          `json:"runtime"`
+	ThreadID     string                `json:"threadID,omitempty"`
+	TurnID       string                `json:"turnID,omitempty"`
+	Output       string                `json:"output,omitempty"`
+	Error        string                `json:"error,omitempty"`
+	Events       []RuntimeConsoleEvent `json:"events"`
+	CanSend      bool                  `json:"canSend"`
+	CanInterrupt bool                  `json:"canInterrupt"`
+}
+
+type codexRuntime struct {
+	ID            string
+	Port          int
+	Endpoint      string
+	NodeID        string
+	ModelRef      string
+	DisplayModel  string
+	ProviderRoute string
+	ApprovalMode  string
+	ExecutionMode string
+	Workspace     string
+	Cmd           *exec.Cmd
+	Stderr        *bytes.Buffer
+	done          chan struct{}
+	StartedAt     time.Time
+	LastUsedAt    time.Time
+
+	mu       sync.Mutex
+	client   *codexclient.AppServerClient
+	threadID string
+	turnID   string
+	status   RuntimeStatus
+	output   string
+	lastErr  string
+	events   []RuntimeConsoleEvent
+}
+
+// CodexRuntimeManager starts `codex app-server` as a retained, loopback-only
+// WebSocket process. One runtime can host many persisted Codex threads; the
+// ProviderSession's ExternalSessionID remains the source of thread identity.
+type CodexRuntimeManager struct {
+	mu       sync.Mutex
+	runtimes map[string]*codexRuntime
+	onUpdate func(RuntimeState)
+}
+
+func newCodexRuntimeManager() *CodexRuntimeManager {
+	return &CodexRuntimeManager{runtimes: make(map[string]*codexRuntime)}
+}
+
+// SetUpdateSink registers the process-local bridge used to wake the browser
+// Runtime Console through Orchestrator SSE. It receives metadata only; raw
+// provider messages stay readable through the authenticated console API.
+func (m *CodexRuntimeManager) SetUpdateSink(sink func(RuntimeState)) {
+	m.mu.Lock()
+	m.onUpdate = sink
+	m.mu.Unlock()
+}
+
+func (m *CodexRuntimeManager) notify(rt *codexRuntime) {
+	m.mu.Lock()
+	sink := m.onUpdate
+	m.mu.Unlock()
+	if sink == nil {
+		return
+	}
+	state := m.stateFor(rt, ExecSpec{}, CleanupRetained)
+	sink(*state)
+}
+
+func (m *CodexRuntimeManager) runtimeKey(spec ExecSpec) string {
+	workspace := spec.Workspace
+	if workspace == "" {
+		workspace = "."
+	}
+	return spec.NodeID + "|" + spec.ModelRef + "|" + workspace + "|" + spec.ProviderRoute
+}
+
+func (m *CodexRuntimeManager) Borrow(ctx context.Context, spec ExecSpec, policy CleanupPolicy) (*RuntimeState, error) {
+	rt, err := m.ensure(ctx, spec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return m.stateFor(rt, spec, policy), nil
+}
+
+func (m *CodexRuntimeManager) Release(runtimeID string) error {
+	m.mu.Lock()
+	var target *codexRuntime
+	for _, rt := range m.runtimes {
+		if rt.ID == runtimeID {
+			target = rt
+			break
+		}
+	}
+	m.mu.Unlock()
+	if target == nil {
+		return fmt.Errorf("codex runtime %q not found", runtimeID)
+	}
+	target.mu.Lock()
+	if target.status != RuntimeBusy {
+		target.status = RuntimeIdle
+	}
+	target.LastUsedAt = time.Now()
+	target.mu.Unlock()
+	m.notify(target)
+	return nil
+}
+
+func (m *CodexRuntimeManager) Stop(runtimeID string) error {
+	m.mu.Lock()
+	var target *codexRuntime
+	var key string
+	for k, rt := range m.runtimes {
+		if rt.ID == runtimeID {
+			target, key = rt, k
+			break
+		}
+	}
+	if target != nil {
+		delete(m.runtimes, key)
+	}
+	m.mu.Unlock()
+	if target == nil {
+		return fmt.Errorf("codex runtime %q not found", runtimeID)
+	}
+	target.mu.Lock()
+	target.status = RuntimeStopped
+	client := target.client
+	target.client = nil
+	target.mu.Unlock()
+	if client != nil {
+		client.Close()
+	}
+	if target.Cmd != nil {
+		stopRuntimeProcess(target.Cmd, target.done)
+	}
+	m.notify(target)
+	return nil
+}
+
+func (m *CodexRuntimeManager) Get(runtimeID string) (*RuntimeState, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, rt := range m.runtimes {
+		if rt.ID == runtimeID {
+			return m.stateFor(rt, ExecSpec{NodeID: ""}, CleanupRetained), true
+		}
+	}
+	return nil, false
+}
+
+func (m *CodexRuntimeManager) List() []*RuntimeState {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]*RuntimeState, 0, len(m.runtimes))
+	for _, rt := range m.runtimes {
+		out = append(out, m.stateFor(rt, ExecSpec{}, CleanupRetained))
+	}
+	return out
+}
+
+func (m *CodexRuntimeManager) stateFor(rt *codexRuntime, spec ExecSpec, policy CleanupPolicy) *RuntimeState {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	nodeID := rt.NodeID
+	if nodeID == "" {
+		nodeID = spec.NodeID
+	}
+	model := rt.DisplayModel
+	if model == "" {
+		model = spec.DisplayModel
+	}
+	if model == "" {
+		model = rt.ModelRef
+	}
+	if model == "" {
+		model = spec.ModelRef
+	}
+	approvalMode := rt.ApprovalMode
+	if approvalMode == "" {
+		approvalMode = spec.ApprovalMode
+	}
+	executionMode := rt.ExecutionMode
+	if executionMode == "" {
+		executionMode = spec.ExecutionMode
+	}
+	return &RuntimeState{
+		RuntimeID: rt.ID, NodeID: nodeID, Executor: string(ExecutorCodex), Model: model,
+		Endpoint: rt.Endpoint, Port: rt.Port, Status: rt.status, Error: rt.lastErr,
+		CreatedAt: rt.StartedAt, LastActiveAt: rt.LastUsedAt, CleanupPolicy: policy,
+		AccessMode: "runtime_console", ApprovalMode: approvalMode, ExecutionMode: executionMode,
+		ThreadID: rt.threadID, TurnID: rt.turnID,
+	}
+}
+
+func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*codexRuntime, error) {
+	key := m.runtimeKey(spec)
+	m.mu.Lock()
+	if rt := m.runtimes[key]; rt != nil {
+		rt.mu.Lock()
+		live := rt.client != nil && rt.status != RuntimeStopped && rt.status != RuntimeError
+		rt.LastUsedAt = time.Now()
+		rt.mu.Unlock()
+		if live {
+			// Preserve display metadata across Loop turns. Provider routing may use
+			// an empty ModelRef (CCSwitch), but the UI must still show its configured
+			// alias and owning pipeline node.
+			if spec.NodeID != "" {
+				rt.NodeID = spec.NodeID
+			}
+			if spec.DisplayModel != "" {
+				rt.DisplayModel = spec.DisplayModel
+			}
+			if spec.ApprovalMode != "" {
+				rt.ApprovalMode = spec.ApprovalMode
+			}
+			if spec.ExecutionMode != "" {
+				rt.ExecutionMode = spec.ExecutionMode
+			}
+			m.mu.Unlock()
+			return rt, nil
+		}
+		delete(m.runtimes, key)
+	}
+	port := findFreePort()
+	rt := &codexRuntime{
+		ID:            fmt.Sprintf("codex_rt_%d", time.Now().UnixNano()),
+		Port:          port,
+		Endpoint:      fmt.Sprintf("ws://127.0.0.1:%d", port),
+		NodeID:        spec.NodeID,
+		ModelRef:      spec.ModelRef,
+		DisplayModel:  spec.DisplayModel,
+		ProviderRoute: spec.ProviderRoute,
+		ApprovalMode:  spec.ApprovalMode,
+		ExecutionMode: spec.ExecutionMode,
+		Workspace:     spec.Workspace,
+		StartedAt:     time.Now(),
+		LastUsedAt:    time.Now(),
+		done:          make(chan struct{}),
+		status:        RuntimeStarting,
+	}
+	m.runtimes[key] = rt
+	m.mu.Unlock()
+
+	cmd := newRetainedRuntimeCommand(ctx, "codex", "app-server", "--listen", rt.Endpoint)
+	cmd.Dir = spec.Workspace
+	cmd.Stdout = io.Discard
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+	if err := cmd.Start(); err != nil {
+		m.mu.Lock()
+		delete(m.runtimes, key)
+		m.mu.Unlock()
+		return nil, fmt.Errorf("start codex app-server: %w", err)
+	}
+	rt.Cmd = cmd
+	rt.Stderr = stderr
+	go m.watchRuntime(key, rt)
+	if onStart != nil {
+		onStart(rt.Endpoint, rt.Port)
+	}
+
+	deadline := time.Now().Add(45 * time.Second)
+	for time.Now().Before(deadline) {
+		dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		client, err := codexclient.DialAppServer(dialCtx, rt.Endpoint, func(e codexclient.AppServerEvent) { m.recordEvent(rt, e) })
+		cancel()
+		if err == nil {
+			rt.mu.Lock()
+			rt.client = client
+			rt.status = RuntimeIdle
+			rt.LastUsedAt = time.Now()
+			rt.mu.Unlock()
+			return rt, nil
+		}
+		select {
+		case <-ctx.Done():
+			m.Stop(rt.ID)
+			return nil, ctx.Err()
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	diagnostic := strings.TrimSpace(stderr.String())
+	_ = m.Stop(rt.ID)
+	return nil, fmt.Errorf("codex app-server %s did not accept WebSocket connections within 45s: %s", rt.Endpoint, diagnostic)
+}
+
+func (m *CodexRuntimeManager) watchRuntime(key string, rt *codexRuntime) {
+	err := rt.Cmd.Wait()
+	rt.mu.Lock()
+	if rt.status != RuntimeStopped {
+		rt.status = RuntimeError
+		if err != nil {
+			rt.lastErr = err.Error()
+		} else {
+			rt.lastErr = "codex app-server exited"
+		}
+	}
+	client := rt.client
+	rt.client = nil
+	rt.mu.Unlock()
+	if client != nil {
+		client.Close()
+	}
+	m.notify(rt)
+	m.mu.Lock()
+	if m.runtimes[key] == rt {
+		delete(m.runtimes, key)
+	}
+	m.mu.Unlock()
+	close(rt.done)
+}
+
+func (m *CodexRuntimeManager) recordEvent(rt *codexRuntime, event codexclient.AppServerEvent) {
+	rt.mu.Lock()
+	payload := string(event.Params)
+	level := "info"
+	if strings.Contains(event.Method, "error") {
+		level = "error"
+	}
+	rt.events = append(rt.events, RuntimeConsoleEvent{At: event.At, Level: level, Method: event.Method, Text: event.Text, Payload: payload})
+	if len(rt.events) > 300 {
+		rt.events = append([]RuntimeConsoleEvent(nil), rt.events[len(rt.events)-300:]...)
+	}
+	rt.mu.Unlock()
+	m.notify(rt)
+}
+
+func (m *CodexRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*ExecResult, error) {
+	rt, err := m.ensure(ctx, spec, onStart)
+	if err != nil {
+		return &ExecResult{ExitCode: -1}, err
+	}
+	opts := codexclient.ThreadOptions{Workspace: spec.Workspace, Model: codexRuntimeModel(spec), ApprovalPolicy: codexApprovalPolicy(spec)}
+	client, err := m.reserveTurn(rt)
+	if err != nil {
+		return &ExecResult{RuntimeID: rt.ID, Endpoint: rt.Endpoint, ExitCode: -1}, err
+	}
+
+	threadID, err := client.ResumeThread(ctx, spec.ExternalSessionID, opts)
+	if err != nil {
+		// Preserve a known historical Thread ID even when thread/resume itself
+		// fails. A subsequent retained runtime can retry the same resume rather
+		// than silently losing the durable conversation identity.
+		threadID = strings.TrimSpace(spec.ExternalSessionID)
+		if threadID == "" {
+			rt.mu.Lock()
+			threadID = rt.threadID
+			rt.mu.Unlock()
+		}
+		m.finishTurn(rt, threadID, err)
+		return m.execResult(rt, "", threadID), err
+	}
+	turnID, err := client.StartTurn(ctx, threadID, spec.Prompt, codexRuntimeModel(spec), spec.ReasoningEffort)
+	if err != nil {
+		m.finishTurn(rt, threadID, err)
+		return m.execResult(rt, "", threadID), err
+	}
+	rt.mu.Lock()
+	rt.threadID = threadID
+	rt.turnID = turnID
+	rt.mu.Unlock()
+	text, err := client.WaitTurn(ctx, turnID)
+	if err == nil && strings.TrimSpace(text) == "" {
+		err = fmt.Errorf("codex app-server turn completed without assistant output")
+	}
+	rt.mu.Lock()
+	rt.output = text
+	rt.mu.Unlock()
+	m.finishTurn(rt, threadID, err)
+	result := m.execResult(rt, text, threadID)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
+// reserveTurn atomically reserves the retained App Server for exactly one
+// active Turn. Both orchestrator work and Runtime Console messages use this
+// gate, so an operator cannot accidentally race a Loop node with a second
+// provider Turn on the same Codex Thread.
+func (m *CodexRuntimeManager) reserveTurn(rt *codexRuntime) (*codexclient.AppServerClient, error) {
+	rt.mu.Lock()
+	if rt.client == nil {
+		rt.mu.Unlock()
+		return nil, fmt.Errorf("codex runtime lost its app-server connection")
+	}
+	if rt.status == RuntimeBusy {
+		rt.mu.Unlock()
+		return nil, fmt.Errorf("codex runtime already has an active turn")
+	}
+	if rt.status == RuntimeStopped {
+		rt.mu.Unlock()
+		return nil, fmt.Errorf("codex runtime is stopped")
+	}
+	if rt.status == RuntimeError {
+		errText := rt.lastErr
+		rt.mu.Unlock()
+		if errText == "" {
+			errText = "runtime is in an error state"
+		}
+		return nil, fmt.Errorf("codex runtime is unavailable: %s", errText)
+	}
+	client := rt.client
+	rt.status = RuntimeBusy
+	rt.turnID = ""
+	rt.LastUsedAt = time.Now()
+	rt.output = ""
+	rt.lastErr = ""
+	rt.mu.Unlock()
+	m.notify(rt)
+	return client, nil
+}
+
+func (m *CodexRuntimeManager) finishTurn(rt *codexRuntime, threadID string, err error) {
+	rt.mu.Lock()
+	rt.threadID = threadID
+	rt.turnID = ""
+	rt.LastUsedAt = time.Now()
+	if errors.Is(err, codexclient.ErrAppServerTurnInterrupted) {
+		// Interrupt is an expected operator action. The completed Turn is no
+		// longer active, while the retained Thread remains ready for a later
+		// manual Turn or orchestrator-owned Loop attempt.
+		rt.status = RuntimeIdle
+		rt.lastErr = ""
+	} else if err != nil {
+		rt.status = RuntimeError
+		rt.lastErr = err.Error()
+	} else {
+		rt.status = RuntimeIdle
+		rt.lastErr = ""
+	}
+	rt.mu.Unlock()
+	m.notify(rt)
+}
+
+func (m *CodexRuntimeManager) execResult(rt *codexRuntime, text, threadID string) *ExecResult {
+	rt.mu.Lock()
+	rt.output = text
+	stderr := rt.lastErr
+	rt.mu.Unlock()
+	return &ExecResult{FinalText: text, RawStdout: text, RawStderr: stderr, RuntimeID: rt.ID, Endpoint: rt.Endpoint, ExternalSessionID: threadID}
+}
+
+func codexRuntimeModel(spec ExecSpec) string {
+	if strings.EqualFold(spec.ProviderRoute, "ccswitch") || strings.EqualFold(spec.ModelRef, "ccs") || strings.EqualFold(spec.ModelRef, "ccswitch") {
+		return ""
+	}
+	return strings.TrimSpace(spec.ModelRef)
+}
+func codexApprovalPolicy(spec ExecSpec) string {
+	if strings.EqualFold(spec.ApprovalMode, "ask") {
+		return "on-request"
+	}
+	return "never"
+}
+
+func (m *CodexRuntimeManager) Snapshot(runtimeID string) (*RuntimeConsoleSnapshot, bool) {
+	m.mu.Lock()
+	var target *codexRuntime
+	for _, rt := range m.runtimes {
+		if rt.ID == runtimeID {
+			target = rt
+			break
+		}
+	}
+	m.mu.Unlock()
+	if target == nil {
+		return nil, false
+	}
+	state := m.stateFor(target, ExecSpec{}, CleanupRetained)
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	events := append([]RuntimeConsoleEvent(nil), target.events...)
+	return &RuntimeConsoleSnapshot{Runtime: *state, ThreadID: target.threadID, TurnID: target.turnID, Output: target.output, Error: target.lastErr, Events: events, CanSend: target.status == RuntimeIdle, CanInterrupt: target.status == RuntimeBusy && target.threadID != "" && target.turnID != ""}, true
+}
+
+func (m *CodexRuntimeManager) Send(ctx context.Context, runtimeID, text string) (string, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return "", fmt.Errorf("message must not be empty")
+	}
+	m.mu.Lock()
+	var rt *codexRuntime
+	for _, candidate := range m.runtimes {
+		if candidate.ID == runtimeID {
+			rt = candidate
+			break
+		}
+	}
+	m.mu.Unlock()
+	if rt == nil {
+		return "", fmt.Errorf("codex runtime %q not found", runtimeID)
+	}
+	client, err := m.reserveTurn(rt)
+	if err != nil {
+		return "", err
+	}
+	rt.mu.Lock()
+	threadID := rt.threadID
+	rt.mu.Unlock()
+	if threadID == "" {
+		err := fmt.Errorf("codex runtime has no thread yet; run the node first")
+		m.finishTurn(rt, "", err)
+		return "", err
+	}
+	// This marker is intentionally runtime-only: it makes the console's human
+	// interaction explicit without creating a PipelineRun, Attempt or Iteration.
+	m.recordEvent(rt, codexclient.AppServerEvent{At: time.Now(), Method: "orchestrator/manual_turn", Text: text})
+	turnID, err := client.StartTurn(ctx, threadID, text, "", "")
+	if err != nil {
+		m.finishTurn(rt, threadID, err)
+		return "", err
+	}
+	rt.mu.Lock()
+	rt.turnID = turnID
+	rt.LastUsedAt = time.Now()
+	rt.mu.Unlock()
+	m.notify(rt)
+	go func() {
+		answer, waitErr := client.WaitTurn(context.Background(), turnID)
+		rt.mu.Lock()
+		rt.output = answer
+		rt.mu.Unlock()
+		m.finishTurn(rt, threadID, waitErr)
+	}()
+	return turnID, nil
+}
+
+func (m *CodexRuntimeManager) Interrupt(ctx context.Context, runtimeID string) error {
+	m.mu.Lock()
+	var rt *codexRuntime
+	for _, candidate := range m.runtimes {
+		if candidate.ID == runtimeID {
+			rt = candidate
+			break
+		}
+	}
+	m.mu.Unlock()
+	if rt == nil {
+		return fmt.Errorf("codex runtime %q not found", runtimeID)
+	}
+	rt.mu.Lock()
+	client, threadID, turnID := rt.client, rt.threadID, rt.turnID
+	rt.mu.Unlock()
+	if client == nil || threadID == "" || turnID == "" {
+		return fmt.Errorf("codex runtime has no active turn")
+	}
+	if err := client.InterruptTurn(ctx, threadID, turnID); err != nil {
+		return err
+	}
+	return nil
+}
+
+var codexRuntimeMgr = newCodexRuntimeManager()
+
+func ListCodexRuntimes() []*RuntimeState              { return codexRuntimeMgr.List() }
+func GetCodexRuntime(id string) (*RuntimeState, bool) { return codexRuntimeMgr.Get(id) }
+func StopCodexRuntime(id string) error                { return codexRuntimeMgr.Stop(id) }
+func GetCodexRuntimeConsole(id string) (*RuntimeConsoleSnapshot, bool) {
+	return codexRuntimeMgr.Snapshot(id)
+}
+func SendCodexRuntimeMessage(ctx context.Context, id, text string) (string, error) {
+	return codexRuntimeMgr.Send(ctx, id, text)
+}
+func InterruptCodexRuntime(ctx context.Context, id string) error {
+	return codexRuntimeMgr.Interrupt(ctx, id)
+}

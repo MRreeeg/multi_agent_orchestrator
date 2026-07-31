@@ -595,6 +595,33 @@ input,textarea,select{font:inherit;color:inherit}
   </div>
 </div>
 
+<!-- Provider-neutral retained Runtime Console. The browser talks only to the
+     orchestrator API; provider WebSocket credentials/endpoints stay server-side. -->
+<div class="modal-overlay" id="runtime-console-modal" style="display:none">
+  <div class="modal" style="width:min(1080px,96vw);height:min(780px,90vh);display:flex;flex-direction:column">
+    <div class="modal__head">
+      <span id="runtime-console-title">Runtime Console</span>
+      <span class="modal__close" id="runtime-console-close">&times;</span>
+    </div>
+    <div class="modal__body" style="display:grid;grid-template-columns:minmax(250px,.75fr) minmax(0,1.65fr);gap:14px;overflow:hidden;flex:1">
+      <section style="min-width:0;display:flex;flex-direction:column;gap:10px">
+        <div id="runtime-console-meta" style="padding:11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);font:11px/1.55 var(--mono)"></div>
+        <label style="font-size:11px;color:var(--muted-2);font-weight:600">人工介入（同一 Codex Thread 的新 Turn；仅调试，不推进 Loop 或改写 Run/Iteration 历史）</label>
+        <textarea id="runtime-console-input" rows="7" placeholder="输入补充要求、纠正指令或后续任务…" style="width:100%;box-sizing:border-box;resize:vertical;background:var(--bg-2);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius);padding:10px;font:12px/1.5 var(--mono)"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn--primary" id="runtime-console-send" type="button">发送新 Turn</button>
+          <button class="btn btn--ghost" id="runtime-console-interrupt" type="button">Interrupt 当前 Turn</button>
+        </div>
+        <div id="runtime-console-output" style="flex:1;min-height:80px;overflow:auto;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;color:var(--fg-2);font:11px/1.5 var(--mono);white-space:pre-wrap"></div>
+      </section>
+      <section style="min-width:0;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><strong style="font-size:12px">实时事件</strong><span style="font-size:10px;color:var(--muted-2)">浏览器经 Orchestrator 轮询；不直连 Provider WebSocket</span></div>
+        <div id="runtime-console-events" style="flex:1;min-height:0;overflow:auto;background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);padding:8px;color:#d9e2f2;font:11px/1.45 var(--mono)"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── State ──
 const state = {
@@ -763,25 +790,23 @@ function syncExecutorOptionsForNode(node) {
   }
   sel.value = node.executor || 'reasonix';
 
-  // Codex forces mode=run and disables mode selector
+  // Codex supports both modes: run uses one-shot `codex exec`; serve uses
+  // a retained `codex app-server` Runtime/Thread managed by Orchestrator.
   const isCodex = node.executor === 'codex';
   const modeSelect = $('#cfg-mode');
-  if (isCodex) {
-    node.mode = 'run';
-    modeSelect.value = 'run';
-    modeSelect.disabled = true;
-    modeSelect.title = 'Codex executor 强制使用 run 模式';
-  } else {
-    modeSelect.disabled = false;
-    modeSelect.title = '';
-  }
+  if (isCodex && !['run', 'serve'].includes(node.mode)) node.mode = 'serve';
+  modeSelect.value = node.mode || (isCodex ? 'serve' : 'serve');
+  modeSelect.disabled = false;
+  modeSelect.title = isCodex
+    ? 'Codex：run 使用一次性 exec；serve 使用保留 Runtime（app-server）'
+    : '';
 }
 
 function enforceNodeConstraints(node) {
   if (!node.executor) node.executor = inferExecutorFromModel(node.model);
-  // Codex executor forces mode=run
+  // Codex supports `run` (one-shot exec) and `serve` (retained app-server).
   if (node.executor === 'codex') {
-    node.mode = 'run';
+    if (!['run', 'serve'].includes(node.mode)) node.mode = 'serve';
     if (!node.model) {
       node.model = 'ccs';
       node.providerRoute = 'ccswitch';
@@ -828,7 +853,7 @@ function syncConfigFieldState(node) {
   $('#cfg-agent').disabled = isCodex; // Codex doesn't use agent config
   $('#cfg-skill').disabled = false; // All executors can use skill (Codex injects via prompt)
 
-  $('#cfg-executor').title = isCodex ? 'Codex executor: 非交互式 exec 模式' : '可手动选择执行器';
+  $('#cfg-executor').title = isCodex ? 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）' : '可手动选择执行器';
   $('#cfg-agent').title = isCodex ? 'Codex 不使用 agent 配置' : (isMimo ? 'mimo executor 会传递 agent 配置；留空最稳妥' : 'reasonix executor 当前不会使用 agent');
   $('#cfg-skill').title = isCodex ? 'Codex 通过 Prompt 注入 Skill 内容' : (isMimo ? 'mimo executor 当前不会使用 skill，但可保留配置' : 'reasonix executor 可使用 skill');
 }
@@ -1697,16 +1722,27 @@ function renderNodes() {
       badge.className = 'node__port-badge';
       badge.textContent = ':' + node.runtime.port;
       const s = node.runtime.status;
-      const canOpen = (s === 'starting' || s === 'ready' || s === 'idle' || s === 'busy') && node.runtime.endpoint && node.runtime.executor !== 'mimo';
+      const isRuntimeConsole = node.runtime.accessMode === 'runtime_console';
+      const isActive = s === 'starting' || s === 'ready' || s === 'idle' || s === 'busy';
+      // Codex app-server uses an internal WebSocket protocol. Never navigate the browser
+      // to that endpoint: its output and controls are exposed through the Orchestrator console.
+      const canOpenConsole = isRuntimeConsole && !!node.runtime.runtimeID;
+      const canOpenBrowser = isActive && node.runtime.endpoint && node.runtime.executor !== 'mimo' && !isRuntimeConsole;
       badge.style.background = s === 'ready' ? 'var(--success)' :
                                s === 'idle' ? '#e6a800' :
                                s === 'busy' ? 'var(--accent)' :
                                s === 'starting' ? '#e6a800' :
                                'var(--muted-2)';
-      badge.title = s === 'starting' ? 'Runtime 正在启动，点击可提前打开' :
-                    canOpen ? (node.runtime.executor === 'mimo' ? '本地 mimo 历史会话' : '点击打开 agent 页面') :
+      badge.title = canOpenConsole ? (s === 'stopped' ? '打开已停止 Runtime 的控制台记录' : '打开 Orchestrator Runtime Console') :
+                    s === 'starting' ? 'Runtime 正在启动，点击可提前打开' :
+                    canOpenBrowser ? '点击打开 agent 页面' :
                     (s === 'stopped' ? 'Runtime 已停止' : 'Runtime 不可用');
-      if (canOpen) {
+      if (canOpenConsole) {
+        badge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openRuntimeConsole(node.runtime.runtimeID);
+        });
+      } else if (canOpenBrowser) {
         badge.addEventListener('click', (e) => {
           e.stopPropagation();
           window.open(node.runtime.endpoint, '_blank');
@@ -2606,21 +2642,31 @@ function connectSSE() {
         case 'pipeline_node_runtime':
           if (e.text && e.detail) {
             try {
-              const rt = JSON.parse(e.detail);
-              // 用 runtimeID 或 nodeID 匹配节点
+              const incomingRuntime = JSON.parse(e.detail);
+              // 用 runtimeID 或 nodeID 匹配节点。启动事件可能只包含端口和状态，
+              // 因此必须与已有的持久化 RuntimeState 合并，不能覆盖掉 accessMode、
+              // runtimeID、Thread ID 等 Runtime Console 元数据。
               let node = null;
-              if (rt.nodeID) {
-                node = state.nodes.find(n => String(n.id) === String(rt.nodeID));
+              if (incomingRuntime.nodeID) {
+                node = state.nodes.find(n => String(n.id) === String(incomingRuntime.nodeID));
               }
               if (!node) {
                 node = state.nodes.find(n => n.name === e.text);
               }
+              const runtimeKey = incomingRuntime.runtimeID || (node ? ('node_' + node.id) : 'runtime_' + e.text);
+              const previousRuntime = state.runtimeStates[runtimeKey] || (node && node.runtime) || {};
+              const rt = { ...previousRuntime, ...incomingRuntime };
               if (node) {
                 node.runtime = rt;
                 // 同步到 runtimeStates
-                const runtimeKey = rt.runtimeID || ('node_' + node.id);
                 state.runtimeStates[runtimeKey] = rt;
                 renderNodes();
+              }
+              // Codex app-server events are proxied by the Orchestrator. The
+              // payload is only a wake-up signal; the console fetches its
+              // escaped event history from the API and never dials WebSocket directly.
+              if (runtimeConsoleID && rt.runtimeID === runtimeConsoleID) {
+                refreshRuntimeConsole();
               }
             } catch (_) {}
           }
@@ -2843,13 +2889,13 @@ async function showNodeDetail(node) {
           <span style="color:var(--muted-2)">端口：</span><span class="mono">${rt.port || '-'}</span>
           <span style="color:var(--muted-2)">端点：</span><span class="mono" style="font-size:10px">${rt.endpoint || '-'}</span>
           <span style="color:var(--muted-2)">策略：</span><span>retained（保留至手动停止）</span>
-          <span style="color:var(--muted-2)">访问方式：</span><span>${rt.accessMode === 'local_history' ? '本地历史会话' : '浏览器'}</span>
+          <span style="color:var(--muted-2)">访问方式：</span><span>${rt.accessMode === 'local_history' ? '本地历史会话' : rt.accessMode === 'runtime_console' ? 'Orchestrator Runtime Console' : '浏览器'}</span>
         </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          ${canOpen && rt.executor !== 'mimo' ? `<a href="${escHtml(rt.endpoint)}" target="_blank" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;text-decoration:none">Open</a>` : ''}
+          ${rt.accessMode === 'runtime_console' ? `<button onclick="openRuntimeConsole('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer">进入控制台</button>` : (canOpen && rt.executor !== 'mimo' ? `<a href="${escHtml(rt.endpoint)}" target="_blank" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;text-decoration:none">Open</a>` : '')}
           ${canOpen && rt.executor === 'mimo' ? `<span style="font-size:11px;color:var(--muted-2)">无网页入口 — 使用本地 mimo 历史会话</span>` : ''}
           ${canStop ? `<button onclick="stopRuntime('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;padding:4px 8px;border:1px solid var(--danger);border-radius:4px;background:none;color:var(--danger);cursor:pointer">Stop</button>` : ''}
-          <button disabled title="后续版本支持" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--muted-2);cursor:not-allowed">Interrupt（保留 runtime）</button>
+          ${rt.accessMode === 'runtime_console' ? `<button onclick="interruptRuntime('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--warning);cursor:pointer">Interrupt（保留 runtime）</button>` : `<button disabled title="后续版本支持" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--muted-2);cursor:not-allowed">Interrupt（保留 runtime）</button>`}
         </div>
       </div>
     `;
@@ -2941,6 +2987,90 @@ async function stopRuntime(runtimeID) {
     toast('停止失败: ' + err.message, 'error');
   }
 }
+
+let runtimeConsoleID = '';
+let runtimeConsoleTimer = null;
+
+function closeRuntimeConsole() {
+  runtimeConsoleID = '';
+  if (runtimeConsoleTimer) { clearInterval(runtimeConsoleTimer); runtimeConsoleTimer = null; }
+  $('#runtime-console-modal').style.display = 'none';
+}
+
+async function openRuntimeConsole(runtimeID) {
+  if (!runtimeID) return;
+  runtimeConsoleID = runtimeID;
+  $('#runtime-console-modal').style.display = 'flex';
+  await refreshRuntimeConsole();
+  if (runtimeConsoleTimer) clearInterval(runtimeConsoleTimer);
+  runtimeConsoleTimer = setInterval(refreshRuntimeConsole, 1200);
+}
+
+async function refreshRuntimeConsole() {
+  if (!runtimeConsoleID) return;
+  try {
+    const data = await apiGet('/runtimes/' + encodeURIComponent(runtimeConsoleID) + '/console');
+    renderRuntimeConsole(data || {});
+  } catch (err) {
+    $('#runtime-console-events').textContent = '读取 Runtime Console 失败：' + (err.message || err);
+  }
+}
+
+function renderRuntimeConsole(data) {
+  const rt = data.runtime || {};
+  $('#runtime-console-title').textContent = 'Runtime Console · ' + (rt.model || 'Codex');
+  $('#runtime-console-meta').innerHTML =
+    '<div><span style="color:var(--muted-2)">状态</span>  ' + escHtml(rt.status || '-') + '</div>' +
+    '<div><span style="color:var(--muted-2)">Runtime</span>  ' + escHtml(rt.runtimeID || '-') + '</div>' +
+    '<div><span style="color:var(--muted-2)">Thread</span>  ' + escHtml(data.threadID || rt.threadID || '尚未创建') + '</div>' +
+    '<div><span style="color:var(--muted-2)">Turn</span>  ' + escHtml(data.turnID || rt.turnID || '空闲') + '</div>' +
+    '<div><span style="color:var(--muted-2)">端点</span>  ' + escHtml(rt.endpoint || '-') + '</div>';
+  const send = $('#runtime-console-send');
+  const interrupt = $('#runtime-console-interrupt');
+  send.disabled = !data.canSend;
+  interrupt.disabled = !data.canInterrupt;
+  $('#runtime-console-output').textContent = data.output || data.error || '等待该 Runtime 的输出…';
+  const events = Array.isArray(data.events) ? data.events : [];
+  const container = $('#runtime-console-events');
+  const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+  container.innerHTML = events.map(e => {
+    const stamp = e.at ? new Date(e.at).toLocaleTimeString() : '--:--:--';
+    const detail = e.text || e.payload || '';
+    const color = e.level === 'error' ? '#ff7b72' : e.method && e.method.includes('agentMessage') ? '#a5d6ff' : '#b7c6db';
+    return '<div style="padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.07)">' +
+      '<span style="color:#7d8590">' + escHtml(stamp) + '</span> ' +
+      '<span style="color:' + color + '">' + escHtml(e.method || 'event') + '</span>' +
+      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:#c9d1d9;font:inherit">' + escHtml(detail) + '</pre>' : '') +
+      '</div>';
+  }).join('') || '<div style="color:#7d8590;padding:8px">等待 Codex App Server 事件…</div>';
+  if (wasNearBottom) container.scrollTop = container.scrollHeight;
+}
+
+async function sendRuntimeConsoleMessage() {
+  const input = $('#runtime-console-input');
+  const text = String(input.value || '').trim();
+  if (!text || !runtimeConsoleID) return;
+  try {
+    $('#runtime-console-send').disabled = true;
+    await apiPost('/runtimes/' + encodeURIComponent(runtimeConsoleID) + '/message', { text });
+    input.value = '';
+    toast('已发送到同一 Codex Thread', 'success');
+    await refreshRuntimeConsole();
+  } catch (err) { toast('发送失败: ' + err.message, 'error'); }
+}
+
+async function interruptRuntime(runtimeID) {
+  if (!runtimeID) return;
+  try {
+    await apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/interrupt', {});
+    toast('已请求中断当前 Turn；Runtime 与 Thread 会保留', 'success');
+    if (runtimeID === runtimeConsoleID) await refreshRuntimeConsole();
+  } catch (err) { toast('中断失败: ' + err.message, 'error'); }
+}
+
+$('#runtime-console-close').addEventListener('click', closeRuntimeConsole);
+$('#runtime-console-send').addEventListener('click', sendRuntimeConsoleMessage);
+$('#runtime-console-interrupt').addEventListener('click', () => interruptRuntime(runtimeConsoleID));
 
 function buildPipelinePayload() {
   const payload = {

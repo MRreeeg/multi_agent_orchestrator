@@ -15,7 +15,8 @@ type CodexPipelineExecutor struct {
 // Name returns the executor identifier.
 func (e *CodexPipelineExecutor) Name() string { return "codex" }
 
-// Execute runs a Codex node via `codex exec` or `codex exec resume`.
+// Execute runs a Codex node through one-shot `codex exec` or the retained
+// `codex app-server` Runtime Manager, depending on the selected node mode.
 func (e *CodexPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int)) (*ExecResult, error) {
 	client := e.Client
 	if client == nil {
@@ -50,11 +51,21 @@ func (e *CodexPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onSt
 		ResumeSessionID: resumeID,
 	}
 
-	// Inject Skill content into prompt if present
+	// Inject Skill content into prompt if present. Both one-shot exec and the
+	// retained app-server must receive exactly the same task contract.
 	prompt := spec.Prompt
 	if spec.SkillContent != "" {
 		prompt = fmt.Sprintf("# SYSTEM-LEVEL SKILL INSTRUCTIONS\n\n以下是本节点必须遵守的 Skill 指令。\nSkill 名称：%s\n\n<skill>\n%s\n</skill>\n\n# TASK\n\n%s",
 			spec.Skill, spec.SkillContent, spec.Prompt)
+	}
+
+	// `serve` is a retained Codex App Server, not a one-shot `codex exec`
+	// process. The manager owns WebSocket JSON-RPC, thread resumption and
+	// Runtime Console state; Loop ownership remains in the orchestrator.
+	if spec.Mode == "serve" {
+		serveSpec := spec
+		serveSpec.Prompt = prompt
+		return codexRuntimeMgr.Execute(ctx, serveSpec, onStart)
 	}
 
 	codexResult, err := client.Exec(ctx, prompt, opts)

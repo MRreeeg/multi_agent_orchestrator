@@ -20,4 +20,8 @@ var (
 
 	// ErrExecutorProtocol is returned when the output cannot be parsed.
 	ErrExecutorProtocol = errors.New("codex: protocol error")
+
+	// ErrAppServerTurnInterrupted is returned when a retained app-server Turn
+	// was explicitly interrupted. The Thread and Runtime remain reusable.
+	ErrAppServerTurnInterrupted = errors.New("codex: app-server turn interrupted")
 )
