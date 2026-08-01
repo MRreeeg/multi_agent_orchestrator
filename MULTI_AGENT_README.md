@@ -144,6 +144,8 @@ Canvas 节点的 retained Codex/Mimo Runtime 可打开 **Runtime Console**：查
 
 Provider 事件通过 Orchestrator SSE 立即唤醒 Console 刷新，并保留 1.2 秒轮询作为断线恢复兜底。Codex 使用 `app-server` 的 JSON-RPC over WebSocket；**Mimo 使用 ACP（Agent Client Protocol）JSON-RPC over stdio**，两者互不复用，各自在 `internal/executor/codex` 与 `internal/executor/mimo` 独立适配。
 
+Console 的流式增量（Codex `textDelta`、Mimo `agent_*_chunk`）会**按消息合并**成一条可读事件（边界事件或静默 400ms 落盘），推理文本浅色显示；**每个 Runtime 可以独立打开一个 Console 窗口**，Mimo 与 Codex 同时执行时互不覆盖，各自保留事件历史。
+
 页面刷新和节点刚启动时，前端会将 `pipeline_node_runtime` SSE 临时事件与持久化 `RuntimeState` 合并，而不是覆盖。这样 `accessMode=runtime_console`、Runtime ID、Thread/Session ID 不会丢失：Canvas 始终打开 Orchestrator Runtime Console，绝不会尝试由浏览器直接访问 `ws://`。
 
 ### Mimo

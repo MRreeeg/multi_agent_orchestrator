@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,11 +19,12 @@ import (
 // Runtime Console. Payload is raw JSON-RPC data and is never executed by the
 // browser; the UI renders it as escaped diagnostic text.
 type RuntimeConsoleEvent struct {
-	At      time.Time `json:"at"`
-	Level   string    `json:"level"`
-	Method  string    `json:"method"`
-	Text    string    `json:"text,omitempty"`
-	Payload string    `json:"payload,omitempty"`
+	At       time.Time `json:"at"`
+	Level    string    `json:"level"`
+	Method   string    `json:"method"`
+	Text     string    `json:"text,omitempty"`
+	Payload  string    `json:"payload,omitempty"`
+	Category string    `json:"category,omitempty"` // reasoning | assistant | prompt | tool | ""
 }
 
 // RuntimeConsoleSnapshot is the backend-owned view returned to the browser.
@@ -63,6 +65,7 @@ type codexRuntime struct {
 	output   string
 	lastErr  string
 	events   []RuntimeConsoleEvent
+	stream   *consoleStreamCoalescer
 }
 
 // CodexRuntimeManager starts `codex app-server` as a retained, loopback-only
@@ -158,7 +161,12 @@ func (m *CodexRuntimeManager) Stop(runtimeID string) error {
 	target.status = RuntimeStopped
 	client := target.client
 	target.client = nil
+	stream := target.stream
+	target.stream = nil
 	target.mu.Unlock()
+	if stream != nil {
+		stream.stop()
+	}
 	if client != nil {
 		client.Close()
 	}
@@ -273,6 +281,16 @@ func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart
 	m.runtimes[key] = rt
 	m.mu.Unlock()
 
+	rt.stream = newConsoleStreamCoalescer(0, func(evt RuntimeConsoleEvent) {
+		rt.mu.Lock()
+		rt.events = append(rt.events, evt)
+		if len(rt.events) > 300 {
+			rt.events = append([]RuntimeConsoleEvent(nil), rt.events[len(rt.events)-300:]...)
+		}
+		rt.mu.Unlock()
+		m.notify(rt)
+	})
+
 	cmd := newRetainedRuntimeCommand(ctx, "codex", "app-server", "--listen", rt.Endpoint)
 	cmd.Dir = spec.Workspace
 	cmd.Stdout = io.Discard
@@ -328,8 +346,13 @@ func (m *CodexRuntimeManager) watchRuntime(key string, rt *codexRuntime) {
 		}
 	}
 	client := rt.client
+	stream := rt.stream
+	rt.stream = nil
 	rt.client = nil
 	rt.mu.Unlock()
+	if stream != nil {
+		stream.stop()
+	}
 	if client != nil {
 		client.Close()
 	}
@@ -343,6 +366,15 @@ func (m *CodexRuntimeManager) watchRuntime(key string, rt *codexRuntime) {
 }
 
 func (m *CodexRuntimeManager) recordEvent(rt *codexRuntime, event codexclient.AppServerEvent) {
+	// Stream the tiny token deltas into a consolidated block so the console
+	// shows one readable entry per message instead of one row per fragment.
+	if rt.stream != nil {
+		if method, key, category, ok := codexStreamPart(event); ok {
+			rt.stream.append(method, key, category, event.Text)
+			return
+		}
+		rt.stream.flushNow()
+	}
 	rt.mu.Lock()
 	payload := string(event.Params)
 	level := "info"
@@ -355,6 +387,35 @@ func (m *CodexRuntimeManager) recordEvent(rt *codexRuntime, event codexclient.Ap
 	}
 	rt.mu.Unlock()
 	m.notify(rt)
+}
+
+// codexStreamPart classifies a Codex app-server event as a streaming delta.
+// Deltas are coalesced per turn so reasoning and assistant text each become a
+// single console block; every other event is a boundary that flushes them.
+func codexStreamPart(event codexclient.AppServerEvent) (method, key, category string, isDelta bool) {
+	// Delta method names vary: item/agentMessage/delta, item/reasoning/textDelta,
+	// item/input/textDelta, ...Chunk variants.
+	if !strings.Contains(strings.ToLower(event.Method), "delta") {
+		return "", "", "", false
+	}
+	key = codexEventTurnID(event.Params)
+	category = "assistant"
+	if strings.Contains(event.Method, "reasoning") || strings.Contains(event.Method, "thought") {
+		category = "reasoning"
+	} else if strings.Contains(event.Method, "input") {
+		category = "prompt"
+	}
+	return event.Method, key, category, true
+}
+
+func codexEventTurnID(params json.RawMessage) string {
+	var body struct {
+		TurnID string `json:"turnId"`
+	}
+	if json.Unmarshal(params, &body) != nil || body.TurnID == "" {
+		return ""
+	}
+	return body.TurnID
 }
 
 func (m *CodexRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*ExecResult, error) {

@@ -44,6 +44,7 @@ type mimoRuntime struct {
 	output    string
 	lastErr   string
 	events    []RuntimeConsoleEvent
+	stream    *consoleStreamCoalescer
 }
 
 // MimoRuntimeManager starts `mimo acp` as a retained, loopback-only runtime
@@ -140,7 +141,12 @@ func (m *MimoRuntimeManager) Stop(runtimeID string) error {
 	target.status = RuntimeStopped
 	client := target.client
 	target.client = nil
+	stream := target.stream
+	target.stream = nil
 	target.mu.Unlock()
+	if stream != nil {
+		stream.stop()
+	}
 	if client != nil {
 		client.Close()
 	}
@@ -188,7 +194,12 @@ func (m *MimoRuntimeManager) cleanupAll() {
 		rt.mu.Lock()
 		client := rt.client
 		rt.client = nil
+		stream := rt.stream
+		rt.stream = nil
 		rt.mu.Unlock()
+		if stream != nil {
+			stream.stop()
+		}
 		if client != nil {
 			client.Close()
 		}
@@ -271,6 +282,16 @@ func (m *MimoRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart 
 	}
 	m.runtimes[key] = rt
 	m.mu.Unlock()
+
+	rt.stream = newConsoleStreamCoalescer(0, func(evt RuntimeConsoleEvent) {
+		rt.mu.Lock()
+		rt.events = append(rt.events, evt)
+		if len(rt.events) > 300 {
+			rt.events = append([]RuntimeConsoleEvent(nil), rt.events[len(rt.events)-300:]...)
+		}
+		rt.mu.Unlock()
+		m.notify(rt)
+	})
 
 	workspace := strings.TrimSpace(spec.Workspace)
 	args := []string{"acp", "--port", fmt.Sprint(port), "--hostname", "127.0.0.1"}
@@ -373,8 +394,13 @@ func (m *MimoRuntimeManager) watchRuntime(key string, rt *mimoRuntime) {
 		}
 	}
 	client := rt.client
+	stream := rt.stream
+	rt.stream = nil
 	rt.client = nil
 	rt.mu.Unlock()
+	if stream != nil {
+		stream.stop()
+	}
 	if client != nil {
 		client.Close()
 	}
@@ -391,6 +417,16 @@ func (m *MimoRuntimeManager) watchRuntime(key string, rt *mimoRuntime) {
 }
 
 func (m *MimoRuntimeManager) recordEvent(rt *mimoRuntime, event mimoclient.AcpEvent) {
+	// ACP streams reasoning/assistant text as tiny agent_*_chunk updates.
+	// Coalesce them into one readable console block per message; everything
+	// else (tool calls, part completion, usage) is a flush boundary.
+	if rt.stream != nil {
+		if method, key, category, ok := mimoStreamPart(event); ok {
+			rt.stream.append(method, key, category, event.Text)
+			return
+		}
+		rt.stream.flushNow()
+	}
 	rt.mu.Lock()
 	level := "info"
 	if strings.Contains(event.Method, "error") || strings.Contains(event.Method, "permission") {
@@ -402,6 +438,20 @@ func (m *MimoRuntimeManager) recordEvent(rt *mimoRuntime, event mimoclient.AcpEv
 	}
 	rt.mu.Unlock()
 	m.notify(rt)
+}
+
+// mimoStreamPart classifies an ACP event as a streaming delta. agent_thought_chunk
+// is reasoning; agent_message_chunk is the assistant answer; both are grouped by
+// message id so a turn produces at most one console block per kind.
+func mimoStreamPart(event mimoclient.AcpEvent) (method, key, category string, isDelta bool) {
+	switch event.Update {
+	case "agent_message_chunk":
+		return "agent_message", event.MessageID, "assistant", true
+	case "agent_thought_chunk":
+		return "agent_thought", event.MessageID, "reasoning", true
+	default:
+		return "", "", "", false
+	}
 }
 
 // Execute runs one orchestration node turn against the retained mimo session.

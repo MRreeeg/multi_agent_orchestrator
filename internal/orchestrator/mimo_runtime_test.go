@@ -15,10 +15,18 @@ func TestMimoRuntimeManagerEventUpdatesConsoleAndSSEBridge(t *testing.T) {
 		StartedAt: time.Now(), LastUsedAt: time.Now(), status: RuntimeIdle,
 	}
 	manager.runtimes["node|xiaomi/mimo-v2.5|work|build"] = runtime
-	updates := make(chan RuntimeState, 1)
+	runtime.stream = newConsoleStreamCoalescer(0, func(evt RuntimeConsoleEvent) {
+		runtime.mu.Lock()
+		runtime.events = append(runtime.events, evt)
+		runtime.mu.Unlock()
+		manager.notify(runtime)
+	})
+	updates := make(chan RuntimeState, 4)
 	manager.SetUpdateSink(func(state RuntimeState) { updates <- state })
 
-	manager.recordEvent(runtime, mimoclient.AcpEvent{At: time.Now(), Method: "session/update", Update: "agent_message_chunk", Text: "OK", Payload: `{"update":{"sessionUpdate":"agent_message_chunk"}}`})
+	manager.recordEvent(runtime, mimoclient.AcpEvent{At: time.Now(), Method: "session/update", Update: "agent_message_chunk", MessageID: "msg-1", Text: "OK", Payload: `{"update":{"sessionUpdate":"agent_message_chunk"}}`})
+	// A non-delta boundary (part completion) flushes the coalesced block.
+	manager.recordEvent(runtime, mimoclient.AcpEvent{At: time.Now(), Method: "session/update", Update: "message_part_completed", MessageID: "msg-1", Payload: `{"update":{"sessionUpdate":"message_part_completed"}}`})
 
 	select {
 	case state := <-updates:
@@ -29,7 +37,8 @@ func TestMimoRuntimeManagerEventUpdatesConsoleAndSSEBridge(t *testing.T) {
 		t.Fatal("runtime event did not notify the SSE bridge")
 	}
 	snapshot, ok := manager.Snapshot(runtime.ID)
-	if !ok || len(snapshot.Events) != 1 || snapshot.Events[0].Text != "OK" {
+	// One consolidated assistant block + one boundary marker.
+	if !ok || len(snapshot.Events) != 2 || snapshot.Events[0].Text != "OK" || snapshot.Events[0].Category != "assistant" {
 		t.Fatalf("console snapshot = %#v, %v", snapshot, ok)
 	}
 }

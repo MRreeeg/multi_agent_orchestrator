@@ -14,10 +14,18 @@ func TestCodexRuntimeManagerEventUpdatesConsoleAndSSEBridge(t *testing.T) {
 		StartedAt: time.Now(), LastUsedAt: time.Now(), status: RuntimeIdle,
 	}
 	manager.runtimes["node|ccs|work|ccswitch"] = runtime
-	updates := make(chan RuntimeState, 1)
+	runtime.stream = newConsoleStreamCoalescer(0, func(evt RuntimeConsoleEvent) {
+		runtime.mu.Lock()
+		runtime.events = append(runtime.events, evt)
+		runtime.mu.Unlock()
+		manager.notify(runtime)
+	})
+	updates := make(chan RuntimeState, 4)
 	manager.SetUpdateSink(func(state RuntimeState) { updates <- state })
 
 	manager.recordEvent(runtime, codexclient.AppServerEvent{At: time.Now(), Method: "item/agentMessage/delta", Text: "hello", Params: []byte(`{"turnId":"turn-1","delta":"hello"}`)})
+	// A non-delta boundary flushes the coalesced stream into one console block.
+	manager.recordEvent(runtime, codexclient.AppServerEvent{At: time.Now(), Method: "turn/completed", Params: []byte(`{"threadId":"t","turn":{"id":"turn-1"}}`)})
 
 	select {
 	case state := <-updates:
@@ -28,7 +36,8 @@ func TestCodexRuntimeManagerEventUpdatesConsoleAndSSEBridge(t *testing.T) {
 		t.Fatal("runtime event did not notify the SSE bridge")
 	}
 	snapshot, ok := manager.Snapshot(runtime.ID)
-	if !ok || len(snapshot.Events) != 1 || snapshot.Events[0].Text != "hello" {
+	// One consolidated assistant block + one boundary marker.
+	if !ok || len(snapshot.Events) != 2 || snapshot.Events[0].Text != "hello" || snapshot.Events[0].Category != "assistant" {
 		t.Fatalf("console snapshot = %#v, %v", snapshot, ok)
 	}
 }

@@ -80,3 +80,8 @@ graph LR
 - `session/close` 未实现 → Stop 依赖关 stdin + `killProcessTree`。
 - 只迁移 serve 模式；run 模式零改动。
 - 浏览器永远不直连 provider 端点。
+
+## Runtime Console 体验（v1.1 补充）
+
+- **流式增量合并**：Codex `item/*/textDelta` / `item/*/delta` 与 Mimo `agent_*_chunk` 按消息合并成一个控制台块（后端 `consoleStreamCoalescer`），在完成/工具调用等边界事件或静默 400ms 时落一条事件；推理文本标记 `category=reasoning` 浅色显示，助手文本 `category=assistant` 高亮。
+- **每 Runtime 独立窗口**：控制台改为多实例——Mimo 与 Codex 可同时各开一个窗口，各自轮询/发送/中断，互不覆盖；历史事件仍在各 Runtime 独立保留（上限 300 条合并事件）。

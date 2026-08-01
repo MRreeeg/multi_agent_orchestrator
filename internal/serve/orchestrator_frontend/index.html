@@ -595,32 +595,35 @@ input,textarea,select{font:inherit;color:inherit}
   </div>
 </div>
 
-<!-- Provider-neutral retained Runtime Console. The browser talks only to the
-     orchestrator API; provider WebSocket credentials/endpoints stay server-side. -->
-<div class="modal-overlay" id="runtime-console-modal" style="display:none">
-  <div class="modal" style="width:min(1080px,96vw);height:min(780px,90vh);display:flex;flex-direction:column">
-    <div class="modal__head">
-      <span id="runtime-console-title">Runtime Console</span>
-      <span class="modal__close" id="runtime-console-close">&times;</span>
-    </div>
-    <div class="modal__body" style="display:grid;grid-template-columns:minmax(250px,.75fr) minmax(0,1.65fr);gap:14px;overflow:hidden;flex:1">
-      <section style="min-width:0;display:flex;flex-direction:column;gap:10px">
-        <div id="runtime-console-meta" style="padding:11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);font:11px/1.55 var(--mono)"></div>
-        <label style="font-size:11px;color:var(--muted-2);font-weight:600">人工介入（同一 Codex Thread 的新 Turn；仅调试，不推进 Loop 或改写 Run/Iteration 历史）</label>
-        <textarea id="runtime-console-input" rows="7" placeholder="输入补充要求、纠正指令或后续任务…" style="width:100%;box-sizing:border-box;resize:vertical;background:var(--bg-2);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius);padding:10px;font:12px/1.5 var(--mono)"></textarea>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn--primary" id="runtime-console-send" type="button">发送新 Turn</button>
-          <button class="btn btn--ghost" id="runtime-console-interrupt" type="button">Interrupt 当前 Turn</button>
-        </div>
-        <div id="runtime-console-output" style="flex:1;min-height:80px;overflow:auto;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;color:var(--fg-2);font:11px/1.5 var(--mono);white-space:pre-wrap"></div>
-      </section>
-      <section style="min-width:0;display:flex;flex-direction:column">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><strong style="font-size:12px">实时事件</strong><span style="font-size:10px;color:var(--muted-2)">浏览器经 Orchestrator 轮询；不直连 Provider WebSocket</span></div>
-        <div id="runtime-console-events" style="flex:1;min-height:0;overflow:auto;background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);padding:8px;color:#d9e2f2;font:11px/1.45 var(--mono)"></div>
-      </section>
+<!-- Provider-neutral retained Runtime Console. One window per runtime can be
+     open at a time; each window polls the orchestrator API (provider WebSocket
+     credentials/endpoints stay server-side). -->
+<template id="runtime-console-template">
+  <div class="modal-overlay rc-modal" style="display:none;background:rgba(6,10,18,.55)">
+    <div class="modal" style="width:min(1080px,96vw);height:min(780px,90vh);display:flex;flex-direction:column">
+      <div class="modal__head">
+        <span class="rc-title">Runtime Console</span>
+        <span class="modal__close rc-close" title="关闭此 Runtime 的控制台">&times;</span>
+      </div>
+      <div class="modal__body" style="display:grid;grid-template-columns:minmax(250px,.75fr) minmax(0,1.65fr);gap:14px;overflow:hidden;flex:1">
+        <section style="min-width:0;display:flex;flex-direction:column;gap:10px">
+          <div class="rc-meta" style="padding:11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);font:11px/1.55 var(--mono)"></div>
+          <label style="font-size:11px;color:var(--muted-2);font-weight:600">人工介入（保留会话上的新 Turn；仅调试，不推进 Loop 或改写 Run/Iteration 历史）</label>
+          <textarea class="rc-input" rows="7" placeholder="输入补充要求、纠正指令或后续任务…" style="width:100%;box-sizing:border-box;resize:vertical;background:var(--bg-2);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius);padding:10px;font:12px/1.5 var(--mono)"></textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn--primary rc-send" type="button">发送新 Turn</button>
+            <button class="btn btn--ghost rc-interrupt" type="button">Interrupt 当前 Turn</button>
+          </div>
+          <div class="rc-output" style="flex:1;min-height:80px;overflow:auto;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;color:var(--fg-2);font:11px/1.5 var(--mono);white-space:pre-wrap"></div>
+        </section>
+        <section style="min-width:0;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><strong style="font-size:12px">实时事件</strong><span style="font-size:10px;color:var(--muted-2)">流式增量已按消息合并；浏览器经 Orchestrator 轮询，不直连 Provider</span></div>
+          <div class="rc-events" style="flex:1;min-height:0;overflow:auto;background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);padding:8px;color:#d9e2f2;font:11px/1.45 var(--mono)"></div>
+        </section>
+      </div>
     </div>
   </div>
-</div>
+</template>
 
 <script>
 // ── State ──
@@ -2665,8 +2668,9 @@ function connectSSE() {
               // Codex app-server events are proxied by the Orchestrator. The
               // payload is only a wake-up signal; the console fetches its
               // escaped event history from the API and never dials WebSocket directly.
-              if (runtimeConsoleID && rt.runtimeID === runtimeConsoleID) {
-                refreshRuntimeConsole();
+              // Wake every open console window that belongs to this runtime.
+              if (rt.runtimeID) {
+                refreshRuntimeConsole(rt.runtimeID);
               }
             } catch (_) {}
           }
@@ -2988,74 +2992,118 @@ async function stopRuntime(runtimeID) {
   }
 }
 
-let runtimeConsoleID = '';
-let runtimeConsoleTimer = null;
+// One independent Runtime Console window per runtime. Multiple windows can be
+// open at the same time (for example a Mimo window and a Codex window), each
+// with its own polling timer, input and interrupt control.
+const runtimeConsoles = new Map(); // runtimeID -> { modal, timer }
+let consoleZ = 1000;
 
-function closeRuntimeConsole() {
-  runtimeConsoleID = '';
-  if (runtimeConsoleTimer) { clearInterval(runtimeConsoleTimer); runtimeConsoleTimer = null; }
-  $('#runtime-console-modal').style.display = 'none';
+function consoleModal(runtimeID) {
+  return (runtimeConsoles.get(runtimeID) || {}).modal || null;
+}
+
+function closeRuntimeConsole(runtimeID) {
+  const entry = runtimeConsoles.get(runtimeID);
+  if (!entry) return;
+  if (entry.timer) { clearInterval(entry.timer); }
+  entry.modal.remove();
+  runtimeConsoles.delete(runtimeID);
 }
 
 async function openRuntimeConsole(runtimeID) {
   if (!runtimeID) return;
-  runtimeConsoleID = runtimeID;
-  $('#runtime-console-modal').style.display = 'flex';
-  await refreshRuntimeConsole();
-  if (runtimeConsoleTimer) clearInterval(runtimeConsoleTimer);
-  runtimeConsoleTimer = setInterval(refreshRuntimeConsole, 1200);
+  const existing = runtimeConsoles.get(runtimeID);
+  if (existing) {
+    existing.modal.style.display = 'flex';
+    existing.modal.style.zIndex = ++consoleZ;
+    await refreshRuntimeConsole(runtimeID);
+    return;
+  }
+  const tpl = document.getElementById('runtime-console-template');
+  const node = tpl.content.cloneNode(true);
+  const modal = node.querySelector('.rc-modal');
+  modal.id = 'rc-modal-' + String(runtimeID).replace(/[^a-zA-Z0-9_-]/g, '_');
+  // Stack offset so several consoles do not fully cover each other.
+  const offset = (runtimeConsoles.size % 6) * 26;
+  modal.style.left = offset + 'px';
+  modal.style.top = offset + 'px';
+  modal.style.zIndex = ++consoleZ;
+  document.body.appendChild(node);
+  const entry = { modal, timer: null, runtimeID };
+  runtimeConsoles.set(runtimeID, entry);
+  modal.querySelector('.rc-close').addEventListener('click', () => closeRuntimeConsole(runtimeID));
+  modal.querySelector('.rc-send').addEventListener('click', () => sendRuntimeConsoleMessage(runtimeID));
+  modal.querySelector('.rc-interrupt').addEventListener('click', () => interruptRuntime(runtimeID));
+  // Clicking anywhere on the overlay brings the window to the front.
+  modal.addEventListener('mousedown', () => { modal.style.zIndex = ++consoleZ; });
+  modal.style.display = 'flex';
+  await refreshRuntimeConsole(runtimeID);
+  entry.timer = setInterval(() => refreshRuntimeConsole(runtimeID), 1200);
 }
 
-async function refreshRuntimeConsole() {
-  if (!runtimeConsoleID) return;
+async function refreshRuntimeConsole(runtimeID) {
+  if (!runtimeID) return;
+  const modal = consoleModal(runtimeID);
+  if (!modal) return;
   try {
-    const data = await apiGet('/runtimes/' + encodeURIComponent(runtimeConsoleID) + '/console');
-    renderRuntimeConsole(data || {});
+    const data = await apiGet('/runtimes/' + encodeURIComponent(runtimeID) + '/console');
+    renderRuntimeConsole(runtimeID, data || {});
   } catch (err) {
-    $('#runtime-console-events').textContent = '读取 Runtime Console 失败：' + (err.message || err);
+    modal.querySelector('.rc-events').textContent = '读取 Runtime Console 失败：' + (err.message || err);
   }
 }
 
-function renderRuntimeConsole(data) {
+function renderRuntimeConsole(runtimeID, data) {
+  const modal = consoleModal(runtimeID);
+  if (!modal) return;
   const rt = data.runtime || {};
-  $('#runtime-console-title').textContent = 'Runtime Console · ' + (rt.model || 'Codex');
-  $('#runtime-console-meta').innerHTML =
+  modal.querySelector('.rc-title').textContent = 'Runtime Console · ' + (rt.model || rt.executor || 'Runtime');
+  modal.querySelector('.rc-meta').innerHTML =
     '<div><span style="color:var(--muted-2)">状态</span>  ' + escHtml(rt.status || '-') + '</div>' +
     '<div><span style="color:var(--muted-2)">Runtime</span>  ' + escHtml(rt.runtimeID || '-') + '</div>' +
-    '<div><span style="color:var(--muted-2)">Thread</span>  ' + escHtml(data.threadID || rt.threadID || '尚未创建') + '</div>' +
+    '<div><span style="color:var(--muted-2)">Session/Thread</span>  ' + escHtml(data.threadID || rt.threadID || '尚未创建') + '</div>' +
     '<div><span style="color:var(--muted-2)">Turn</span>  ' + escHtml(data.turnID || rt.turnID || '空闲') + '</div>' +
     '<div><span style="color:var(--muted-2)">端点</span>  ' + escHtml(rt.endpoint || '-') + '</div>';
-  const send = $('#runtime-console-send');
-  const interrupt = $('#runtime-console-interrupt');
+  const send = modal.querySelector('.rc-send');
+  const interrupt = modal.querySelector('.rc-interrupt');
   send.disabled = !data.canSend;
   interrupt.disabled = !data.canInterrupt;
-  $('#runtime-console-output').textContent = data.output || data.error || '等待该 Runtime 的输出…';
+  modal.querySelector('.rc-output').textContent = data.output || data.error || '等待该 Runtime 的输出…';
   const events = Array.isArray(data.events) ? data.events : [];
-  const container = $('#runtime-console-events');
+  const container = modal.querySelector('.rc-events');
   const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
   container.innerHTML = events.map(e => {
     const stamp = e.at ? new Date(e.at).toLocaleTimeString() : '--:--:--';
     const detail = e.text || e.payload || '';
-    const color = e.level === 'error' ? '#ff7b72' : e.method && e.method.includes('agentMessage') ? '#a5d6ff' : '#b7c6db';
+    // Streaming deltas are already merged into one block per message by the
+    // backend; reasoning stays dim and collapsed-looking so the assistant
+    // answer is the visual focus.
+    const reasoning = e.category === 'reasoning';
+    const assistant = e.category === 'assistant';
+    const color = e.level === 'error' ? '#ff7b72' : assistant ? '#a5d6ff' : reasoning ? '#6e7681' : '#b7c6db';
+    const prefix = reasoning ? '🧠 推理 · ' : assistant ? '💬 回答 · ' : '';
+    const label = (reasoning || assistant) ? prefix + (e.method || 'text') : (e.method || 'event');
     return '<div style="padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.07)">' +
       '<span style="color:#7d8590">' + escHtml(stamp) + '</span> ' +
-      '<span style="color:' + color + '">' + escHtml(e.method || 'event') + '</span>' +
-      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:#c9d1d9;font:inherit">' + escHtml(detail) + '</pre>' : '') +
+      '<span style="color:' + color + (reasoning ? ';font-style:italic' : '') + '">' + escHtml(label) + '</span>' +
+      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#8b949e' : '#c9d1d9') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
       '</div>';
-  }).join('') || '<div style="color:#7d8590;padding:8px">等待 Codex App Server 事件…</div>';
+  }).join('') || '<div style="color:#7d8590;padding:8px">等待 Runtime 事件…</div>';
   if (wasNearBottom) container.scrollTop = container.scrollHeight;
 }
 
-async function sendRuntimeConsoleMessage() {
-  const input = $('#runtime-console-input');
+async function sendRuntimeConsoleMessage(runtimeID) {
+  const modal = consoleModal(runtimeID);
+  if (!modal) return;
+  const input = modal.querySelector('.rc-input');
   const text = String(input.value || '').trim();
-  if (!text || !runtimeConsoleID) return;
+  if (!text) return;
   try {
-    $('#runtime-console-send').disabled = true;
-    await apiPost('/runtimes/' + encodeURIComponent(runtimeConsoleID) + '/message', { text });
+    modal.querySelector('.rc-send').disabled = true;
+    await apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/message', { text });
     input.value = '';
-    toast('已发送到同一 Codex Thread', 'success');
-    await refreshRuntimeConsole();
+    toast('已发送到同一保留会话', 'success');
+    await refreshRuntimeConsole(runtimeID);
   } catch (err) { toast('发送失败: ' + err.message, 'error'); }
 }
 
@@ -3063,14 +3111,10 @@ async function interruptRuntime(runtimeID) {
   if (!runtimeID) return;
   try {
     await apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/interrupt', {});
-    toast('已请求中断当前 Turn；Runtime 与 Thread 会保留', 'success');
-    if (runtimeID === runtimeConsoleID) await refreshRuntimeConsole();
+    toast('已请求中断当前 Turn；Runtime 与会话会保留', 'success');
+    await refreshRuntimeConsole(runtimeID);
   } catch (err) { toast('中断失败: ' + err.message, 'error'); }
 }
-
-$('#runtime-console-close').addEventListener('click', closeRuntimeConsole);
-$('#runtime-console-send').addEventListener('click', sendRuntimeConsoleMessage);
-$('#runtime-console-interrupt').addEventListener('click', () => interruptRuntime(runtimeConsoleID));
 
 function buildPipelinePayload() {
   const payload = {
