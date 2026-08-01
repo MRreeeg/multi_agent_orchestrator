@@ -174,6 +174,24 @@ providerRoute: ccswitch
 
 `ccs` 是路由别名，不是要传给 Codex 的真实模型 ID。Orchestrator 会省略 `--model` / app-server `model` 字段，实际模型由用户已开启的 CCSwitch 路由决定。
 
+### Claude Code
+
+Claude Code 的接入方式与 codex/mimo 对等（`executor=claude`）：
+
+| 节点模式 | Orchestrator 命令/协议 | 上下文与生命周期 |
+|---|---|---|
+| `run` | `claude -p --output-format json [--resume <sid>]` | 一次性执行；长 Prompt 经 stdin 传入；`session_id` 持久化为 ExternalSessionID 供 `--resume`。 |
+| `serve` | `claude -p --input-format stream-json --output-format stream-json --verbose --include-partial-messages` | 后端 spawn 保留进程，使用 Claude Agent SDK 协议（JSON Lines over stdio），每次节点 Attempt = 一个 Turn，会话跨轮保留。 |
+
+serve 的每一次 Orchestrator 节点执行只创建一个 Turn，随后等待 `result` 行。Interrupt 通过 `control_request {subtype: interrupt}` 实现并保留会话；Stop 关闭 stdin 并 kill 进程树。权限走 SDK 控制协议：init 后 `EnablePermissionProtocol()`，`approvalMode=auto` 自动 allow 工具调用、`ask` 拒绝（与 mimo ACP `requestPermission` 语义一致）。
+
+模型配置与 codex 相同：`model=ccs / providerRoute=ccswitch` 走 CCSwitch 路由（省略 `--model`）；`providerRoute` 留空时自配模型（`opus` / `sonnet` / `haiku` / `claude-fable-5` / `deepseek-xxx` 等）原样透传，由 Claude 自身 provider 配置决定可用性。codex 的 deepseek 硬拒绝也已放开，改为运行时透传。
+
+前端节点下拉由 `nodeTypes` 驱动（`executors` 含 `claude`，`modelsByExecutor[claude]` 含预设模型），另提供“✏️ 自定义模型”入口用于输入自配模型。Claude retained runtime 同样只通过 Orchestrator HTTP/SSE 的 **Runtime Console** 访问，浏览器不直连 CLI。
+
+> [!note] 外部依赖
+> 真实模型 E2E 需要 Claude 的 `ANTHROPIC_BASE_URL` 路由可用；协议层（握手/流式/权限/中断）由 `internal/executor/claude` 单测覆盖，真实模型验证在 `RUN_INTEGRATION=1` 下运行（见 `internal/orchestrator/claude_e2e_test.go`）。
+
 ### 明确不支持：`codex exec-server`
 
 本版本未将 `codex exec-server` 放入执行路径。它与 `codex app-server` 的 Thread/Turn 生命周期及恢复语义尚未在本项目中独立验证；不能因为二者都使用 WebSocket 就互换使用。

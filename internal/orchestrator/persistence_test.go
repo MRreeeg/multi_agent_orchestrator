@@ -146,6 +146,34 @@ func TestLoadAllDataRecoversSessionReferencesFromEntityFiles(t *testing.T) {
 	}
 }
 
+func TestMarkInterruptedStopsPersistedClaudeRuntimeButPreservesSession(t *testing.T) {
+	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("REASONIX_ORCHESTRATOR_DATA_DIR", t.TempDir())
+
+	store := NewStore()
+	sess, err := store.CreateOrchSession("claude recovery", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateRuntimeState(RuntimeState{
+		RuntimeID: "claude_rt_stale", SessionID: sess.ID, Executor: string(ExecutorClaude),
+		Status: RuntimeIdle, Endpoint: "stdio://claude", ThreadID: "ses-persisted",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.markInterrupted(); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := store.GetRuntimeState("claude_rt_stale")
+	if !ok {
+		t.Fatal("runtime missing")
+	}
+	if got.Status != RuntimeStopped || got.Endpoint != "" || got.Port != 0 || got.ThreadID != "ses-persisted" || got.TurnID != "" {
+		t.Fatalf("recovered runtime = %#v", got)
+	}
+}
+
 func TestMarkInterruptedStopsPersistedCodexRuntimeButPreservesThread(t *testing.T) {
 	t.Setenv("USERPROFILE", t.TempDir())
 	t.Setenv("HOME", t.TempDir())

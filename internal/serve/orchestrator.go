@@ -482,9 +482,10 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 				orchestrator.ExecutorReasonix: {"deepseek-pro", "deepseek-flash", "deepseek"},
 				orchestrator.ExecutorMimo:     {"mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5"},
 				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default"},
+				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5"},
 			},
 			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex},
+			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude},
 		},
 		{
 			Type:   orchestrator.NodeReviewer,
@@ -494,9 +495,10 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 				orchestrator.ExecutorReasonix: {"deepseek-flash", "deepseek"},
 				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5"},
 				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default"},
+				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5"},
 			},
 			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex},
+			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude},
 		},
 		{
 			Type:   orchestrator.NodeExecutor,
@@ -506,9 +508,10 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 				orchestrator.ExecutorReasonix: {"deepseek-flash", "deepseek-pro"},
 				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5", "xiaomi/mimo-v2.5-pro"},
 				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default"},
+				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5"},
 			},
 			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex},
+			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude},
 		},
 	}
 	writeJSON(w, types)
@@ -588,6 +591,7 @@ func (h *orchestratorHandler) listRuntimes(w http.ResponseWriter, _ *http.Reques
 	all = append(all, orchestrator.ListMimoRuntimes()...)
 	all = append(all, orchestrator.ListReasonixRuntimes()...)
 	all = append(all, orchestrator.ListCodexRuntimes()...)
+	all = append(all, orchestrator.ListClaudeRuntimes()...)
 	writeJSON(w, all)
 }
 
@@ -601,6 +605,10 @@ func (h *orchestratorHandler) getRuntime(w http.ResponseWriter, _ *http.Request,
 		return
 	}
 	if rt, ok := orchestrator.GetCodexRuntime(id); ok {
+		writeJSON(w, rt)
+		return
+	}
+	if rt, ok := orchestrator.GetClaudeRuntime(id); ok {
 		writeJSON(w, rt)
 		return
 	}
@@ -620,6 +628,10 @@ func (h *orchestratorHandler) stopRuntime(w http.ResponseWriter, _ *http.Request
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if err := orchestrator.StopClaudeRuntime(id); err == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	writeErr(w, "runtime not found", http.StatusNotFound)
 }
 
@@ -628,6 +640,10 @@ func (h *orchestratorHandler) stopRuntime(w http.ResponseWriter, _ *http.Request
 // keep their existing browser/local-history integrations.
 func (h *orchestratorHandler) getRuntimeConsole(w http.ResponseWriter, _ *http.Request, id string) {
 	if snapshot, ok := orchestrator.GetMimoRuntimeConsole(id); ok {
+		writeJSON(w, snapshot)
+		return
+	}
+	if snapshot, ok := orchestrator.GetClaudeRuntimeConsole(id); ok {
 		writeJSON(w, snapshot)
 		return
 	}
@@ -653,6 +669,11 @@ func (h *orchestratorHandler) sendRuntimeMessage(w http.ResponseWriter, r *http.
 		return
 	}
 	turnID, err = orchestrator.SendCodexRuntimeMessage(r.Context(), id, body.Text)
+	if err == nil {
+		writeJSON(w, map[string]string{"turnID": turnID})
+		return
+	}
+	turnID, err = orchestrator.SendClaudeRuntimeMessage(r.Context(), id, body.Text)
 	if err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
@@ -665,7 +686,11 @@ func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Re
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	if err := orchestrator.InterruptCodexRuntime(r.Context(), id); err != nil {
+	if err := orchestrator.InterruptCodexRuntime(r.Context(), id); err == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err := orchestrator.InterruptClaudeRuntime(r.Context(), id); err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -1589,6 +1614,7 @@ func (h *orchestratorHandler) listOrchRuntimes(w http.ResponseWriter, _ *http.Re
 	live = append(live, orchestrator.ListMimoRuntimes()...)
 	live = append(live, orchestrator.ListReasonixRuntimes()...)
 	live = append(live, orchestrator.ListCodexRuntimes()...)
+	live = append(live, orchestrator.ListClaudeRuntimes()...)
 	for _, runtime := range live {
 		persisted, ok := byID[runtime.RuntimeID]
 		if !ok {

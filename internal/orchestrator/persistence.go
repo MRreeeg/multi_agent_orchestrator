@@ -1927,15 +1927,17 @@ func (s *Store) markInterrupted() error {
 		}
 	}
 
-	// A persisted Codex app-server endpoint only belongs to the process that
-	// launched it. Preserve ThreadID for a later thread/resume, but never show a
-	// historical WebSocket runtime as alive after the orchestrator restarts.
+	// A persisted retained runtime (Codex app-server WebSocket, Mimo ACP stdio,
+	// Claude stream-json stdio) only belongs to the process that launched it.
+	// Preserve the provider ThreadID/session for a later resume, but never show
+	// a historical runtime as alive after the orchestrator restarts.
 	for _, rt := range s.runtimeStates {
-		if rt.Executor != string(ExecutorCodex) || rt.Status == RuntimeStopped || rt.Status == RuntimeError {
+		retained := rt.Executor == string(ExecutorCodex) || rt.Executor == string(ExecutorMimo) || rt.Executor == string(ExecutorClaude)
+		if !retained || rt.Status == RuntimeStopped || rt.Status == RuntimeError {
 			continue
 		}
 		rt.Status = RuntimeStopped
-		rt.Error = "orchestrator restarted; retained Codex runtime is no longer connected"
+		rt.Error = "orchestrator restarted; retained runtime is no longer connected"
 		rt.Endpoint = ""
 		rt.Port = 0
 		rt.PID = 0
@@ -1944,7 +1946,7 @@ func (s *Store) markInterrupted() error {
 		if rt.SessionID != "" {
 			rtDir := filepath.Join(sessionDir(rt.SessionID), "runtimes")
 			if err := saveSessionJSON(rtDir, rt.RuntimeID+".json", rt); err != nil {
-				return fmt.Errorf("mark Codex runtime %s stopped: %w", rt.RuntimeID, err)
+				return fmt.Errorf("mark retained runtime %s stopped: %w", rt.RuntimeID, err)
 			}
 		}
 	}

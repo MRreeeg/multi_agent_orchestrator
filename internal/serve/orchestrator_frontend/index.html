@@ -688,7 +688,7 @@ function normalizeNode(raw) {
     name: raw.name,
     type: raw.type,
     model: raw.model || '',
-    providerRoute: raw.providerRoute || ((raw.executor === 'codex' && ['ccs', 'ccswitch'].includes(String(raw.model || '').toLowerCase())) ? 'ccswitch' : ''),
+    providerRoute: raw.providerRoute || ((['codex', 'claude'].includes(raw.executor) && ['ccs', 'ccswitch'].includes(String(raw.model || '').toLowerCase())) ? 'ccswitch' : ''),
     agent: raw.agent || '',
     skill: raw.skill || '',
     mode: raw.mode || 'serve',
@@ -721,6 +721,7 @@ function inferExecutorFromModel(model) {
   const m = String(model || '').toLowerCase();
   if (m.includes('/mimo-') || m.startsWith('mimo')) return 'mimo';
   if (m === 'ccs' || m === 'ccswitch' || m === 'o3' || m === 'codex-default' || m.includes('codex')) return 'codex';
+  if (m === 'opus' || m === 'sonnet' || m === 'haiku' || m === 'claude-fable-5' || m.includes('claude')) return 'claude';
   return 'reasonix';
 }
 
@@ -736,10 +737,15 @@ function modelSupportsExecutor(model, executor) {
   const typeInfo = state.nodeTypes.find(t => t.type === (node?.type || 'executor'));
   const byExec = typeInfo?.modelsByExecutor || {};
   const allowed = byExec[executor] || [];
-  if (allowed.length > 0) return allowed.includes(m);
+  if (allowed.length > 0 && allowed.includes(m)) return true;
+  // codex/claude own provider resolution: self-configured models (deepseek-xxx,
+  // claude full names, ...) pass through even when not in the preset list.
+  if (allowed.length > 0 && (executor === 'codex' || executor === 'claude')) return true;
+  if (allowed.length > 0) return false;
   const mimo = isMimoModel(m);
   if (executor === 'mimo') return mimo;
-  if (executor === 'codex') return m === 'ccs' || m === 'ccswitch' || m === 'o3' || m === 'codex-default' || m.includes('codex');
+  if (executor === 'codex') return true;
+  if (executor === 'claude') return true;
   if (executor === 'reasonix') return true;
   return false;
 }
@@ -793,22 +799,23 @@ function syncExecutorOptionsForNode(node) {
   }
   sel.value = node.executor || 'reasonix';
 
-  // Codex supports both modes: run uses one-shot `codex exec`; serve uses
-  // a retained `codex app-server` Runtime/Thread managed by Orchestrator.
+  // Codex/Claude support both modes: run uses a one-shot CLI; serve uses a
+  // retained Runtime (app-server / stream-json) managed by Orchestrator.
   const isCodex = node.executor === 'codex';
+  const isClaude = node.executor === 'claude';
   const modeSelect = $('#cfg-mode');
-  if (isCodex && !['run', 'serve'].includes(node.mode)) node.mode = 'serve';
-  modeSelect.value = node.mode || (isCodex ? 'serve' : 'serve');
+  if ((isCodex || isClaude) && !['run', 'serve'].includes(node.mode)) node.mode = 'serve';
+  modeSelect.value = node.mode || 'serve';
   modeSelect.disabled = false;
   modeSelect.title = isCodex
     ? 'Codex：run 使用一次性 exec；serve 使用保留 Runtime（app-server）'
-    : '';
+    : (isClaude ? 'Claude：run 使用一次性 claude -p；serve 使用保留 Runtime（stream-json）' : '');
 }
 
 function enforceNodeConstraints(node) {
   if (!node.executor) node.executor = inferExecutorFromModel(node.model);
-  // Codex supports `run` (one-shot exec) and `serve` (retained app-server).
-  if (node.executor === 'codex') {
+  // Codex/Claude support `run` (one-shot CLI) and `serve` (retained Runtime).
+  if (node.executor === 'codex' || node.executor === 'claude') {
     if (!['run', 'serve'].includes(node.mode)) node.mode = 'serve';
     if (!node.model) {
       node.model = 'ccs';
@@ -1536,11 +1543,24 @@ $('#config-close').addEventListener('click', hideConfig);
     if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = '节点: ' + el.value; }
     if (id === 'cfg-type') node.type = el.value;
     if (id === 'cfg-model') {
+      if (el.value === '__custom__') {
+        const custom = (window.prompt('输入模型名：ccs/ccswitch 走 ccswitch 路由；其他（如 deepseek-xxx、claude 全名）将透传给 CLI 自行解析。', node.model || '') || '').trim();
+        node.model = custom || node.model || '';
+        if (['ccs', 'ccswitch'].includes(String(node.model).toLowerCase())) {
+          node.model = 'ccs';
+          node.providerRoute = 'ccswitch';
+        } else if (node.executor === 'codex' || node.executor === 'claude') {
+          node.providerRoute = '';
+        }
+        $('#cfg-model').value = node.model;
+        render();
+        return;
+      }
       node.model = el.value;
-      if (node.executor === 'codex' && ['ccs', 'ccswitch'].includes(String(node.model).toLowerCase())) {
+      if (['codex', 'claude'].includes(node.executor) && ['ccs', 'ccswitch'].includes(String(node.model).toLowerCase())) {
         node.model = 'ccs';
         node.providerRoute = 'ccswitch';
-      } else if (node.executor === 'codex') {
+      } else if (node.executor === 'codex' || node.executor === 'claude') {
         node.providerRoute = '';
       }
       if (!modelSupportsExecutor(node.model, node.executor || 'reasonix')) {
@@ -1555,7 +1575,7 @@ $('#config-close').addEventListener('click', hideConfig);
     if (id === 'cfg-skill') node.skill = el.value;
     if (id === 'cfg-executor') {
       node.executor = el.value;
-      if (node.executor === 'codex' && !node.model) {
+      if ((node.executor === 'codex' || node.executor === 'claude') && !node.model) {
         node.model = 'ccs';
         node.providerRoute = 'ccswitch';
       }
@@ -3308,7 +3328,7 @@ presetSelect.addEventListener('change', async () => {
         name: n.name,
         type: n.type,
         model: n.model || '',
-        providerRoute: n.providerRoute || ((n.executor === 'codex' && ['ccs', 'ccswitch'].includes(String(n.model || '').toLowerCase())) ? 'ccswitch' : ''),
+        providerRoute: n.providerRoute || ((['codex', 'claude'].includes(n.executor) && ['ccs', 'ccswitch'].includes(String(n.model || '').toLowerCase())) ? 'ccswitch' : ''),
         agent: n.agent || '',
         skill: n.skill || '',
         mode: n.mode || 'serve',
@@ -3415,6 +3435,12 @@ function populateModelSelect(node) {
     opt.textContent = m;
     sel.appendChild(opt);
   });
+  // 自配模型入口：codex/claude 透传任意模型名给 CLI（如 deepseek-xxx）。
+  const custom = document.createElement('option');
+  custom.value = '__custom__';
+  custom.textContent = '✏️ 自定义模型…';
+  sel.appendChild(custom);
+  sel.value = activeNode?.model || '';
 }
 
 function populateSkillSelect(node) {

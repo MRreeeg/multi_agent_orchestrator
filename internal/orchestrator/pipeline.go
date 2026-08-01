@@ -108,6 +108,11 @@ func runtimeAccessMode(executor ExecutorType, mode string) string {
 		// longer spawned by this build.
 		return "runtime_console"
 	}
+	if executor == ExecutorClaude && strings.EqualFold(mode, "serve") {
+		// claude stream-json is a retained provider runtime proxied through
+		// the Orchestrator Runtime Console; the browser never dials the CLI.
+		return "runtime_console"
+	}
 	return "browser"
 }
 
@@ -131,6 +136,9 @@ func managedRuntimeState(runtimeID string) (*RuntimeState, bool) {
 		return rt, true
 	}
 	if rt, ok := codexRuntimeMgr.Get(runtimeID); ok {
+		return rt, true
+	}
+	if rt, ok := claudeRuntimeMgr.Get(runtimeID); ok {
 		return rt, true
 	}
 	return nil, false
@@ -1366,6 +1374,7 @@ var (
 		ExecutorReasonix: &ReasonixExecutor{},
 		ExecutorMimo:     &MimoExecutor{},
 		ExecutorCodex:    &CodexPipelineExecutor{},
+		ExecutorClaude:   &ClaudePipelineExecutor{},
 	}
 	executorsMu sync.Mutex
 )
@@ -2980,8 +2989,8 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	executorName := node.Executor
 	providerRoute := strings.ToLower(strings.TrimSpace(node.ProviderRoute))
 	// "ccs" is a frontend-friendly alias. Treat it as a route selection, not
-	// as a real Codex model name.
-	if executorName == ExecutorCodex && (strings.EqualFold(modelRef, "ccs") || strings.EqualFold(modelRef, "ccswitch")) {
+	// as a real Codex/Claude model name.
+	if (executorName == ExecutorCodex || executorName == ExecutorClaude) && (strings.EqualFold(modelRef, "ccs") || strings.EqualFold(modelRef, "ccswitch")) {
 		providerRoute = "ccswitch"
 		modelRef = ""
 	}
@@ -2998,9 +3007,9 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	if executorName == "" {
 		executorName = ExecutorReasonix
 	}
-	// Codex is a local CLI whose active provider/model may be supplied by
-	// CCSwitch. An empty Codex model therefore defaults to the CCSwitch route.
-	if executorName == ExecutorCodex && modelRef == "" && providerRoute == "" {
+	// Codex/Claude are local CLIs whose active provider/model may be supplied
+	// by CCSwitch. An empty model therefore defaults to the CCSwitch route.
+	if (executorName == ExecutorCodex || executorName == ExecutorClaude) && modelRef == "" && providerRoute == "" {
 		providerRoute = "ccswitch"
 	}
 	if cfgErr := validateNodeExecutionConfigAtWorkspaceWithRoute(executorName, node.Mode, modelRef, node.Agent, providerRoute, workspace); cfgErr != nil {
@@ -3170,6 +3179,11 @@ func resolveExecutorModelRef(workspace string, executor ExecutorType, mode strin
 	switch executor {
 	case ExecutorMimo:
 		return normalizeMimoExecutionModelRef(workspace, model)
+	case ExecutorClaude:
+		// Claude model aliases/full names pass through verbatim: the CLI owns
+		// provider resolution, including self-configured models via its own
+		// base URL settings.
+		return model
 	case ExecutorReasonix:
 		if strings.EqualFold(strings.TrimSpace(mode), "run") {
 			return normalizeReasonixRunModelRef(workspace, model)
@@ -3196,7 +3210,7 @@ func validateNodeExecutionConfigAtWorkspaceWithRoute(executor ExecutorType, mode
 	if mode == "" {
 		mode = "serve"
 	}
-	ccswitchRoute := executor == ExecutorCodex && (providerRoute == "ccs" || providerRoute == "ccswitch")
+	ccswitchRoute := (executor == ExecutorCodex || executor == ExecutorClaude) && (providerRoute == "ccs" || providerRoute == "ccswitch")
 	if model == "" && !ccswitchRoute {
 		return fmt.Errorf("model is required")
 	}
@@ -3242,9 +3256,17 @@ func validateNodeExecutionConfigAtWorkspaceWithRoute(executor ExecutorType, mode
 		if providerRoute != "" && !ccswitchRoute {
 			return fmt.Errorf("unsupported codex provider route %q; use ccswitch", providerRoute)
 		}
-		// Reject deepseek models for Codex — they cause metadata warnings
-		if isDeepseekModel {
-			return fmt.Errorf("codex executor does not support deepseek models; use gpt-5.6-luna or another codex-compatible model")
+		// Deepseek and other self-configured models are passed through to the
+		// Codex CLI; the CLI's own provider configuration decides availability.
+		// The old hard rejection was lifted so per-node custom models work.
+	case ExecutorClaude:
+		// `run` is the one-shot `claude -p --output-format json` path. `serve`
+		// is the retained stream-json runtime owned by ClaudeRuntimeManager.
+		if mode != "run" && mode != "serve" {
+			return fmt.Errorf("unsupported claude mode %q; supported modes are run and serve", mode)
+		}
+		if providerRoute != "" && !ccswitchRoute {
+			return fmt.Errorf("unsupported claude provider route %q; use ccswitch", providerRoute)
 		}
 	}
 	return nil

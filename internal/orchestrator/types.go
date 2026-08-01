@@ -25,6 +25,7 @@ const (
 	ExecutorReasonix ExecutorType = "reasonix"
 	ExecutorMimo     ExecutorType = "mimo"
 	ExecutorCodex    ExecutorType = "codex"
+	ExecutorClaude   ExecutorType = "claude"
 )
 
 // validateContextPolicy checks that a context policy value is valid.
@@ -509,4 +510,3 @@ type ReviewDecision struct {
 	NextTask        string   `json:"nextTask"`
 	Evidence        []string `json:"evidence"`
 }
-

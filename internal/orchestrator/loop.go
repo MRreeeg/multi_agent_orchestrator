@@ -582,6 +582,8 @@ func (s *Store) finalizeLoopRuntimes(run *PipelineRun) {
 				_ = mimoRuntimeMgr.Release(rt.id)
 			case ExecutorCodex:
 				_ = codexRuntimeMgr.Release(rt.id)
+			case ExecutorClaude:
+				_ = claudeRuntimeMgr.Release(rt.id)
 			default:
 				_ = reasonixRuntimeMgr.Release(rt.id)
 			}
@@ -799,13 +801,13 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 	contextPolicy := run.ExecOptions.ContextPolicy
 	reuseAgentSessions := run.ExecOptions.ReuseAgentSessions
 	externalSessionID := ""
-	// A retained Codex reviewer is still orchestrator-controlled, but its
-	// App Server Thread must persist across Loop iterations. All other loop
+	// A retained Codex/Claude reviewer is still orchestrator-controlled, but
+	// its provider session must persist across Loop iterations. All other loop
 	// reviewers keep the historical fresh-session behavior.
-	codexRetainedReviewer := loopReview && nodeCopy.Executor == ExecutorCodex && strings.EqualFold(nodeCopy.Mode, "serve")
+	retainedReviewer := loopReview && (nodeCopy.Executor == ExecutorCodex || nodeCopy.Executor == ExecutorClaude) && strings.EqualFold(nodeCopy.Mode, "serve")
 	if !loopReview {
 		externalSessionID = "" // populated from the ProviderSession below
-	} else if codexRetainedReviewer {
+	} else if retainedReviewer {
 		contextPolicy = "reuse"
 		reuseAgentSessions = true
 	} else {
@@ -858,7 +860,7 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 
 	// Retained Codex reviewers deliberately reuse their ProviderSession Thread.
 	// Other reviewer executors remain fresh to preserve their previous isolation.
-	if (!loopReview || codexRetainedReviewer) && providerSessionID != "" {
+	if (!loopReview || retainedReviewer) && providerSessionID != "" {
 		if ps, ok := s.GetProviderSession(providerSessionID); ok {
 			externalSessionID = ps.ExternalSessionID
 		}
@@ -874,7 +876,7 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 	// Codex app-server runs exactly one Turn per orchestrator node attempt.
 	// Keep the legacy one-shot correction for other reviewer executors, but do
 	// not silently start a second retained Codex Turn on malformed output.
-	if loopReview && !codexRetainedReviewer && execErr == nil && !validLoopReviewOutput(output) && ctx.Err() == nil {
+	if loopReview && !retainedReviewer && execErr == nil && !validLoopReviewOutput(output) && ctx.Err() == nil {
 		retryInput := input + `
 
 [系统纠正] 你上一条响应不是合法的 loop-review-v1 审查结果，可能只输出了工具调用参数。请不要再次调用工具，立即只输出一个纯 JSON 对象，严格包含 schemaVersion、decision、confidence、summary、blockingIssues、requiredChanges、nextTask、evidence。decision 只能是 pass、revise 或 blocked。`
@@ -1114,6 +1116,8 @@ func stopManagedRuntime(executor ExecutorType, runtimeID string) error {
 		return StopReasonixRuntime(runtimeID)
 	case ExecutorCodex:
 		return StopCodexRuntime(runtimeID)
+	case ExecutorClaude:
+		return StopClaudeRuntime(runtimeID)
 	default:
 		return nil
 	}
