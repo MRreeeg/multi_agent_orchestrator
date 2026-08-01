@@ -7,6 +7,35 @@ import (
 	codexclient "reasonix/internal/executor/codex"
 )
 
+func TestCodexProfileSelection(t *testing.T) {
+	cases := []struct {
+		spec ExecSpec
+		want string
+	}{
+		{ExecSpec{ProviderRoute: "ccswitch", ModelRef: "ccs"}, "ccs"},
+		{ExecSpec{ProviderRoute: "ccs", ModelRef: "ccs"}, "ccs"},
+		{ExecSpec{ModelRef: "ccswitch"}, "ccs"},
+		{ExecSpec{ModelRef: "deepseek-v4-flash"}, "deepseek"},
+		{ExecSpec{ModelRef: "DeepSeek-V4-Flash"}, "deepseek"},
+		{ExecSpec{ModelRef: "o3"}, ""},
+		{ExecSpec{ModelRef: "codex-default"}, ""},
+	}
+	for _, tc := range cases {
+		if got := codexProfile(tc.spec); got != tc.want {
+			t.Errorf("codexProfile(%+v) = %q, want %q", tc.spec, got, tc.want)
+		}
+	}
+	if got := codexServeProvider(ExecSpec{ModelRef: "deepseek-v4-flash"}); got != "deepseek" {
+		t.Errorf("codexServeProvider(deepseek) = %q, want deepseek", got)
+	}
+	if got := codexServeProvider(ExecSpec{ProviderRoute: "ccswitch", ModelRef: "ccs"}); got != "custom" {
+		t.Errorf("codexServeProvider(ccs) = %q, want custom", got)
+	}
+	if got := codexServeProvider(ExecSpec{ModelRef: "o3"}); got != "" {
+		t.Errorf("codexServeProvider(o3) = %q, want empty", got)
+	}
+}
+
 func TestCodexRuntimeManagerEventUpdatesConsoleAndSSEBridge(t *testing.T) {
 	manager := newCodexRuntimeManager()
 	runtime := &codexRuntime{

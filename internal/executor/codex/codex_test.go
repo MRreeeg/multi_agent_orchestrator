@@ -203,6 +203,27 @@ func TestCodexBuildArgsUsesStdinPromptSelector(t *testing.T) {
 	}
 }
 
+func TestCodexBuildArgsPassesProfile(t *testing.T) {
+	executor := New()
+	args := executor.buildArgs(ExecOptions{
+		Model:   "deepseek-v4-flash",
+		Profile: "deepseek",
+		JSON:    true,
+	})
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--profile deepseek") {
+		t.Fatalf("args = %v, want --profile deepseek", args)
+	}
+	if !strings.Contains(joined, "-m deepseek-v4-flash") {
+		t.Fatalf("args = %v, want -m deepseek-v4-flash", args)
+	}
+	// No profile when unset.
+	args2 := executor.buildArgs(ExecOptions{Model: "o3", JSON: true})
+	if strings.Contains(strings.Join(args2, " "), "--profile") {
+		t.Fatalf("args = %v, want no --profile", args2)
+	}
+}
+
 func TestCodexLongPromptUsesStdin(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "stdin.txt")

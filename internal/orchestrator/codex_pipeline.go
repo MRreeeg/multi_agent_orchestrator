@@ -43,6 +43,7 @@ func (e *CodexPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onSt
 
 	opts := codex.ExecOptions{
 		Model:           spec.ModelRef,
+		Profile:         codexProfile(spec),
 		ReasoningEffort: spec.ReasoningEffort,
 		Workspace:       spec.Workspace,
 		BypassAll:       spec.Trust,

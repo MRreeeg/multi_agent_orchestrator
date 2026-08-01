@@ -477,11 +477,11 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 		{
 			Type:   orchestrator.NodeArchitect,
 			Label:  "架构师",
-			Models: []string{"deepseek-pro", "deepseek-flash", "deepseek", "mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5", "ccs", "o3", "codex-default"},
+			Models: []string{"deepseek-pro", "deepseek-flash", "deepseek", "deepseek-v4-flash", "mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5", "ccs", "o3", "codex-default"},
 			ModelsByExecutor: map[orchestrator.ExecutorType][]string{
 				orchestrator.ExecutorReasonix: {"deepseek-pro", "deepseek-flash", "deepseek"},
 				orchestrator.ExecutorMimo:     {"mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5"},
-				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default"},
+				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5"},
 			},
 			Skills:    listSkills(),
@@ -494,7 +494,7 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 			ModelsByExecutor: map[orchestrator.ExecutorType][]string{
 				orchestrator.ExecutorReasonix: {"deepseek-flash", "deepseek"},
 				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5"},
-				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default"},
+				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5"},
 			},
 			Skills:    listSkills(),
@@ -503,11 +503,11 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 		{
 			Type:   orchestrator.NodeExecutor,
 			Label:  "执行者",
-			Models: []string{"deepseek-flash", "deepseek-pro", "xiaomi/mimo-v2.5", "xiaomi/mimo-v2.5-pro", "o3", "codex-default"},
+			Models: []string{"deepseek-flash", "deepseek-pro", "deepseek-v4-flash", "xiaomi/mimo-v2.5", "xiaomi/mimo-v2.5-pro", "o3", "codex-default"},
 			ModelsByExecutor: map[orchestrator.ExecutorType][]string{
 				orchestrator.ExecutorReasonix: {"deepseek-flash", "deepseek-pro"},
 				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5", "xiaomi/mimo-v2.5-pro"},
-				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default"},
+				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5"},
 			},
 			Skills:    listSkills(),

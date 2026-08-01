@@ -30,6 +30,10 @@ type ExecutorResult struct {
 	// ThreadID is the Codex thread/session ID from thread.started event.
 	// Used for `codex exec resume` in subsequent executions.
 	ThreadID string `json:"threadID,omitempty"`
+	// Profile is the $CODEX_HOME/<name>.config.toml overlay to load via
+	// `--profile <name>`. Profiles switch model_provider per node (for example
+	// deepseek = DeepSeek official direct, ccs = cc-switch local proxy) without
+	// touching the shared base config.
 	// HasError indicates if any Codex error event was found in JSONL.
 	HasError bool `json:"hasError,omitempty"`
 	// FatalError indicates a fatal error event was found (not just a warning).
@@ -45,6 +49,7 @@ type ExecutorResult struct {
 // ExecOptions configures a Codex exec execution.
 type ExecOptions struct {
 	Model           string
+	Profile         string // --profile <name>: $CODEX_HOME/<name>.config.toml overlay
 	ReasoningEffort string // "high" | "medium" | "low"
 	Timeout         time.Duration
 	Workspace       string
@@ -101,6 +106,9 @@ func (e *CodexExecutor) buildArgs(opts ExecOptions) []string {
 
 	if opts.Model != "" {
 		args = append(args, "-m", opts.Model)
+	}
+	if opts.Profile != "" {
+		args = append(args, "--profile", opts.Profile)
 	}
 	if opts.ReasoningEffort != "" {
 		args = append(args, "-c", "model_reasoning_effort="+opts.ReasoningEffort)

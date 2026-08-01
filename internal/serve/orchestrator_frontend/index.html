@@ -721,6 +721,8 @@ function inferExecutorFromModel(model) {
   const m = String(model || '').toLowerCase();
   if (m.includes('/mimo-') || m.startsWith('mimo')) return 'mimo';
   if (m === 'ccs' || m === 'ccswitch' || m === 'o3' || m === 'codex-default' || m.includes('codex')) return 'codex';
+  // deepseek-v4-* are Codex-native models (official direct via codex profile).
+  if (m.startsWith('deepseek-v4')) return 'codex';
   if (m === 'opus' || m === 'sonnet' || m === 'haiku' || m === 'claude-fable-5' || m.includes('claude')) return 'claude';
   return 'reasonix';
 }

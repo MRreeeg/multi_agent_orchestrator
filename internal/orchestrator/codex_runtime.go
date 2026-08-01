@@ -291,7 +291,16 @@ func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart
 		m.notify(rt)
 	})
 
-	cmd := newRetainedRuntimeCommand(ctx, "codex", "app-server", "--listen", rt.Endpoint)
+	spawnArgs := []string{"app-server", "--listen", rt.Endpoint}
+	// `codex app-server` does not accept --profile, but it does accept the
+	// global -c key=value override: pin the provider route per retained
+	// runtime (deepseek official vs cc-switch proxy) without touching the
+	// shared base config. Thread-level model selection still flows through
+	// startTurn below.
+	if provider := codexServeProvider(spec); provider != "" {
+		spawnArgs = append(spawnArgs, "-c", "model_provider="+provider)
+	}
+	cmd := newRetainedRuntimeCommand(ctx, "codex", spawnArgs...)
 	cmd.Dir = spec.Workspace
 	cmd.Stdout = io.Discard
 	stderr := &bytes.Buffer{}
@@ -532,6 +541,40 @@ func (m *CodexRuntimeManager) execResult(rt *codexRuntime, text, threadID string
 	stderr := rt.lastErr
 	rt.mu.Unlock()
 	return &ExecResult{FinalText: text, RawStdout: text, RawStderr: stderr, RuntimeID: rt.ID, Endpoint: rt.Endpoint, ExternalSessionID: threadID}
+}
+
+// codexProfile picks the $CODEX_HOME/<name>.config.toml overlay for a node.
+//
+//   - providerRoute=ccswitch (or model=ccs/ccswitch): "ccs" profile -> the
+//     cc-switch local proxy owns the upstream model (e.g. gpt5.6).
+//   - model starts with deepseek: "deepseek" profile -> DeepSeek official
+//     direct connection, bypassing any local proxy.
+//   - otherwise: no profile; the base config default provider is used.
+//
+// Profiles are the supported way to switch model_provider per invocation in
+// codex >= 0.145 (a single config cannot route by model name).
+func codexProfile(spec ExecSpec) string {
+	if strings.EqualFold(spec.ProviderRoute, "ccswitch") || strings.EqualFold(spec.ModelRef, "ccs") || strings.EqualFold(spec.ModelRef, "ccswitch") {
+		return "ccs"
+	}
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(spec.ModelRef)), "deepseek") {
+		return "deepseek"
+	}
+	return ""
+}
+
+// codexServeProvider maps a node onto the model_provider override passed to
+// the retained `codex app-server` process. The deepseek provider is the
+// official direct connection; ccs routes through the cc-switch local proxy
+// (named "custom" in the shared base config).
+func codexServeProvider(spec ExecSpec) string {
+	switch codexProfile(spec) {
+	case "deepseek":
+		return "deepseek"
+	case "ccs":
+		return "custom"
+	}
+	return ""
 }
 
 func codexRuntimeModel(spec ExecSpec) string {

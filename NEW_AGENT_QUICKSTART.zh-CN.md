@@ -217,6 +217,58 @@ go test ./internal/orchestrator -run TestClaudeServeReturnsVisibleTextEndToEnd -
 
 ---
 
+### 5.1 实例：codex 直连 DeepSeek 官方（不走中转/ccs）
+
+需求：执行者用 `executor=codex, model=deepseek-v4-flash`（官方直连），审查者继续走 `providerRoute=ccswitch`（cc-switch 本地代理）。
+
+> [!important] 关键事实（codex 0.145 实测）
+> 同一份 `~/.codex/config.toml` **不能按模型名路由**：`--model deepseek-v4-flash` 仍走全局 `model_provider`。正确做法是 **profile / `-c` 覆盖**：
+> - run 模式：`codex --profile <name> exec ...`（`--profile` = 加载 `$CODEX_HOME/<name>.config.toml` 覆盖层）；
+> - serve 模式：`codex app-server --listen ... -c model_provider=<provider>`（app-server 不接受 `--profile`，但接受全局 `-c key=value`）。
+
+本机已配置（`~/.codex`，2026-08-01）：
+
+```toml
+# config.toml（基础层，保留原样）
+model_provider = "custom"          # 默认走 cc-switch 本地代理
+model = "deepseek-v4-flash"
+[model_providers.custom]           # cc-switch 代理（中转）
+base_url = "http://127.0.0.1:15721/v1"
+wire_api = "responses"
+experimental_bearer_token = "PROXY_MANAGED"
+[model_providers.deepseek]         # DeepSeek 官方直连
+name = "DeepSeek Official"
+base_url = "https://api.deepseek.com/"
+wire_api = "responses"
+requires_openai_auth = true
+experimental_bearer_token = "sk-..."   # 你的 DeepSeek API key
+```
+
+```toml
+# deepseek.config.toml（profile 覆盖层：官方直连）
+model_provider = "deepseek"
+model = "deepseek-v4-flash"
+
+# ccs.config.toml（profile 覆盖层：cc-switch）
+model_provider = "custom"
+model = "deepseek-v4-flash"
+```
+
+框架按节点自动选择（`codexProfile` / `codexServeProvider`，已实现）：
+
+| 节点配置 | run 模式 | serve 模式 |
+|---|---|---|
+| `model=deepseek-v4-flash, providerRoute=`（空） | `codex --profile deepseek exec -m deepseek-v4-flash` | `codex app-server ... -c model_provider=deepseek` |
+| `model=ccs, providerRoute=ccswitch` | `codex --profile ccs exec`（省略 -m） | `codex app-server ... -c model_provider=custom` |
+| `model=o3 / codex-default` 等 | 不传 profile（用基础配置） | 不传 `-c`（用基础配置） |
+
+实测结果（2026-08-01）：
+- `codex --profile deepseek exec -m deepseek-v4-flash "只回复OK"` → 直连 `api.deepseek.com` 返回文本（~4s）；
+- 对照：把 cc-switch base_url 改成坏端口后，`--profile deepseek` 仍成功、`--profile ccs` 失败 → 两路严格分流；
+- serve：`TestCodexServeDeepseekOfficialEndToEnd`（`RUN_INTEGRATION=1`）真实跑通（app-server + `-c model_provider=deepseek` + `deepseek-v4-flash` 返回可见文本）。
+
+> 另一台电脑接入步骤：① 按 DeepSeek 官方脚本或在 `~/.codex/config.toml` 添加 `[model_providers.deepseek]`（base_url + key）；② 新建 `deepseek.config.toml` / `ccs.config.toml` 两个覆盖层；③ 控制台节点 `executor=codex, model=deepseek-v4-flash`（自配）或 `model=ccs, providerRoute=ccswitch`（路由）。
+
 ## 6. 验收命令清单
 
 ```powershell
