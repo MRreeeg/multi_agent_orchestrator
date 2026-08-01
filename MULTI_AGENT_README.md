@@ -71,6 +71,10 @@ $env:REASONIX_HOME = "$PWD\.reasonix-home"
 
 然后在 `.reasonix-home` 中准备对应的 `config.toml` 和凭据。不要把真实 API Key 提交到 GitHub。
 
+## 新 Agent / 模型快速接入
+
+想把新的 Agent/模型（如本机安装的 Claude Code、或其他 CLI）接入本控制台时，直接看 **`NEW_AGENT_QUICKSTART.zh-CN.md`**（本文件夹根目录的执行手册）。它包含：前置问题结论（同类 Agent 多节点隔离、ccswitch vs 自配模型）、10 个接入点清单、以 Claude Code 为例的 8 步操作、验收命令与常见问题排查。该手册随文件夹一起分发，其他电脑拿到本目录即可照做。
+
 ## 目录说明
 
 ```text
