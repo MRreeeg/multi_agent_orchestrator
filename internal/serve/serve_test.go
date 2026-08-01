@@ -402,6 +402,12 @@ func TestOrchestratorNodeTypesExposeExecutorSpecificModels(t *testing.T) {
 	if !slices.Contains(executorModels["reasonix"], "deepseek-flash") {
 		t.Fatalf("reasonix models = %v, want deepseek-flash", executorModels["reasonix"])
 	}
+	if !slices.Contains(executorModels["claude"], "sonnet") || !slices.Contains(executorModels["claude"], "ccs") {
+		t.Fatalf("claude models = %v, want sonnet and ccs", executorModels["claude"])
+	}
+	if !slices.Contains(executorModels["codex"], "ccs") {
+		t.Fatalf("codex models = %v, want ccs", executorModels["codex"])
+	}
 }
 
 func TestServeCompactEndpoint(t *testing.T) {
