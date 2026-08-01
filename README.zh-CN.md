@@ -209,6 +209,8 @@ Codex 的 `run` 使用 `codex exec`，Prompt 经 stdin 传入以绕过 Windows �
 
 服务重启不会把旧 App Server 假装为在线，但会保留 Thread ID，以便下一次 `serve` 执行 `thread/resume`。`Interrupt` 保留 Runtime / Thread，`Stop` 才关闭连接与进程。`codex exec-server` 目前未纳入执行路径。 刷新控制台后，持久化 RuntimeState 会重新绑定到 Canvas 节点；Codex retained runtime 始终显示为 Orchestrator Runtime Console，而不是让浏览器直接打开 `ws://` 端点。
 
+Mimo 的 `serve` 模式同样升级为 **retained Runtime Console**：Orchestrator spawn `mimo acp`（ACP = Agent Client Protocol，JSON-RPC over stdio），每次节点 Attempt 走一次 `session/prompt` Turn，`session/cancel` 支持 Interrupt 且保留会话，`Stop` 关闭 stdin 并终止进程树。`mode=run` 仍使用一次性 `mimo run`。浏览器同样只通过 Orchestrator HTTP/SSE 访问 Mimo Runtime Console，不直连 provider 端点。
+
 使用 CCSwitch 时，先开启 CCSwitch 路由，再在节点中选择 `executor=codex`、`model=ccs`、`providerRoute=ccswitch`。`ccs` 是路由别名，Orchestrator 会省略 Codex 的模型参数，由 CCSwitch 决定真实模型。
 
 提取版的操作、迁移、Loop 验收和已知边界见 [`MULTI_AGENT_README.md`](./MULTI_AGENT_README.md)。

@@ -279,7 +279,7 @@ func TestRuntimeAccessMode(t *testing.T) {
 	}{
 		{name: "codex serve uses orchestrator runtime console", executor: ExecutorCodex, mode: "serve", want: "runtime_console"},
 		{name: "codex run has no retained console", executor: ExecutorCodex, mode: "run", want: "browser"},
-		{name: "mimo serve opens local history", executor: ExecutorMimo, mode: "serve", want: "local_history"},
+		{name: "mimo serve uses orchestrator runtime console", executor: ExecutorMimo, mode: "serve", want: "runtime_console"},
 		{name: "reasonix serve retains browser access", executor: ExecutorReasonix, mode: "serve", want: "browser"},
 	}
 

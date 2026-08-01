@@ -626,9 +626,13 @@ func (h *orchestratorHandler) stopRuntime(w http.ResponseWriter, _ *http.Request
 // Only Codex retained runtimes currently expose this endpoint; other providers
 // keep their existing browser/local-history integrations.
 func (h *orchestratorHandler) getRuntimeConsole(w http.ResponseWriter, _ *http.Request, id string) {
+	if snapshot, ok := orchestrator.GetMimoRuntimeConsole(id); ok {
+		writeJSON(w, snapshot)
+		return
+	}
 	snapshot, ok := orchestrator.GetCodexRuntimeConsole(id)
 	if !ok {
-		writeErr(w, "Codex runtime console not found", http.StatusNotFound)
+		writeErr(w, "runtime console not found", http.StatusNotFound)
 		return
 	}
 	writeJSON(w, snapshot)
@@ -642,7 +646,12 @@ func (h *orchestratorHandler) sendRuntimeMessage(w http.ResponseWriter, r *http.
 		writeErr(w, "text is required", http.StatusBadRequest)
 		return
 	}
-	turnID, err := orchestrator.SendCodexRuntimeMessage(r.Context(), id, body.Text)
+	turnID, err := orchestrator.SendMimoRuntimeMessage(r.Context(), id, body.Text)
+	if err == nil {
+		writeJSON(w, map[string]string{"turnID": turnID})
+		return
+	}
+	turnID, err = orchestrator.SendCodexRuntimeMessage(r.Context(), id, body.Text)
 	if err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
@@ -651,6 +660,10 @@ func (h *orchestratorHandler) sendRuntimeMessage(w http.ResponseWriter, r *http.
 }
 
 func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Request, id string) {
+	if err := orchestrator.InterruptMimoRuntime(r.Context(), id); err == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if err := orchestrator.InterruptCodexRuntime(r.Context(), id); err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return

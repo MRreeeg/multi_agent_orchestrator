@@ -135,25 +135,30 @@ Runtime 的复用键为 `nodeID + model + workspace + providerRoute`。同一 Lo
 
 Runtime 状态统一为：执行时 `busy`、完成后 `idle`、连接/非预期 Turn 错误为 `error`、显式停止为 `stopped`。**Interrupt** 仅中断当前 Turn，保留 Runtime 与 Thread，完成后重新可发送新 Turn；只有 **Stop** 会关闭 WebSocket 并停止 `codex app-server` 子进程。
 
-### Runtime Console（仅 Codex 第一版）
+### Runtime Console（Codex 与 Mimo）
 
-Canvas 节点的 retained Codex Runtime 可打开 **Runtime Console**：查看状态、端点、Thread/Turn、最终输出和原始事件；空闲时可发送人工新 Turn，运行时可 Interrupt 当前 Turn。
+Canvas 节点的 retained Codex/Mimo Runtime 可打开 **Runtime Console**：查看状态、端点、Thread/Session、Turn、最终输出和原始事件；空闲时可发送人工新 Turn，运行时可 Interrupt 当前 Turn。
 
 > [!important] 边界
-> 浏览器只访问 Orchestrator 的 HTTP API / SSE，**不会直接连接 Codex Provider WebSocket**。人工 Turn 仅用于调试或补充上下文：不会创建、恢复或推进 `PipelineRun` / `Iteration`，也不会污染 Loop 历史。
+> 浏览器只访问 Orchestrator 的 HTTP API / SSE，**不会直接连接任何 Provider 端点**（Codex `ws://`、Mimo ACP stdio 都不直连）。人工 Turn 仅用于调试或补充上下文：不会创建、恢复或推进 `PipelineRun` / `Iteration`，也不会污染 Loop 历史。
 
-App Server 事件通过 Orchestrator SSE 立即唤醒 Console 刷新，并保留 1.2 秒轮询作为断线恢复兜底。第一版协议只适用于 Codex；Mimo 等执行器未来需要各自适配，不复用 Codex JSON-RPC。
+Provider 事件通过 Orchestrator SSE 立即唤醒 Console 刷新，并保留 1.2 秒轮询作为断线恢复兜底。Codex 使用 `app-server` 的 JSON-RPC over WebSocket；**Mimo 使用 ACP（Agent Client Protocol）JSON-RPC over stdio**，两者互不复用，各自在 `internal/executor/codex` 与 `internal/executor/mimo` 独立适配。
 
-页面刷新和节点刚启动时，前端会将 `pipeline_node_runtime` SSE 临时事件与持久化 `RuntimeState` 合并，而不是覆盖。这样 `accessMode=runtime_console`、Runtime ID、Thread ID 不会丢失：Canvas 始终打开 Orchestrator Runtime Console，绝不会尝试由浏览器直接访问 `ws://`。
+页面刷新和节点刚启动时，前端会将 `pipeline_node_runtime` SSE 临时事件与持久化 `RuntimeState` 合并，而不是覆盖。这样 `accessMode=runtime_console`、Runtime ID、Thread/Session ID 不会丢失：Canvas 始终打开 Orchestrator Runtime Console，绝不会尝试由浏览器直接访问 `ws://`。
 
 ### Mimo
 
-Mimo 的典型方式是：
+Mimo 的 serve 模式是 **retained `mimo acp` ACP Runtime**（不是旧的一次性 attach）：
 
 ```text
-mimo serve
-mimo run --attach <runtime-url>
+mimo acp --port <port> --hostname 127.0.0.1 --cwd <workspace>   ← Orchestrator spawn（保留进程）
+session/new → session/set_config_option(model) → session/set_mode(build)
+session/prompt ← 每次节点 Attempt = 一个 Turn（流式 session/update）
+session/cancel ← Interrupt（保留会话）
+Stop → 关闭 stdin + kill 进程树
 ```
+
+`mode=run` 仍然使用一次性 `mimo run`。ACP 传输在当前 mimo 构建为 stdio；ACP 的 WebSocket/Streamable-HTTP 传输由 `AcpClient` 的 `io.Reader/io.Writer` 抽象保留为可插拔扩展。完整设计见 `docs/superpowers/specs/2026-08-01-mimo-acp-websocket-design.md`。
 
 ### CCSwitch
 

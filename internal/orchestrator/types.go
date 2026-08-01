@@ -304,7 +304,7 @@ type RuntimeState struct {
 	CreatedAt      time.Time     `json:"createdAt"`
 	LastActiveAt   time.Time     `json:"lastActiveAt"`
 	CleanupPolicy  CleanupPolicy `json:"cleanupPolicy"`
-	AccessMode     string        `json:"accessMode,omitempty"`    // browser | local_history
+	AccessMode     string        `json:"accessMode,omitempty"`    // browser | local_history | runtime_console
 	ApprovalMode   string        `json:"approvalMode,omitempty"`  // ask | auto
 	ExecutionMode  string        `json:"executionMode,omitempty"` // task | goal
 	// ThreadID and TurnID expose retained WebSocket-provider context to the
@@ -509,3 +509,4 @@ type ReviewDecision struct {
 	NextTask        string   `json:"nextTask"`
 	Evidence        []string `json:"evidence"`
 }
+

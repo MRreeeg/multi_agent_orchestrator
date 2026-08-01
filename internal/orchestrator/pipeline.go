@@ -58,26 +58,6 @@ type RuntimeManager interface {
 	List() []*RuntimeState
 }
 
-type mimoRuntime struct {
-	ID         string
-	Port       int
-	Endpoint   string
-	ModelRef   string
-	Workspace  string
-	Agent      string
-	Cmd        *exec.Cmd
-	Stderr     *bytes.Buffer
-	done       chan struct{}
-	exitErr    error
-	StartedAt  time.Time
-	LastUsedAt time.Time
-}
-
-type MimoRuntimeManager struct {
-	mu       sync.Mutex
-	runtimes map[string]*mimoRuntime
-}
-
 type reasonixRuntime struct {
 	ID         string
 	Port       int
@@ -99,199 +79,21 @@ type ReasonixRuntimeManager struct {
 	runtimes map[string]*reasonixRuntime
 }
 
-func newMimoRuntimeManager() *MimoRuntimeManager {
-	return &MimoRuntimeManager{runtimes: make(map[string]*mimoRuntime)}
-}
-
 func newReasonixRuntimeManager() *ReasonixRuntimeManager {
 	return &ReasonixRuntimeManager{runtimes: make(map[string]*reasonixRuntime)}
 }
 
-func (m *MimoRuntimeManager) runtimeKey(spec ExecSpec) string {
-	workspace := spec.Workspace
-	if workspace == "" {
-		workspace = "."
-	}
-	return spec.NodeID + "|" + spec.ModelRef + "|" + workspace + "|" + spec.Agent
-}
-
 // cleanupAll kills all managed serve processes and clears the registry.
-func (m *MimoRuntimeManager) cleanupAll() {
-	m.mu.Lock()
-	runtimes := make([]*mimoRuntime, 0, len(m.runtimes))
-	for key, rt := range m.runtimes {
-		delete(m.runtimes, key)
-		runtimes = append(runtimes, rt)
-	}
-	m.mu.Unlock()
-	for _, rt := range runtimes {
-		stopRuntimeProcess(rt.Cmd, rt.done)
-	}
-}
 
 // Borrow acquires or creates a runtime for the given spec.
-func (m *MimoRuntimeManager) Borrow(ctx context.Context, spec ExecSpec, policy CleanupPolicy) (*RuntimeState, error) {
-	rt, err := m.ensure(ctx, spec, nil)
-	if err != nil {
-		return nil, err
-	}
-	pid := 0
-	if rt.Cmd != nil && rt.Cmd.Process != nil {
-		pid = rt.Cmd.Process.Pid
-	}
-	return &RuntimeState{
-		RuntimeID:     rt.ID,
-		NodeID:        spec.NodeID,
-		Executor:      "mimo",
-		Model:         spec.ModelRef,
-		Endpoint:      rt.Endpoint,
-		Port:          rt.Port,
-		PID:           pid,
-		Status:        RuntimeReady,
-		CreatedAt:     rt.StartedAt,
-		LastActiveAt:  time.Now(),
-		CleanupPolicy: policy,
-		AccessMode:    "local_history",
-		ApprovalMode:  spec.ApprovalMode,
-		ExecutionMode: spec.ExecutionMode,
-	}, nil
-}
 
 // Release marks a runtime as idle (task finished, process still alive).
-func (m *MimoRuntimeManager) Release(runtimeID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, rt := range m.runtimes {
-		if rt.ID == runtimeID {
-			rt.LastUsedAt = time.Now()
-			return nil
-		}
-	}
-	return fmt.Errorf("runtime %s not found", runtimeID)
-}
 
 // Stop kills a runtime process and marks it as stopped.
-func (m *MimoRuntimeManager) Stop(runtimeID string) error {
-	m.mu.Lock()
-	for key, rt := range m.runtimes {
-		if rt.ID == runtimeID {
-			delete(m.runtimes, key)
-			m.mu.Unlock()
-			stopRuntimeProcess(rt.Cmd, rt.done)
-			return nil
-		}
-	}
-	m.mu.Unlock()
-	return fmt.Errorf("runtime %s not found", runtimeID)
-}
 
 // Get returns a runtime by ID.
-func (m *MimoRuntimeManager) Get(runtimeID string) (*RuntimeState, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, rt := range m.runtimes {
-		if rt.ID == runtimeID {
-			pid := 0
-			if rt.Cmd != nil && rt.Cmd.Process != nil {
-				pid = rt.Cmd.Process.Pid
-			}
-			return &RuntimeState{
-				RuntimeID: rt.ID, NodeID: "", Executor: "mimo",
-				Model: rt.ModelRef, Endpoint: rt.Endpoint, Port: rt.Port,
-				PID: pid, Status: RuntimeReady, CreatedAt: rt.StartedAt,
-				LastActiveAt: rt.LastUsedAt, CleanupPolicy: CleanupRetained,
-			}, true
-		}
-	}
-	return nil, false
-}
 
 // List returns all managed runtimes.
-func (m *MimoRuntimeManager) List() []*RuntimeState {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	var out []*RuntimeState
-	for _, rt := range m.runtimes {
-		pid := 0
-		if rt.Cmd != nil && rt.Cmd.Process != nil {
-			pid = rt.Cmd.Process.Pid
-		}
-		out = append(out, &RuntimeState{
-			RuntimeID: rt.ID, Executor: "mimo",
-			Model: rt.ModelRef, Endpoint: rt.Endpoint, Port: rt.Port,
-			PID: pid, Status: RuntimeReady, CreatedAt: rt.StartedAt,
-			LastActiveAt: rt.LastUsedAt, CleanupPolicy: CleanupRetained,
-		})
-	}
-	return out
-}
-
-func (m *MimoRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*mimoRuntime, error) {
-	key := m.runtimeKey(spec)
-	m.mu.Lock()
-	if rt := m.runtimes[key]; rt != nil {
-		if !runtimeExited(rt.done) {
-			rt.LastUsedAt = time.Now()
-			m.mu.Unlock()
-			return rt, nil
-		}
-		// The serve process exited outside the manager. Do not reuse its dead
-		// endpoint; remove the stale entry and create a fresh runtime below.
-		delete(m.runtimes, key)
-	}
-	port := findFreePort()
-	rt := &mimoRuntime{
-		ID:         fmt.Sprintf("mimo_rt_%d", time.Now().UnixNano()),
-		Port:       port,
-		Endpoint:   fmt.Sprintf("http://127.0.0.1:%d", port),
-		ModelRef:   spec.ModelRef,
-		Workspace:  spec.Workspace,
-		Agent:      spec.Agent,
-		StartedAt:  time.Now(),
-		LastUsedAt: time.Now(),
-		done:       make(chan struct{}),
-	}
-	m.runtimes[key] = rt
-	m.mu.Unlock()
-
-	// Keep the serve invocation to the minimal, version-stable flags set.
-	// Newer mimocode builds accept `mimo serve --port/--hostname`; older/newer
-	// builds at least accept the positional command plus `--port`.
-	// Model/agent belong to `mimo run --attach`, not `mimo serve`.
-	args := []string{"serve", "--port", fmt.Sprint(port)}
-	// The serve process is a retained runtime, not a child of one node's request.
-	// Binding it to nodeCtx would kill the Agent as soon as the node returns and
-	// the caller invokes cancelNode(), which presents as "reconnecting" in the
-	// embedded Agent UI. Stop() is the explicit lifecycle boundary instead.
-	cmd := newRetainedRuntimeCommand(ctx, "mimo", args...)
-	cmd.Dir = spec.Workspace
-	cmd.Stdout = io.Discard
-	stderr := &bytes.Buffer{}
-	cmd.Stderr = stderr
-	if err := cmd.Start(); err != nil {
-		m.mu.Lock()
-		delete(m.runtimes, key)
-		m.mu.Unlock()
-		return nil, err
-	}
-	rt.Cmd = cmd
-	rt.Stderr = stderr
-	go m.watchRuntime(key, rt)
-	// Notify caller immediately — process started, port known.
-	if onStart != nil {
-		onStart(rt.Endpoint, rt.Port)
-	}
-	if err := waitForServeReadyContext(ctx, rt.Endpoint, 60*time.Second, cmd, stderr); err != nil {
-		m.mu.Lock()
-		if current := m.runtimes[key]; current == rt {
-			delete(m.runtimes, key)
-		}
-		m.mu.Unlock()
-		stopRuntimeProcess(cmd, rt.done)
-		return nil, err
-	}
-	return rt, nil
-}
 
 // runtimeAccessMode describes how the browser should reach a retained runtime.
 // Codex app-server is an internal WebSocket protocol and must be proxied through
@@ -301,7 +103,10 @@ func runtimeAccessMode(executor ExecutorType, mode string) string {
 		return "runtime_console"
 	}
 	if executor == ExecutorMimo && strings.EqualFold(mode, "serve") {
-		return "local_history"
+		// mimo acp is a retained provider runtime proxied through the
+		// Orchestrator Runtime Console; the legacy `mimo serve` HTTP flow is no
+		// longer spawned by this build.
+		return "runtime_console"
 	}
 	return "browser"
 }
@@ -580,17 +385,6 @@ func processAlive(cmd *exec.Cmd) bool {
 	return cmd.ProcessState == nil
 }
 
-func (m *MimoRuntimeManager) watchRuntime(key string, rt *mimoRuntime) {
-	err := rt.Cmd.Wait()
-	m.mu.Lock()
-	rt.exitErr = err
-	close(rt.done)
-	if current := m.runtimes[key]; current == rt {
-		delete(m.runtimes, key)
-	}
-	m.mu.Unlock()
-}
-
 func (m *ReasonixRuntimeManager) watchRuntime(key string, rt *reasonixRuntime) {
 	err := rt.Cmd.Wait()
 	m.mu.Lock()
@@ -855,12 +649,7 @@ type MimoExecutor struct{}
 
 func (e *MimoExecutor) Name() string { return "mimo" }
 
-var mimoRuntimeMgr = newMimoRuntimeManager()
-
 // Package-level functions for runtime API access.
-func ListMimoRuntimes() []*RuntimeState                  { return mimoRuntimeMgr.List() }
-func GetMimoRuntime(id string) (*RuntimeState, bool)     { return mimoRuntimeMgr.Get(id) }
-func StopMimoRuntime(id string) error                    { return mimoRuntimeMgr.Stop(id) }
 func ListReasonixRuntimes() []*RuntimeState              { return reasonixRuntimeMgr.List() }
 func GetReasonixRuntime(id string) (*RuntimeState, bool) { return reasonixRuntimeMgr.Get(id) }
 func StopReasonixRuntime(id string) error                { return reasonixRuntimeMgr.Stop(id) }
@@ -869,65 +658,7 @@ func (e *MimoExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(
 	if strings.EqualFold(strings.TrimSpace(spec.Mode), "run") {
 		return executeMimoRun(ctx, spec)
 	}
-	rt, err := mimoRuntimeMgr.ensure(ctx, spec, onStart)
-	if err != nil {
-		return &ExecResult{ExitCode: -1}, err
-	}
-	// Mimo owns its own serve protocol. Do not call Reasonix-only HTTP APIs
-	// such as /goal or /tool-approval-mode here: an attached Mimo server may
-	// ignore them while the actual run continues, leaving the orchestrator
-	// waiting for a result that never becomes a bounded review response.
-
-	// Keep the full orchestration prompt out of the Windows command line.
-	// Mimo's --file option attaches the prompt as a local file while the
-	// positional message stays short enough for CreateProcess.
-	args, cleanup, err := buildMimoRunArgs(spec, rt.Endpoint)
-	if err != nil {
-		return &ExecResult{ExitCode: -1, RuntimeID: rt.ID, Endpoint: rt.Endpoint}, err
-	}
-	defer cleanup()
-
-	start := time.Now()
-	stdoutText, stderrText, runErr := runMimoCommand(ctx, args, spec.Workspace)
-	duration := time.Since(start).Milliseconds()
-
-	exitCode := 0
-	if runErr != nil {
-		if exitErr, ok := runErr.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			exitCode = -1
-		}
-	}
-
-	finalText, eventErr := parseMimoOutput(stdoutText, stderrText)
-	// A valid final response is authoritative. Mimo can emit an error event
-	// for a transient tool/UI warning after it has already emitted the final
-	// answer. Such a warning must not turn a successful Review into failed.
-	if strings.TrimSpace(finalText) != "" {
-		if runErr != nil && isMimoHardFailure(runErr, stderrText) {
-			// Permission/argument failures are transport failures even if a
-			// partial text happened to be printed before the failure.
-			return &ExecResult{FinalText: finalText, RawStdout: stdoutText, RawStderr: formatMimoCommandDiagnostic(args, stderrText), ExitCode: exitCode, DurationMs: duration, RuntimeID: rt.ID, Endpoint: rt.Endpoint}, runErr
-		}
-		runErr = nil
-		eventErr = nil
-	}
-	if runErr == nil && eventErr != nil && strings.TrimSpace(finalText) == "" {
-		runErr = eventErr
-		exitCode = -1
-	}
-
-	return &ExecResult{
-		FinalText:  finalText,
-		RawStdout:  stdoutText,
-		RawStderr:  formatMimoCommandDiagnostic(args, stderrText),
-		ExitCode:   exitCode,
-		DurationMs: duration,
-		RuntimeID:  rt.ID,
-		Endpoint:   rt.Endpoint,
-		TokenUsage: nil,
-	}, runErr
+	return mimoRuntimeMgr.Execute(ctx, spec, onStart)
 }
 
 type synchronizedOutput struct {
@@ -1696,7 +1427,7 @@ func NewStore() *Store {
 // SetEmitter sets the event emitter for pipeline progress events.
 func (s *Store) SetEmitter(em event.Sink) {
 	s.emitter = em
-	codexRuntimeMgr.SetUpdateSink(func(runtime RuntimeState) {
+	mirrorRuntimeState := func(runtime RuntimeState) {
 		// Runtime manager state is process-local. Mirror its lifecycle fields into
 		// the persisted session record when it exists, then use that record for
 		// SSE so the frontend can still resolve the owning node and session.
@@ -1720,7 +1451,9 @@ func (s *Store) SetEmitter(em event.Sink) {
 			return
 		}
 		s.emit(event.Event{Kind: event.PipelineNodeRuntime, Text: runtime.RuntimeID, Detail: string(detail)})
-	})
+	}
+	codexRuntimeMgr.SetUpdateSink(mirrorRuntimeState)
+	mimoRuntimeMgr.SetUpdateSink(mirrorRuntimeState)
 }
 
 // emit sends an event if an emitter is configured; otherwise no-op.
