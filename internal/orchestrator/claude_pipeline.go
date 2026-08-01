@@ -55,6 +55,7 @@ func (e *ClaudePipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onS
 	}
 	opts := claudeclient.ExecOptions{
 		Model:              claudeRuntimeModel(spec),
+		ConfigDir:          claudeConfigDir(spec),
 		Workspace:          spec.Workspace,
 		ResumeSessionID:    resumeID,
 		PermissionMode:     claudeclient.PermissionModeForApproval(spec.ApprovalMode),

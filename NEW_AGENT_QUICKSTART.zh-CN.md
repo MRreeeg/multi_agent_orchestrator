@@ -269,6 +269,45 @@ model = "deepseek-v4-flash"
 
 > 另一台电脑接入步骤：① 按 DeepSeek 官方脚本或在 `~/.codex/config.toml` 添加 `[model_providers.deepseek]`（base_url + key）；② 新建 `deepseek.config.toml` / `ccs.config.toml` 两个覆盖层；③ 控制台节点 `executor=codex, model=deepseek-v4-flash`（自配）或 `model=ccs, providerRoute=ccswitch`（路由）。
 
+### 5.2 实例：Claude Code 直连 DeepSeek 官方（CLAUDE_CONFIG_DIR 独立配置）
+
+需求：claude 节点用 `deepseek-v4-flash` 官方直连，同时保留默认 `~/.claude`（right.codes/ccs 代理）配置。
+
+官方接入方式（DeepSeek 文档）：`ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic` + `ANTHROPIC_AUTH_TOKEN=<key>` + 模型映射（opus→deepseek-v4-pro、sonnet/haiku→deepseek-v4-flash）。
+
+> [!important] 不覆盖现有配置
+> 用 `CLAUDE_CONFIG_DIR` 指向独立配置目录，完全不动默认 `~/.claude`。目录（含 API key）**只存在于本机**，不进仓库。
+
+本机已配置 `~/.claude-deepseek/settings.json`：
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "<你的 DeepSeek API Key>",
+    "ANTHROPIC_MODEL": "deepseek-v4-pro[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-pro[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-v4-flash",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+  }
+}
+```
+
+框架按节点自动设置 `CLAUDE_CONFIG_DIR`（`claudeConfigDir`，已实现）：
+
+| 节点配置 | 行为 |
+|---|---|
+| `executor=claude, model=deepseek-v4-flash`（或任意 deepseek-*） | 设 `CLAUDE_CONFIG_DIR=~/.claude-deepseek`（可用 `CLAUDE_DEEPSEEK_CONFIG_DIR` 覆盖）→ DeepSeek 官方直连 |
+| `executor=claude, model=ccs, providerRoute=ccswitch` / 其他模型 | 不设 → 用默认 `~/.claude`（right.codes / cc-switch 代理） |
+
+实测（2026-08-01）：
+- run：`CLAUDE_CONFIG_DIR=~/.claude-deepseek claude -p --output-format json --model deepseek-v4-flash "只回复OK"` → 官方返回 OK（~3s，`modelUsage.deepseek-v4-pro[1m]`）；
+- serve（stream-json）：协议层与框架代码就绪（曾实测返回 OK），但 claude 2.1.217 的 stream-json init 在本机部分时段延迟（CLI 行为，run 模式不受影响）；E2E 测试 `TestClaudeServeDeepseekOfficialEndToEnd` 已写好，`RUN_INTEGRATION=1` 门控。
+
+> 换电脑：把 `~/.claude-deepseek/settings.json` 里的 key 换成自己的，框架代码无需改动。
+
 ## 6. 验收命令清单
 
 ```powershell

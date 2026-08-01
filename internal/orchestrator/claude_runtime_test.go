@@ -147,6 +147,28 @@ func TestClaudePermissionPolicyAllowsAutoDeniesAsk(t *testing.T) {
 	}
 }
 
+func TestClaudeConfigDirSelectsDeepseekOverlay(t *testing.T) {
+	t.Setenv("CLAUDE_DEEPSEEK_CONFIG_DIR", "")
+	t.Setenv("USERPROFILE", `C:\Users\test`)
+	t.Setenv("HOME", `C:\Users\test`)
+	if got := claudeConfigDir(ExecSpec{ModelRef: "deepseek-v4-flash"}); got != `C:\Users\test\.claude-deepseek` {
+		t.Fatalf("deepseek config dir = %q", got)
+	}
+	if got := claudeConfigDir(ExecSpec{ModelRef: "deepseek-v4-pro[1m]"}); got == "" {
+		t.Fatal("deepseek-v4-pro must use the deepseek overlay")
+	}
+	if got := claudeConfigDir(ExecSpec{ModelRef: "ccs", ProviderRoute: "ccswitch"}); got != "" {
+		t.Fatalf("ccs route config dir = %q, want empty (default ~/.claude)", got)
+	}
+	if got := claudeConfigDir(ExecSpec{ModelRef: "sonnet"}); got != "" {
+		t.Fatalf("sonnet config dir = %q, want empty", got)
+	}
+	t.Setenv("CLAUDE_DEEPSEEK_CONFIG_DIR", `D:\ds`)
+	if got := claudeConfigDir(ExecSpec{ModelRef: "deepseek-v4-flash"}); got != `D:\ds` {
+		t.Fatalf("override config dir = %q, want D:\\ds", got)
+	}
+}
+
 func TestClaudeRuntimeModelOmitsForCCSwitch(t *testing.T) {
 	if got := claudeRuntimeModel(ExecSpec{ModelRef: "sonnet"}); got != "sonnet" {
 		t.Fatalf("self model = %q", got)

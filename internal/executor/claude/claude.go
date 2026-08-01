@@ -35,7 +35,13 @@ type ExecutorResult struct {
 
 // ExecOptions configures a Claude Code execution.
 type ExecOptions struct {
-	Model              string
+	Model string
+	// ConfigDir overrides CLAUDE_CONFIG_DIR for the child process. This lets a
+	// node pin its own settings.json (for example ~/.claude-deepseek with the
+	// DeepSeek official base URL + API key) without touching the default
+	// ~/.claude profile used by ccs/proxy routing. Never store keys in the
+	// repository; the directory lives on the machine.
+	ConfigDir          string
 	Workspace          string
 	Timeout            time.Duration
 	ResumeSessionID    string
@@ -82,6 +88,9 @@ func (e *ClaudeExecutor) Exec(ctx context.Context, prompt string, opts ExecOptio
 	cmd := exec.CommandContext(ctx, bin, args...)
 	if strings.TrimSpace(opts.Workspace) != "" {
 		cmd.Dir = opts.Workspace
+	}
+	if strings.TrimSpace(opts.ConfigDir) != "" {
+		cmd.Env = append(os.Environ(), "CLAUDE_CONFIG_DIR="+opts.ConfigDir)
 	}
 	// Windows command lines are length limited and Loop prompts can carry the
 	// full pipeline context, skills, previous iteration output and review

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -305,6 +306,12 @@ func (m *ClaudeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStar
 	cmd := newRetainedRuntimeCommand(ctx, bin, args...)
 	if strings.TrimSpace(spec.Workspace) != "" {
 		cmd.Dir = spec.Workspace
+	}
+	if configDir := claudeConfigDir(spec); configDir != "" {
+		// Pin the node's own settings.json (e.g. ~/.claude-deepseek for the
+		// DeepSeek official endpoint) so ccs/proxy nodes keep the default
+		// ~/.claude profile. The key never lives in the repository.
+		cmd.Env = append(os.Environ(), "CLAUDE_CONFIG_DIR="+configDir)
 	}
 	stdinR, stdinW, err := os.Pipe()
 	if err != nil {
@@ -723,6 +730,29 @@ func claudePermissionPolicy(rt *claudeRuntime) claudeclient.PermissionPolicy {
 		}
 		return true, nil
 	}
+}
+
+// claudeConfigDir picks the CLAUDE_CONFIG_DIR overlay for a node.
+//
+//   - model starts with deepseek: the dedicated DeepSeek official config
+//     directory (~/.claude-deepseek by default, override with the
+//     CLAUDE_DEEPSEEK_CONFIG_DIR environment variable). That directory's
+//     settings.json carries ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+//     and the machine-local API key; it is never stored in the repository.
+//   - ccs/ccswitch routes and other models: empty -> the default ~/.claude
+//     settings (right.codes / cc-switch proxy) is used.
+func claudeConfigDir(spec ExecSpec) string {
+	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(spec.ModelRef)), "deepseek") {
+		return ""
+	}
+	if dir := strings.TrimSpace(os.Getenv("CLAUDE_DEEPSEEK_CONFIG_DIR")); dir != "" {
+		return dir
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".claude-deepseek")
 }
 
 // claudeRuntimeModel omits --model when the node routes through CCSwitch (the
