@@ -477,13 +477,14 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 		{
 			Type:   orchestrator.NodeArchitect,
 			Label:  "架构师",
-			Models: []string{"deepseek-pro", "deepseek-flash", "deepseek", "mimo-v2.5-pro", "mimo-v2.5"},
+			Models: []string{"deepseek-pro", "deepseek-flash", "deepseek", "mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5", "ccs", "o3", "codex-default"},
 			ModelsByExecutor: map[orchestrator.ExecutorType][]string{
 				orchestrator.ExecutorReasonix: {"deepseek-pro", "deepseek-flash", "deepseek"},
-				orchestrator.ExecutorMimo:     {"mimo-v2.5-pro", "mimo-v2.5"},
+				orchestrator.ExecutorMimo:     {"mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5"},
+				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default"},
 			},
 			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix},
+			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex},
 		},
 		{
 			Type:   orchestrator.NodeReviewer,

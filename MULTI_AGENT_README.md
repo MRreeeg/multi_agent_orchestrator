@@ -248,3 +248,9 @@ go build ./cmd/reasonix
 
 - `G:\工作\学习笔记\多agent项目\Reasonix Orchestrator Loop 与多执行器功能说明.md`
 - `G:\工作\学习笔记\多agent项目\Reasonix Orchestrator 调试记录.md`
+
+## 控制台与节点配置体验
+
+- 架构师/执行者/审查者节点都可自由选择 reasonix / mimo / codex 执行器，模型下拉只显示该执行器绑定的模型。
+- Runtime Console 窗口内容可滚轮滚动；流式增量按消息合并（推理浅色、回答高亮）。
+- 每个 Runtime 可独立开一个 Console 窗口，执行过程中已完成的节点也能随时打开它的 Console（runtimeID 在 SSE 合并中不会被丢失）。

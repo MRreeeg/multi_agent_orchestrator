@@ -85,3 +85,9 @@ graph LR
 
 - **流式增量合并**：Codex `item/*/textDelta` / `item/*/delta` 与 Mimo `agent_*_chunk` 按消息合并成一个控制台块（后端 `consoleStreamCoalescer`），在完成/工具调用等边界事件或静默 400ms 时落一条事件；推理文本标记 `category=reasoning` 浅色显示，助手文本 `category=assistant` 高亮。
 - **每 Runtime 独立窗口**：控制台改为多实例——Mimo 与 Codex 可同时各开一个窗口，各自轮询/发送/中断，互不覆盖；历史事件仍在各 Runtime 独立保留（上限 300 条合并事件）。
+
+## Console UX 修复（v1.2）
+
+- **节点职责不再限制执行器**：架构师/执行者/审查者都可选 reasonix/mimo/codex，模型下拉只显示当前执行器绑定的模型（`/nodes/types` 架构师节点放开到三个执行器）。
+- **滚轮滚动修复**：Runtime Console 模态框的 flex 链缺少 `min-height:0`，导致 `.rc-events`/`.rc-output` 撑高被裁剪、无法滚动；已为 modal body 与左右 section 补 `min-height:0`，事件/输出面板均可滚轮滚动。
+- **已完成节点控制台可随时打开**：节点 start/completion 的 SSE 事件不含 runtimeID，合并时会覆盖掉带 runtimeID 的记录，导致执行中已完成的节点"Runtime 不可用"；SSE 合并现在优先保留 node.runtime 的 runtimeID，并按 nodeID 从 runtimeStates 找回，执行中即可打开任一已完成节点的 Console。
