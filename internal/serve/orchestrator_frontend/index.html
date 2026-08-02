@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Reasonix — 多Agent编排控制台</title>
+<title>多智能体管家 · 多Agent 编排控制台</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -47,7 +47,7 @@ input,textarea,select{font:inherit;color:inherit}
 .app--no-config{grid-template-columns:56px 1fr 0px}
 .topbar{grid-column:1/-1;background:var(--bg-2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;z-index:10}
 .topbar__brand{font-family:var(--heading);font-weight:700;font-size:15px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
-.topbar__logo{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--violet));display:flex;align-items:center;justify-content:center;font-family:var(--heading);font-weight:700;font-size:11px;color:oklch(99% 0 0)}
+.topbar__logo{width:22px;height:22px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px oklch(0% 0 0/.18))}
 .topbar__sep{width:1px;height:20px;background:var(--border)}
 .topbar__title{font-family:var(--heading);font-size:13px;font-weight:500;color:var(--fg-2)}
 .topbar__spacer{flex:1}
@@ -349,9 +349,17 @@ input,textarea,select{font:inherit;color:inherit}
   <!-- Top bar -->
   <header class="topbar">
     <div class="topbar__brand">
-      <div class="topbar__logo">R</div>
+      <div class="topbar__logo" title="多智能体管家">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="22" height="22" rx="5.5" fill="var(--accent-strong)"/>
+          <path d="M7.5 10.6 12 13.2 M12 13.2 16.5 11.7" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+          <circle cx="7.5" cy="8" r="2.6" fill="#fff"/>
+          <circle cx="12" cy="15.5" r="2.6" fill="#fff"/>
+          <circle cx="16.5" cy="9" r="2.6" fill="#fff"/>
+        </svg>
+      </div>
       <span>多智能体管家</span>
-      <span class="topbar__sub">Reasonix Orchestrator</span>
+      <span class="topbar__sub">多Agent 编排控制台</span>
     </div>
     <div class="topbar__sep"></div>
     <div class="topbar__title">多Agent 协作编排 · 架构 → 实现 → 审查</div>
@@ -951,8 +959,8 @@ function syncConfigFieldState(node) {
   $('#cfg-skill').disabled = false; // All executors can use skill (Codex injects via prompt)
 
   $('#cfg-executor').title = isCodex ? 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）' : '可手动选择执行器';
-  $('#cfg-agent').title = isCodex ? 'Codex 不使用 agent 配置' : (isMimo ? 'mimo executor 会传递 agent 配置；留空最稳妥' : 'reasonix executor 当前不会使用 agent');
-  $('#cfg-skill').title = isCodex ? 'Codex 通过 Prompt 注入 Skill 内容' : (isMimo ? 'mimo executor 当前不会使用 skill，但可保留配置' : 'reasonix executor 可使用 skill');
+  $('#cfg-agent').title = isCodex ? 'Codex 不使用 agent 配置' : (isMimo ? 'mimo executor 会传递 agent 配置；留空最稳妥' : '默认执行器当前不会使用 agent');
+  $('#cfg-skill').title = isCodex ? 'Codex 通过 Prompt 注入 Skill 内容' : (isMimo ? 'mimo executor 当前不会使用 skill，但可保留配置' : '默认执行器可使用 skill');
 }
 
 // ── DOM refs ──
@@ -2526,7 +2534,7 @@ async function loadOrchestratorState(sessionID) {
       data = await apiGet('/orch-sessions/' + sessionID);
       console.log('[orch:init] loaded session id:', sessionID);
     } catch (e) {
-      // A Reasonix history session predates OrchestrationSession. Migrate its
+      // A legacy history session predates OrchestrationSession. Migrate its
       // saved canvas once, then continue with the new session ID.
       if (!String(e.message || '').includes('404')) throw e;
       if (String(sessionID).startsWith('orchestrator-')) {
