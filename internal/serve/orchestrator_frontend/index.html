@@ -65,6 +65,8 @@ input,textarea,select{font:inherit;color:inherit}
 .topbar__btn--danger{background:var(--danger-soft);color:var(--danger);border-color:transparent}
 .topbar__btn--danger:hover{background:oklch(66% .18 25/.25)}
 .topbar__btn--success{background:var(--success-soft);color:var(--success);border-color:transparent}
+@keyframes exec-pulse{0%,100%{box-shadow:0 0 0 0 var(--accent-soft)}50%{box-shadow:0 0 0 6px transparent}}
+#btn-execute.exec-pulse{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);animation:exec-pulse 1.4s ease-in-out infinite}
 .topbar__btn svg{width:14px;height:14px}
 
 /* ── Sidebar nav ── */
@@ -131,8 +133,31 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__input{flex:1;min-height:48px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .hero__input::placeholder{color:var(--muted-2)}
-.hero__send{flex-shrink:0;padding:0 18px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--violet));color:oklch(99% 0 0);font-size:13px;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .2s}
-.hero__send:hover{transform:translateY(-1px);box-shadow:0 6px 18px oklch(0% 0 0/.25)}
+.hero__send{flex-shrink:0;padding:0 18px;border:none;border-radius:14px;background:var(--accent-strong);color:oklch(14% .01 40);font-size:13px;font-weight:700;cursor:pointer;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
+.hero__send:hover{background:var(--accent);box-shadow:0 8px 20px -8px var(--accent-soft)}
+.hero__send:active{transform:scale(.97)}
+.hero__send:disabled{opacity:.55;cursor:default;transform:none;box-shadow:none}
+.hero__chip:active{transform:scale(.97)}
+.run-dash{border:1px solid var(--accent-soft);border-radius:var(--radius-lg);background:linear-gradient(180deg,var(--panel),var(--bg-2));margin:12px 16px 0;padding:12px 14px;font-size:12px}
+.run-dash__head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.run-dash__badge{font-family:var(--mono);font-size:10.5px;padding:2px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);animation:exec-pulse 1.4s ease-in-out infinite}
+.run-dash__badge--done{background:var(--success-soft);color:var(--success);animation:none}
+.run-dash__badge--err{background:var(--danger-soft);color:var(--danger);animation:none}
+.run-dash__title{font-weight:600;color:var(--fg)}
+.run-dash__spacer{flex:1}
+.run-dash__btn{border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--fg-2);font-size:11px;padding:3px 10px;transition:all .15s}
+.run-dash__btn:hover{border-color:var(--border-strong);color:var(--fg)}
+.run-dash__btn--danger:hover{border-color:var(--danger);color:var(--danger)}
+.run-dash__iter{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.run-dash__nodes{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto}
+.rd-node{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:8px;background:var(--card);border:1px solid var(--border)}
+.rd-node__dot{width:8px;height:8px;border-radius:50%;background:var(--muted-2);flex-shrink:0}
+.rd-node__dot--running{background:var(--accent);animation:pulse 1s ease-in-out infinite}
+.rd-node__dot--done{background:var(--success)}
+.rd-node__dot--failed{background:var(--danger)}
+.rd-node__name{font-weight:600;color:var(--fg);font-size:12px}
+.rd-node__type{font-size:10px;color:var(--muted-2)}
+.rd-node__out{flex:1;font-family:var(--mono);font-size:10.5px;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;max-width:55%}
 .hero__chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
 .hero__chip{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--fg-2);font-size:12px;cursor:pointer;transition:all .15s}
 .hero__chip:hover{border-color:var(--accent);color:var(--accent)}
@@ -2712,17 +2737,20 @@ function connectSSE() {
         case 'pipeline_node_start':
           addChatMessage('ai', '⏳ ' + (e.text || '节点') + ' 开始执行...', '流水线');
           if (e.text) updateNodeStatus(e.text, 'running');
+          if (e.text) updateRunDashboardNode(e.text, 'running');
           break;
         case 'pipeline_node_done':
           addChatMessage('ai', '✅ ' + (e.text || '节点') + ' 完成\n' + (e.detail || '').substring(0, 500), '流水线');
           if (e.text) state.nodeOutputs[e.text] = { output: e.detail || '', status: 'done' };
           if (e.text) updateNodeStatus(e.text, 'done');
+          if (e.text) updateRunDashboardNode(e.text, 'done', e.detail);
           break;
         case 'pipeline_node_failed':
           addChatMessage('ai', '❌ ' + (e.text || '节点') + ' 失败: ' + (e.detail || e.err || ''), '流水线');
 
           if (e.text) state.nodeOutputs[e.text] = { error: e.detail || e.err || '', status: 'failed' };
           if (e.text) updateNodeStatus(e.text, 'failed');
+          if (e.text) updateRunDashboardNode(e.text, 'failed', e.detail);
           break;
         case 'pipeline_node_runtime':
           if (e.text && e.detail) {
@@ -2771,6 +2799,7 @@ function connectSSE() {
           break;
         case 'pipeline_done':
           addChatMessage('ai', '🎉 流水线执行完成！', '流水线');
+          finishRunDashboard(true);
 
           loadStats();
           autoSaveState();
@@ -2918,7 +2947,7 @@ $('#confirm-ok').addEventListener('click', async () => {
     } else {
       run = await apiPost('/pipelines/' + state.pipelineId + '/execute', { task });
     }
-    if (run && run.id) state.runId = run.id;
+    if (run && run.id) { state.runId = run.id; showRunDashboard(run.id); }
     addChatMessage('user', task);
     toast('流水线开始执行', 'success');
 
@@ -3648,6 +3677,63 @@ async function resumeLoopRun(runID) {
     toast('继续 Loop 失败: ' + err.message, 'error');
   }
 }
+
+// ── Loop Run dashboard ──
+const runDash = { active: false, runID: '', nodes: {} };
+function initRunDashboard() {
+  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  runDash.nodes = {};
+  $('#rd-nodes').innerHTML = state.nodes.map(n => {
+    runDash.nodes[String(n.id)] = { name: n.name, type: n.type, status: 'pending', output: '' };
+    return '<div class="rd-node" data-nid="' + n.id + '">' +
+      '<span class="rd-node__dot"></span>' +
+      '<span class="rd-node__name">' + escHtml(n.name) + '</span>' +
+      '<span class="rd-node__type">' + (typeLabels[n.type] || n.type) + '</span>' +
+      '<span class="rd-node__out"></span>' +
+      '</div>';
+  }).join('');
+  const runID = runDash.runID || state.runId || '';
+  $('#rd-iter').textContent = runID ? ('Run ' + runID) : '';
+}
+function showRunDashboard(runID) {
+  runDash.active = true;
+  runDash.runID = runID || state.runId || '';
+  $('#run-dash').classList.remove('hidden');
+  initRunDashboard();
+  const b = $('#rd-badge');
+  b.className = 'run-dash__badge';
+  b.textContent = '● 执行中';
+}
+function updateRunDashboardNode(nodeID, status, output) {
+  if (!runDash.active) return;
+  const n = runDash.nodes[String(nodeID)];
+  if (n) { n.status = status; if (output !== undefined) n.output = output; }
+  const row = document.querySelector('.rd-node[data-nid="' + nodeID + '"]');
+  if (!row) return;
+  const dot = row.querySelector('.rd-node__dot');
+  const out = row.querySelector('.rd-node__out');
+  dot.className = 'rd-node__dot' +
+    (status === 'running' ? ' rd-node__dot--running' : status === 'done' ? ' rd-node__dot--done' : status === 'failed' ? ' rd-node__dot--failed' : '');
+  if (status === 'running') out.textContent = '执行中…';
+  else if (status === 'done') out.textContent = (output || '').replace(/\s+/g, ' ').substring(0, 120);
+  else if (status === 'failed') out.textContent = '失败: ' + (output || '').substring(0, 120);
+  else out.textContent = '';
+}
+function finishRunDashboard(ok) {
+  if (!runDash.active) return;
+  const b = $('#rd-badge');
+  b.className = 'run-dash__badge ' + (ok ? 'run-dash__badge--done' : 'run-dash__badge--err');
+  b.textContent = ok ? '✓ 全部完成' : '✕ 已停止/失败';
+  runDash.active = false;
+}
+$('#rd-stop').addEventListener('click', () => {
+  if (runDash.runID) { cancelOrchRun(runDash.runID); finishRunDashboard(false); }
+  else toast('没有正在运行的 Loop', 'error');
+});
+$('#rd-close').addEventListener('click', () => {
+  $('#run-dash').classList.add('hidden');
+  runDash.active = false;
+});
 
 async function cancelOrchRun(runID) {
   if (!state.sessionID || !runID) return;
