@@ -1,7 +1,7 @@
 @echo off
 rem start-desktop.bat - ????????????????
 cd /d "%~dp0.."
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-desktop.ps1"
+start "" powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0start-desktop.ps1"
 if errorlevel 1 (
   echo.
   echo [start-desktop] ???????????????

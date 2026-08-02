@@ -10,28 +10,28 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:oklch(16% .008 262);--bg-2:oklch(19% .009 262);
-  --panel:oklch(20.5% .01 262);--panel-2:oklch(23.5% .011 262);
-  --card:oklch(22% .01 262);--card-hover:oklch(25% .011 262);
-  --border:oklch(29% .012 262);--border-strong:oklch(37% .014 262);
-  --fg:oklch(96% .004 262);--fg-2:oklch(81% .007 262);
-  --muted:oklch(63% .009 262);--muted-2:oklch(49% .009 262);
-  --accent:oklch(78% .11 178);--accent-soft:oklch(78% .11 178/.15);--accent-strong:oklch(82% .12 176);
-  --success:oklch(74% .13 152);--success-soft:oklch(74% .13 152/.14);
-  --warning:oklch(80% .12 88);--warning-soft:oklch(80% .12 88/.16);
-  --danger:oklch(66% .17 22);--danger-soft:oklch(66% .17 22/.16);
-  --violet:oklch(72% .13 296);--violet-soft:oklch(72% .13 296/.16);
-  --blue:oklch(70% .12 250);--blue-soft:oklch(70% .12 250/.16);
-  --green:oklch(74% .12 158);--green-soft:oklch(74% .12 158/.16);
-  --red:oklch(66% .17 22);--red-soft:oklch(66% .17 22/.16);
-  --shadow-sm:0 1px 0 oklch(0% 0 0/.35);
-  --shadow-md:0 8px 24px -8px oklch(0% 0 0/.5);
-  --shadow-lg:0 24px 60px -16px oklch(0% 0 0/.65);
+  --bg:oklch(97.5% .004 262);--bg-2:oklch(94.5% .006 262);
+  --panel:oklch(96% .005 262);--panel-2:oklch(92.5% .007 262);
+  --card:oklch(100% 0 0);--card-hover:oklch(95.5% .006 262);
+  --border:oklch(89% .009 262);--border-strong:oklch(79% .012 262);
+  --fg:oklch(23% .02 262);--fg-2:oklch(38% .015 262);
+  --muted:oklch(52% .012 262);--muted-2:oklch(62% .011 262);
+  --accent:oklch(52% .11 178);--accent-soft:oklch(52% .11 178/.12);--accent-strong:oklch(45% .12 176);
+  --success:oklch(47% .11 152);--success-soft:oklch(47% .11 152/.12);
+  --warning:oklch(56% .12 85);--warning-soft:oklch(56% .12 85/.14);
+  --danger:oklch(52% .16 22);--danger-soft:oklch(52% .16 22/.12);
+  --violet:oklch(50% .13 296);--violet-soft:oklch(50% .13 296/.12);
+  --blue:oklch(50% .12 250);--blue-soft:oklch(50% .12 250/.12);
+  --green:oklch(47% .11 158);--green-soft:oklch(47% .11 158/.12);
+  --red:oklch(52% .16 22);--red-soft:oklch(52% .16 22/.12);
+  --shadow-sm:0 1px 2px oklch(0% 0 0/.05);
+  --shadow-md:0 8px 24px -8px oklch(0% 0 0/.12);
+  --shadow-lg:0 24px 60px -16px oklch(0% 0 0/.18);
   --radius:8px;--radius-lg:12px;
   --sans:'Segoe UI Variable Text','Segoe UI','Microsoft YaHei UI','PingFang SC',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
   --heading:'Space Grotesk','Segoe UI Variable Display','Segoe UI','Microsoft YaHei UI',sans-serif;
   --mono:'Cascadia Code','JetBrains Mono',ui-monospace,SFMono-Regular,Consolas,monospace;
-  color-scheme:dark;
+  color-scheme:light;
 }
 html,body{height:100%;overflow:hidden}
 body{font:14px/1.6 var(--sans);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased}
@@ -119,7 +119,7 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
 .chat-bubble--user .chat-bubble__meta{text-align:right}
 .chat__input-bar{border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;background:var(--bg)}
-.chat__input{flex:1;min-height:38px;max-height:132px;border:1px solid var(--border-strong);border-radius:10px;background:var(--card);padding:8px 12px;font-size:13px;line-height:1.5;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease}
+.chat__input{flex:1;min-height:46px;max-height:160px;border:1px solid var(--border-strong);border-radius:10px;background:var(--card);padding:8px 12px;font-size:13px;line-height:1.5;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease}
 .chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .chat__input::placeholder{color:var(--muted-2)}
 .chat__send{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius);background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
@@ -130,10 +130,10 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__title{font-family:var(--heading);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--fg);text-align:center;line-height:1.3}
 .hero__sub{font-size:13px;color:var(--muted-2);text-align:center;max-width:540px;line-height:1.65}
 .hero__box{display:flex;gap:8px;width:min(640px,92%);margin-top:8px}
-.hero__input{flex:1;min-height:48px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s}
+.hero__input{flex:1;min-height:56px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .hero__input::placeholder{color:var(--muted-2)}
-.hero__send{flex-shrink:0;padding:0 18px;border:none;border-radius:14px;background:var(--accent-strong);color:oklch(14% .01 40);font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
+.hero__send{flex-shrink:0;padding:0 18px;border:none;border-radius:14px;background:var(--accent-strong);color:oklch(99% 0 0);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
 .hero__send:hover{background:var(--accent);box-shadow:0 8px 20px -8px var(--accent-soft)}
 .hero__send:active{transform:scale(.97)}
 .hero__send:disabled{opacity:.55;cursor:default;transform:none;box-shadow:none}
@@ -229,12 +229,12 @@ input,textarea,select{font:inherit;color:inherit}
 .node__status--failed{background:var(--danger)}
 .node__status--interrupted{background:var(--warning, #d97706)}
 .node__output{font-size:10px;color:var(--muted-2);line-height:1.35;margin-top:3px;word-break:break-all;max-height:38px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.rc-events details.rc-ev{border-bottom:1px solid rgba(255,255,255,.07)}
+.rc-events details.rc-ev{border-bottom:1px solid rgba(15,23,42,.07)}
 .rc-events details.rc-ev summary{cursor:pointer;padding:5px 4px;list-style:none;display:flex;gap:6px;align-items:baseline;user-select:none}
 .rc-events details.rc-ev summary::-webkit-details-marker{display:none}
-.rc-events details.rc-ev summary::before{content:"▸";color:#7d8590;font-size:10px;flex-shrink:0}
+.rc-events details.rc-ev summary::before{content:"▸";color:#8c959f;font-size:10px;flex-shrink:0}
 .rc-events details.rc-ev[open] summary::before{content:"▾"}
-.rc-events details.rc-ev pre{margin:0 4px 6px 18px;white-space:pre-wrap;color:#8b949e;font:11px/1.5 var(--mono);max-height:200px;overflow:auto;background:rgba(255,255,255,.03);padding:6px;border-radius:4px}
+.rc-events details.rc-ev pre{margin:0 4px 6px 18px;white-space:pre-wrap;color:#57606a;font:11px/1.5 var(--mono);max-height:200px;overflow:auto;background:rgba(15,23,42,.04);padding:6px;border-radius:4px}
 .rc-send--confirm{background:var(--danger-soft)!important;color:var(--danger)!important;border-color:var(--danger)!important}
 .node__detail-btn{cursor:pointer;font-size:11px;color:var(--muted-2);margin-left:4px;opacity:0.6;transition:opacity .15s}
 .node:hover .node__detail-btn{opacity:1}
@@ -703,7 +703,7 @@ input,textarea,select{font:inherit;color:inherit}
         </section>
         <section style="min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><strong style="font-size:12px">实时事件</strong><span style="font-size:10px;color:var(--muted-2)">流式增量已按消息合并；浏览器经 Orchestrator 轮询，不直连 Provider</span></div>
-          <div class="rc-events" style="flex:1;min-height:0;overflow:auto;background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);padding:8px;color:#d9e2f2;font:11px/1.45 var(--mono)"></div>
+          <div class="rc-events" style="flex:1;min-height:0;overflow:auto;background:#f6f8fa;border:1px solid var(--border);border-radius:var(--radius);padding:8px;color:#24292f;font:11px/1.45 var(--mono)"></div>
         </section>
       </div>
     </div>
@@ -3261,26 +3261,26 @@ function renderRuntimeConsole(runtimeID, data) {
     // answer is the visual focus.
     const reasoning = e.category === 'reasoning';
     const assistant = e.category === 'assistant';
-    const color = e.level === 'error' ? '#ff7b72' : assistant ? '#a5d6ff' : reasoning ? '#6e7681' : '#b7c6db';
+    const color = e.level === 'error' ? '#d1242f' : assistant ? '#0969da' : reasoning ? '#57606a' : '#57606a';
     const prefix = reasoning ? '🧠 推理 · ' : assistant ? '💬 回答 · ' : '';
     const label = (reasoning || assistant) ? prefix + (e.method || 'text') : (e.method || 'event');
     if (reasoning || assistant) {
       // QA content stays expanded.
-      return '<div style="padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.07)">' +
-        '<span style="color:#7d8590">' + escHtml(stamp) + '</span> ' +
+      return '<div style="padding:5px 4px;border-bottom:1px solid rgba(15,23,42,.07)">' +
+        '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
         '<span style="color:' + color + (reasoning ? ';font-style:italic' : '') + '">' + escHtml(label) + '</span>' +
-        (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#8b949e' : '#c9d1d9') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
+        (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#57606a' : '#24292f') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
         '</div>';
     }
     // Non-QA (system/tool/usage) events are folded; click to expand the raw log.
     return '<details class="rc-ev">' +
-      '<summary><span style="color:#7d8590">' + escHtml(stamp) + '</span> ' +
+      '<summary><span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
       '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
-      (e.level === 'error' ? ' <span style="color:#ff7b72">⚠</span>' : '') +
-      '<span style="margin-left:auto;color:#484f58">' + (detail ? '展开日志' : '') + '</span></summary>' +
-      (detail ? '<pre>' + escHtml(detail) + '</pre>' : '<pre style="color:#6e7681">（无内容）</pre>') +
+      (e.level === 'error' ? ' <span style="color:#d1242f">⚠</span>' : '') +
+      '<span style="margin-left:auto;color:#8c959f">' + (detail ? '展开日志' : '') + '</span></summary>' +
+      (detail ? '<pre>' + escHtml(detail) + '</pre>' : '<pre style="color:#57606a">（无内容）</pre>') +
       '</details>';
-  }).join('') || '<div style="color:#7d8590;padding:8px">等待 Runtime 事件…</div>';
+  }).join('') || '<div style="color:#8c959f;padding:8px">等待 Runtime 事件…</div>';
   if (wasNearBottom) container.scrollTop = container.scrollHeight;
 }
 

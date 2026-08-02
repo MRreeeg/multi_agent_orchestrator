@@ -1,0 +1,8 @@
+{
+  "RT_GROUP_ICON": {
+    "APP": { "0000": ["../orchestrator.png"] }
+  },
+  "RT_MANIFEST": {
+    "APP": { "0000": "app.manifest" }
+  }
+}
