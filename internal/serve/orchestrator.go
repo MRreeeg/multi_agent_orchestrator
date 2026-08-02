@@ -977,66 +977,72 @@ Agent角色:
 	// Log input dimensions for debugging second-call failures
 	slog.Info("analyze: starting", "history_count", len(body.History), "prompt_len", len(prompt), "text_len", len(body.Text))
 	// Pass prompt via stdin to avoid Windows 32K command-line length limit.
-	cmd := exec.CommandContext(ctx, bin, "run", "--model", "deepseek-flash")
-	cmd.Dir = workDir
-	cmd.Stdin = strings.NewReader(prompt)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		errMsg := stderr.String()
-		if errMsg == "" {
-			errMsg = err.Error()
+	// Pass prompt via stdin to avoid Windows 32K command-line length limit.
+	runOnce := func(p string) (string, error) {
+		cmd := exec.CommandContext(ctx, bin, "run", "--model", "deepseek-flash")
+		cmd.Dir = workDir
+		cmd.Stdin = strings.NewReader(p)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			errMsg := stderr.String()
+			if errMsg == "" {
+				errMsg = err.Error()
+			}
+			slog.Error("analyze failed", "err", errMsg, "bin", bin, "stdout", truncate(stdout.String(), 200))
+			return "", fmt.Errorf("%s", errMsg)
 		}
-		isTimeout := ctx.Err() == context.DeadlineExceeded
-		slog.Error("analyze failed", "err", errMsg, "timeout", isTimeout, "bin", bin, "stdout", truncate(stdout.String(), 200))
-		writeErr(w, "analysis failed: "+errMsg, http.StatusInternalServerError)
-		return
-	}
-	slog.Info("analyze: subprocess completed", "stdout_len", stdout.Len())
-
-	// Parse the JSON response
-	// reasonix run outputs thinking text BEFORE the JSON and token stats AFTER it.
-	// Find the LAST complete JSON object containing "analysis" key to avoid
-	// matching stray { from tool dispatch lines.
-	raw := stdout.String()
-	var jsonStr string
-	// Scan for all top-level JSON objects and pick the last one with "analysis"
-	for i := 0; i < len(raw); i++ {
-		if raw[i] != '{' {
-			continue
-		}
-		// Find matching closing brace
-		depth := 0
-		end := -1
-		for j := i; j < len(raw); j++ {
-			if raw[j] == '{' {
-				depth++
-			} else if raw[j] == '}' {
-				depth--
-				if depth == 0 {
-					end = j
-					break
+		slog.Info("analyze: subprocess completed", "stdout_len", stdout.Len())
+		// Parse the JSON response. reasonix run outputs thinking text BEFORE the
+		// JSON and token stats AFTER it; find the LAST complete JSON object
+		// containing the "analysis" key.
+		raw := stdout.String()
+		var jsonStr string
+		for k := 0; k < len(raw); k++ {
+			if raw[k] != '{' {
+				continue
+			}
+			depth := 0
+			end := -1
+			for m := k; m < len(raw); m++ {
+				if raw[m] == '{' {
+					depth++
+				} else if raw[m] == '}' {
+					depth--
+					if depth == 0 {
+						end = m
+						break
+					}
 				}
 			}
+			if end < 0 {
+				continue
+			}
+			candidate := raw[k : end+1]
+			if strings.Contains(candidate, `"analysis"`) {
+				jsonStr = candidate
+			}
+			k = end
 		}
-		if end < 0 {
-			continue
+		if jsonStr == "" {
+			return "", fmt.Errorf("no JSON in analysis response")
 		}
-		candidate := raw[i : end+1]
-		if strings.Contains(candidate, `"analysis"`) {
-			jsonStr = candidate
-		}
-		i = end // skip past this object
+		return jsonStr, nil
 	}
-	if jsonStr == "" {
-		slog.Error("analyze: no JSON found", "raw", truncate(raw, 500))
-		writeErr(w, "no JSON in analysis response", http.StatusInternalServerError)
-		return
+	jsonStr, err := runOnce(prompt)
+	if err != nil {
+		// Retry once with a strict instruction; models often emit thinking text
+		// on the first attempt which then lacks the analysis JSON.
+		strict := prompt + "\n\n重要：你必须只输出一个 JSON 对象，禁止输出思考过程、解释或 Markdown 代码围栏。"
+		jsonStr, err = runOnce(strict)
+		if err != nil {
+			writeErr(w, "analysis failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	// Fix corrupted UTF-8 and escape sequences from model output
-	raw = cleanJSON(jsonStr)
+	raw := cleanJSON(jsonStr)
 
 	var result struct {
 		Analysis  string `json:"analysis"`

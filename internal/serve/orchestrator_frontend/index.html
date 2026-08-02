@@ -1061,7 +1061,12 @@ async function api(method, path, body) {
   if (body) opts.body = JSON.stringify(body);
   try {
     const res = await fetch('/orchestrator/api' + path, opts);
-    if (!res.ok) throw new Error(`API ${method} ${path}: ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.text()) || ''; } catch (_) {}
+      const suffix = detail ? ' — ' + detail.slice(0, 300) : '';
+      throw new Error(`API ${method} ${path}: ${res.status} ${res.statusText}${suffix}`);
+    }
     const text = await res.text();
     return text ? JSON.parse(text) : null;
   } catch (err) {
