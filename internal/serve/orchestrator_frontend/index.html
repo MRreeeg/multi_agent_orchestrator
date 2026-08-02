@@ -175,6 +175,13 @@ input,textarea,select{font:inherit;color:inherit}
 .node__status--failed{background:var(--danger)}
 .node__status--interrupted{background:var(--warning, #d97706)}
 .node__output{font-size:10px;color:var(--muted-2);line-height:1.35;margin-top:3px;word-break:break-all;max-height:38px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.rc-events details.rc-ev{border-bottom:1px solid rgba(255,255,255,.07)}
+.rc-events details.rc-ev summary{cursor:pointer;padding:5px 4px;list-style:none;display:flex;gap:6px;align-items:baseline;user-select:none}
+.rc-events details.rc-ev summary::-webkit-details-marker{display:none}
+.rc-events details.rc-ev summary::before{content:"▸";color:#7d8590;font-size:10px;flex-shrink:0}
+.rc-events details.rc-ev[open] summary::before{content:"▾"}
+.rc-events details.rc-ev pre{margin:0 4px 6px 18px;white-space:pre-wrap;color:#8b949e;font:11px/1.5 var(--mono);max-height:200px;overflow:auto;background:rgba(255,255,255,.03);padding:6px;border-radius:4px}
+.rc-send--confirm{background:var(--danger-soft)!important;color:var(--danger)!important;border-color:var(--danger)!important}
 .node__detail-btn{cursor:pointer;font-size:11px;color:var(--muted-2);margin-left:4px;opacity:0.6;transition:opacity .15s}
 .node:hover .node__detail-btn{opacity:1}
 .node__detail-btn:hover{color:var(--accent)}
@@ -3133,11 +3140,22 @@ function renderRuntimeConsole(runtimeID, data) {
     const color = e.level === 'error' ? '#ff7b72' : assistant ? '#a5d6ff' : reasoning ? '#6e7681' : '#b7c6db';
     const prefix = reasoning ? '🧠 推理 · ' : assistant ? '💬 回答 · ' : '';
     const label = (reasoning || assistant) ? prefix + (e.method || 'text') : (e.method || 'event');
-    return '<div style="padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.07)">' +
-      '<span style="color:#7d8590">' + escHtml(stamp) + '</span> ' +
-      '<span style="color:' + color + (reasoning ? ';font-style:italic' : '') + '">' + escHtml(label) + '</span>' +
-      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#8b949e' : '#c9d1d9') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
-      '</div>';
+    if (reasoning || assistant) {
+      // QA content stays expanded.
+      return '<div style="padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.07)">' +
+        '<span style="color:#7d8590">' + escHtml(stamp) + '</span> ' +
+        '<span style="color:' + color + (reasoning ? ';font-style:italic' : '') + '">' + escHtml(label) + '</span>' +
+        (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#8b949e' : '#c9d1d9') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
+        '</div>';
+    }
+    // Non-QA (system/tool/usage) events are folded; click to expand the raw log.
+    return '<details class="rc-ev">' +
+      '<summary><span style="color:#7d8590">' + escHtml(stamp) + '</span> ' +
+      '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
+      (e.level === 'error' ? ' <span style="color:#ff7b72">⚠</span>' : '') +
+      '<span style="margin-left:auto;color:#484f58">' + (detail ? '展开日志' : '') + '</span></summary>' +
+      (detail ? '<pre>' + escHtml(detail) + '</pre>' : '<pre style="color:#6e7681">（无内容）</pre>') +
+      '</details>';
   }).join('') || '<div style="color:#7d8590;padding:8px">等待 Runtime 事件…</div>';
   if (wasNearBottom) container.scrollTop = container.scrollHeight;
 }
@@ -3146,15 +3164,37 @@ async function sendRuntimeConsoleMessage(runtimeID) {
   const modal = consoleModal(runtimeID);
   if (!modal) return;
   const input = modal.querySelector('.rc-input');
+  const btn = modal.querySelector('.rc-send');
   const text = String(input.value || '').trim();
   if (!text) return;
+  // Two-step confirmation: first click arms the button, second click sends.
+  if (modal.dataset.sendConfirm !== '1') {
+    modal.dataset.sendConfirm = '1';
+    btn.textContent = '⚠️ 再次点击确认发送';
+    btn.classList.add('rc-send--confirm');
+    clearTimeout(modal._sendConfirmTimer);
+    modal._sendConfirmTimer = setTimeout(() => {
+      modal.dataset.sendConfirm = '';
+      btn.textContent = '发送新 Turn';
+      btn.classList.remove('rc-send--confirm');
+    }, 4000);
+    return;
+  }
+  modal.dataset.sendConfirm = '';
+  clearTimeout(modal._sendConfirmTimer);
+  btn.classList.remove('rc-send--confirm');
   try {
-    modal.querySelector('.rc-send').disabled = true;
+    btn.disabled = true;
+    btn.textContent = '发送中…';
     await apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/message', { text });
     input.value = '';
+    btn.textContent = '发送新 Turn';
     toast('已发送到同一保留会话', 'success');
     await refreshRuntimeConsole(runtimeID);
-  } catch (err) { toast('发送失败: ' + err.message, 'error'); }
+  } catch (err) {
+    btn.textContent = '发送新 Turn';
+    toast('发送失败: ' + err.message, 'error');
+  }
 }
 
 async function interruptRuntime(runtimeID) {
