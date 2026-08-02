@@ -291,3 +291,36 @@ func TestRuntimeAccessMode(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveExecutorModelRefCodexPassthroughIgnoresReasonixConfig guards the
+// codex/claude model argument: a workspace reasonix.toml that maps the bare
+// model into "provider/model" (deepseek-v4-flash -> deepseek-flash/deepseek-v4-flash)
+// must NOT rewrite the codex/claude model ref, or the provider rejects it
+// ("you passed deepseek-flash/deepseek-v4-flash").
+func TestResolveExecutorModelRefCodexPassthroughIgnoresReasonixConfig(t *testing.T) {
+	ws := t.TempDir()
+	toml := `
+default_model = "deepseek-flash/deepseek-v4-flash"
+[[providers]]
+name = "deepseek-flash"
+kind = "openai"
+base_url = "https://api.deepseek.com"
+model = "deepseek-v4-flash"
+api_key_env = "DEEPSEEK_TEST_KEY"
+`
+	if err := os.WriteFile(filepath.Join(ws, "reasonix.toml"), []byte(toml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEEPSEEK_TEST_KEY", "sk-test")
+
+	for _, exec := range []ExecutorType{ExecutorCodex, ExecutorClaude} {
+		got := resolveExecutorModelRef(ws, exec, "serve", "deepseek-v4-flash")
+		if got != "deepseek-v4-flash" {
+			t.Fatalf("%s model ref = %q, want passthrough deepseek-v4-flash (reasonix config must not rewrite it)", exec, got)
+		}
+	}
+	// run mode must behave the same.
+	if got := resolveExecutorModelRef(ws, ExecutorCodex, "run", "deepseek-v4-flash"); got != "deepseek-v4-flash" {
+		t.Fatalf("codex run model ref = %q, want passthrough", got)
+	}
+}

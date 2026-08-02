@@ -3196,10 +3196,13 @@ func resolveExecutorModelRef(workspace string, executor ExecutorType, mode strin
 	switch executor {
 	case ExecutorMimo:
 		return normalizeMimoExecutionModelRef(workspace, model)
-	case ExecutorClaude:
-		// Claude model aliases/full names pass through verbatim: the CLI owns
-		// provider resolution, including self-configured models via its own
-		// base URL settings.
+	case ExecutorCodex, ExecutorClaude:
+		// Codex/Claude pass model refs through verbatim: the CLI owns provider
+		// resolution (deepseek-v4-flash, gpt-5.6-luna, o3, ...). They must NOT
+		// be run through the Reasonix config resolver, which rewrites bare
+		// model names into "provider/model" pairs (e.g. deepseek-v4-flash ->
+		// deepseek-flash/deepseek-v4-flash) and breaks the codex app-server /
+		// exec model argument.
 		return model
 	case ExecutorReasonix:
 		if strings.EqualFold(strings.TrimSpace(mode), "run") {
