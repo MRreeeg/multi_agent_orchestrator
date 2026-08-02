@@ -168,6 +168,13 @@ input,textarea,select{font:inherit;color:inherit}
 .rd-review__summary{color:var(--fg-2)}
 .rd-review__changes{color:var(--warning);margin-top:4px}
 .rd-review__next{color:var(--accent);margin-top:4px}
+.rd-analysis{margin-top:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--bg-2);font-size:12px;line-height:1.6}
+.rd-analysis__head{font-weight:700;color:var(--fg);margin-bottom:6px}
+.rd-analysis__loading{color:var(--muted-2)}
+.rd-analysis__summary{color:var(--fg);font-size:12.5px;font-weight:600;margin-bottom:4px}
+.rd-analysis__progress{color:var(--fg-2);white-space:pre-wrap}
+.rd-analysis__blocking{color:var(--warning);margin-top:4px}
+.rd-analysis__sugg{color:var(--accent);margin-top:4px}
 .hero__chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
 .hero__chip{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--fg-2);font-size:12px;cursor:pointer;transition:all .15s}
 .hero__chip:hover{border-color:var(--accent);color:var(--accent)}
@@ -401,12 +408,14 @@ input,textarea,select{font:inherit;color:inherit}
             <span class="run-dash__badge" id="rd-badge">● 执行中</span>
             <span class="run-dash__title">Loop 运行看板</span>
             <span class="run-dash__spacer"></span>
+            <button class="run-dash__btn" id="rd-analyze" title="AI 分析当前执行进展">分析进展</button>
             <button class="run-dash__btn" id="rd-stop" title="停止当前 Loop">停止</button>
             <button class="run-dash__btn" id="rd-close" title="收起看板">收起</button>
           </div>
           <div class="run-dash__iter" id="rd-iter"></div>
           <div class="run-dash__nodes" id="rd-nodes"></div>
           <div class="rd-review hidden" id="rd-review"></div>
+          <div class="rd-analysis hidden" id="rd-analysis"></div>
         </div>
         <div class="chat__messages" id="chat-messages">
           <div class="chat__welcome" id="chat-welcome">
@@ -3787,6 +3796,29 @@ function finishRunDashboard(ok) {
   b.textContent = ok ? '✓ 全部完成' : '✕ 已停止/失败';
   runDash.active = false;
 }
+$('#rd-analyze').addEventListener('click', async () => {
+  const runID = runDash.runID || state.runId;
+  if (!runID) { toast('没有可分析的 Run', 'error'); return; }
+  const box = $('#rd-analysis');
+  box.className = 'rd-analysis';
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="rd-analysis__loading">⏳ 正在分析执行进展…</div>';
+  try {
+    const res = await apiPost('/runs/' + encodeURIComponent(runID) + '/analysis', {});
+    const a = res || {};
+    const blocking = (Array.isArray(a.blocking) && a.blocking.length)
+      ? '<div class="rd-analysis__blocking"><b>卡点：</b>' + a.blocking.map(escHtml).join('；') + '</div>'
+      : '<div class="rd-analysis__blocking" style="color:var(--success)">暂无卡点</div>';
+    const sugg = (Array.isArray(a.suggestions) && a.suggestions.length)
+      ? '<div class="rd-analysis__sugg"><b>建议：</b>' + a.suggestions.map(escHtml).join('；') + '</div>' : '';
+    box.innerHTML = '<div class="rd-analysis__head">📊 执行进展分析</div>' +
+      '<div class="rd-analysis__summary">' + escHtml(a.summary || '') + '</div>' +
+      (a.progress ? '<div class="rd-analysis__progress">' + escHtml(a.progress) + '</div>' : '') +
+      blocking + sugg;
+  } catch (err) {
+    box.innerHTML = '<div style="color:var(--danger)">分析失败: ' + escHtml(err.message || err) + '</div>';
+  }
+});
 $('#rd-stop').addEventListener('click', () => {
   if (runDash.runID) { cancelOrchRun(runDash.runID); finishRunDashboard(false); }
   else toast('没有正在运行的 Loop', 'error');

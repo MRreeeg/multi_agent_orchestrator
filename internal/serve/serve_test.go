@@ -377,7 +377,7 @@ func TestOrchestratorIndexContainsStewardHome(t *testing.T) {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	html := string(body)
-	for _, want := range []string{"多智能体管家", "hero-input", "hero-send", "hero__chip", "把任务交给我", "run-dash", "rd-nodes", "rd-stop", "rd-review"} {
+	for _, want := range []string{"多智能体管家", "hero-input", "hero-send", "hero__chip", "把任务交给我", "run-dash", "rd-nodes", "rd-stop", "rd-review", "rd-analyze"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("orchestrator index missing %q", want)
 		}

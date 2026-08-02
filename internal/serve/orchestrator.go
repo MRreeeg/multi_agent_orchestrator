@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -241,6 +242,9 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	case strings.HasSuffix(path, "/cancel") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/cancel")
 		h.cancelRun(w, r, id)
+	case strings.HasSuffix(path, "/analysis") && r.Method == http.MethodPost:
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/analysis")
+		h.analyzeRunProgress(w, r, id)
 	case path == "/agents" && r.Method == http.MethodGet:
 		h.listAgents(w, r)
 	case path == "/skills" && r.Method == http.MethodGet:
@@ -462,6 +466,114 @@ func (h *orchestratorHandler) cancelRun(w http.ResponseWriter, _ *http.Request, 
 	}
 	h.save()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// analyzeRunProgress returns an AI summary of the current Loop execution:
+// what each node produced, where it stands, blockers and suggested next steps.
+// It reuses the same model subprocess mechanism as requirement analysis.
+func (h *orchestratorHandler) analyzeRunProgress(w http.ResponseWriter, r *http.Request, id string) {
+	run, ok := h.store.GetRun(id)
+	if !ok {
+		writeErr(w, fmt.Sprintf("run %q not found", id), http.StatusNotFound)
+		return
+	}
+	attempts := h.store.ListAttempts(id)
+	iterations := h.store.ListIterations(id)
+
+	typeLbl := map[string]string{"architect": "架构师", "executor": "执行者", "reviewer": "审查者"}
+	var nodesText []string
+	order := 0
+	for _, att := range attempts {
+		if att.NodeID == "" {
+			continue
+		}
+		order++
+		label := typeLbl[att.NodeID]
+		if label == "" {
+			label = att.NodeID
+		}
+		output := strings.TrimSpace(att.Output)
+		if len(output) > 600 {
+			output = output[:600] + "…"
+		}
+		nodesText = append(nodesText, fmt.Sprintf("%d. 节点ID=%s 类型=%s 状态=%s\n输出摘要: %s", order, att.NodeID, label, att.Status, output))
+	}
+	iterText := "暂无迭代记录"
+	if len(iterations) > 0 {
+		var parts []string
+		for _, it := range iterations {
+			parts = append(parts, fmt.Sprintf("第%d轮 状态=%s", it.Number, it.Status))
+		}
+		iterText = strings.Join(parts, "; ")
+	}
+	reviewText := "暂无"
+	if run.FinalReview != nil {
+		rv := *run.FinalReview
+		reviewText = fmt.Sprintf("decision=%s confidence=%v summary=%s", rv.Decision, rv.Confidence, rv.Summary)
+	}
+
+	prompt := fmt.Sprintf(`你是多Agent编排控制台的运行状态分析助手。以下是当前 Loop 运行的信息，请用中文分析执行进展，并给出卡点与下一步建议。
+
+Run ID: %s
+任务: %s
+运行状态: %s
+迭代进度: %s
+审查决策: %s
+
+节点执行情况:
+%s
+
+请只输出一个 JSON 对象（不要 Markdown 代码围栏、不要解释），字段：
+{"summary":"一句话进展","progress":"较详细的进展描述","blocking":["卡点1","卡点2"],"suggestions":["建议1","建议2"]}
+若没有卡点，blocking 给空数组。`, id, run.Task, run.Status, iterText, reviewText, strings.Join(nodesText, "\n"))
+
+	bin := "reasonix"
+	workDir := "."
+	if exe, err := os.Executable(); err == nil {
+		bin = filepath.Join(filepath.Dir(exe), "reasonix.exe")
+		if _, err := os.Stat(bin); err != nil {
+			bin = "reasonix"
+		}
+		workDir = filepath.Dir(exe)
+	}
+	const analysisTimeout = 4 * time.Minute
+	ctx, cancel := context.WithTimeout(r.Context(), analysisTimeout)
+	defer cancel()
+	slog.Info("analyzeRunProgress: starting", "run", id, "attempts", len(attempts), "prompt_len", len(prompt))
+	cmd := exec.CommandContext(ctx, bin, "run", "--model", "deepseek-flash")
+	cmd.Dir = workDir
+	cmd.Stdin = strings.NewReader(prompt)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		errMsg := stderr.String()
+		if errMsg == "" {
+			errMsg = err.Error()
+		}
+		slog.Error("analyzeRunProgress failed", "err", errMsg, "run", id)
+		writeErr(w, "analysis failed: "+errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	var result map[string]any
+	scanner := bufio.NewScanner(strings.NewReader(stdout.String()))
+	var lastJSON string
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "{") && json.Valid([]byte(line)) {
+			lastJSON = line
+		}
+	}
+	if lastJSON == "" {
+		writeErr(w, "analysis produced no JSON", http.StatusInternalServerError)
+		return
+	}
+	if err := json.Unmarshal([]byte(lastJSON), &result); err != nil {
+		writeErr(w, "analysis JSON invalid: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, result)
 }
 
 func (h *orchestratorHandler) listAgents(w http.ResponseWriter, _ *http.Request) {
