@@ -75,6 +75,28 @@ func TestClaudeServeDeepseekOfficialEndToEnd(t *testing.T) {
 		t.Fatalf("ExternalSessionID empty: %#v", execResult)
 	}
 	t.Logf("E2E OK text=%q session=%s", execResult.FinalText, execResult.ExternalSessionID)
+
+	// Second turn on the same retained runtime must reuse the same session.
+	execResult2, err := mgr.Execute(ctx, ExecSpec{
+		Workspace:    workspace,
+		Prompt:       "再回复OK",
+		ModelRef:     "deepseek-v4-flash",
+		DisplayModel: "deepseek-v4-flash",
+		NodeID:       "e2e-claude-deepseek",
+		Mode:         "serve",
+		Executor:     "claude",
+		ApprovalMode: "auto",
+	}, nil)
+	if err != nil {
+		t.Fatalf("second Execute: %v", err)
+	}
+	if strings.TrimSpace(execResult2.FinalText) == "" {
+		t.Fatalf("second FinalText empty: %#v", execResult2)
+	}
+	if execResult2.ExternalSessionID != execResult.ExternalSessionID {
+		t.Fatalf("session changed across turns: %q -> %q", execResult.ExternalSessionID, execResult2.ExternalSessionID)
+	}
+	t.Logf("E2E second turn OK text=%q session=%s (reused)", execResult2.FinalText, execResult2.ExternalSessionID)
 }
 
 func TestClaudeServeReturnsVisibleTextEndToEnd(t *testing.T) {
@@ -115,4 +137,26 @@ func TestClaudeServeReturnsVisibleTextEndToEnd(t *testing.T) {
 		t.Fatalf("ExternalSessionID empty: %#v", execResult)
 	}
 	t.Logf("E2E OK text=%q session=%s", execResult.FinalText, execResult.ExternalSessionID)
+
+	// Second turn on the same retained runtime must reuse the same session.
+	execResult2, err := mgr.Execute(ctx, ExecSpec{
+		Workspace:    workspace,
+		Prompt:       "再回复OK",
+		ModelRef:     "deepseek-v4-flash",
+		DisplayModel: "deepseek-v4-flash",
+		NodeID:       "e2e-claude-deepseek",
+		Mode:         "serve",
+		Executor:     "claude",
+		ApprovalMode: "auto",
+	}, nil)
+	if err != nil {
+		t.Fatalf("second Execute: %v", err)
+	}
+	if strings.TrimSpace(execResult2.FinalText) == "" {
+		t.Fatalf("second FinalText empty: %#v", execResult2)
+	}
+	if execResult2.ExternalSessionID != execResult.ExternalSessionID {
+		t.Fatalf("session changed across turns: %q -> %q", execResult.ExternalSessionID, execResult2.ExternalSessionID)
+	}
+	t.Logf("E2E second turn OK text=%q session=%s (reused)", execResult2.FinalText, execResult2.ExternalSessionID)
 }

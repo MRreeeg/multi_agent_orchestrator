@@ -184,14 +184,17 @@ func (c *SdkClient) Prompt(ctx context.Context, text string) (*TurnResult, error
 		c.emit(Event{At: time.Now(), Type: "result", Subtype: "drained_pending", SessionID: pending.SessionID, Text: pending.Error, Payload: string(pending.Raw)})
 	}
 
-	if err := c.write(map[string]any{
+	userMsg := map[string]any{
 		"type": "user",
 		"message": map[string]any{
 			"role":    "user",
 			"content": []any{map[string]any{"type": "text", "text": text}},
 		},
-		"session_id": sessionID,
-	}); err != nil {
+	}
+	if sessionID != "" {
+		userMsg["session_id"] = sessionID
+	}
+	if err := c.write(userMsg); err != nil {
 		c.completeTurn(turn, nil, err)
 		return nil, err
 	}
@@ -374,13 +377,20 @@ func (c *SdkClient) handleSystem(event Event, raw json.RawMessage) {
 			Model     string `json:"model"`
 		}
 		_ = json.Unmarshal(raw, &body)
-		event.SessionID = body.SessionID
+		// The init event carries session_id at the top level; raw (the
+		// envelope "result" field) is usually empty here, so keep the
+		// top-level value parsed by the envelope when the nested one is empty.
+		sid := body.SessionID
+		if sid == "" {
+			sid = event.SessionID
+		}
+		event.SessionID = sid
 		c.mu.Lock()
-		if body.SessionID != "" {
-			c.sessionID = body.SessionID
+		if sid != "" {
+			c.sessionID = sid
 		}
 		c.mu.Unlock()
-		event.Text = "claude ready (session " + body.SessionID + ", model " + body.Model + ")"
+		event.Text = "claude ready (session " + sid + ", model " + body.Model + ")"
 	}
 	c.emit(event)
 }

@@ -302,9 +302,9 @@ model = "deepseek-v4-flash"
 | `executor=claude, model=deepseek-v4-flash`（或任意 deepseek-*） | 设 `CLAUDE_CONFIG_DIR=~/.claude-deepseek`（可用 `CLAUDE_DEEPSEEK_CONFIG_DIR` 覆盖）→ DeepSeek 官方直连 |
 | `executor=claude, model=ccs, providerRoute=ccswitch` / 其他模型 | 不设 → 用默认 `~/.claude`（right.codes / cc-switch 代理） |
 
-实测（2026-08-01）：
+实测（2026-08-02 修复后全部可用）：
 - run：`CLAUDE_CONFIG_DIR=~/.claude-deepseek claude -p --output-format json --model deepseek-v4-flash "只回复OK"` → 官方返回 OK（~3s，`modelUsage.deepseek-v4-pro[1m]`）；
-- serve（stream-json）：协议层与框架代码就绪（曾实测返回 OK），但 claude 2.1.217 的 stream-json init 在本机部分时段延迟（CLI 行为，run 模式不受影响）；E2E 测试 `TestClaudeServeDeepseekOfficialEndToEnd` 已写好，`RUN_INTEGRATION=1` 门控。
+- serve（stream-json）：**已修复 init 死锁并实测跑通**——claude 2.1.x 只在收到第一条 stdin `user` 消息后才发 init，框架原先"spawn 后只等 init"会死锁。修复：serve 不再单独等 init，第一次真实 turn 即触发 init，`Execute/Send` 在 turn 后从客户端捕获 session id。`TestClaudeServeDeepseekOfficialEndToEnd`（`RUN_INTEGRATION=1`）两轮真实跑通（首轮 ~9s 返回 OK，第二轮复用同一 session）。
 
 > 换电脑：把 `~/.claude-deepseek/settings.json` 里的 key 换成自己的，框架代码无需改动。
 

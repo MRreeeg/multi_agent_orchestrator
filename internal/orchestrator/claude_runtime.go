@@ -354,38 +354,53 @@ func (m *ClaudeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStar
 	rt.client = client
 	rt.mu.Unlock()
 
-	// The CLI needs time to boot (config, plugins) and the init event reports
-	// the retained session id. Provider API unavailability shows up as
-	// system/api_retry events on the console; the runtime itself stays usable.
-	deadline := time.Now().Add(120 * time.Second)
-	for {
+	// The Claude CLI (2.1.x) only emits the stream-json init event after it
+	// receives the first user message on stdin; waiting for init alone would
+	// deadlock the runtime. So readiness is a short grace window: if init
+	// arrives we record the session id now, otherwise the first real turn
+	// triggers it and Execute/Send capture it afterwards. A process that dies
+	// during the window still fails fast.
+	initDeadline := time.Now().Add(8 * time.Second)
+	initSeen := false
+	for time.Now().Before(initDeadline) {
 		if client.SessionID() != "" {
-			// Enable tool-approval routing once the CLI is up so the retained
-			// runtime can actually edit files / run commands in auto mode.
-			_ = client.EnablePermissionProtocol()
-			rt.mu.Lock()
-			rt.sessionID = client.SessionID()
-			rt.status = RuntimeIdle
-			rt.LastUsedAt = time.Now()
-			rt.mu.Unlock()
-			m.notify(rt)
-			return rt, nil
-		}
-		if time.Now().After(deadline) {
-			diagnostic := strings.TrimSpace(stderr.String())
-			if diagnostic == "" {
-				diagnostic = "no init event within 120s (provider API may be unavailable; see ~/.claude/debug for CLI logs)"
-			}
-			m.Stop(rt.ID)
-			return nil, fmt.Errorf("claude did not emit init within 120s: %s", diagnostic)
+			initSeen = true
+			break
 		}
 		select {
+		case <-client.Done():
+			diagnostic := strings.TrimSpace(stderr.String())
+			if diagnostic == "" {
+				diagnostic = "claude exited before emitting init"
+			}
+			m.Stop(rt.ID)
+			return nil, fmt.Errorf("claude stream-json process exited before init: %s", diagnostic)
 		case <-ctx.Done():
 			m.Stop(rt.ID)
 			return nil, ctx.Err()
-		case <-time.After(300 * time.Millisecond):
+		case <-time.After(200 * time.Millisecond):
 		}
 	}
+	if initSeen {
+		// Enable tool-approval routing once the CLI is up so the retained
+		// runtime can actually edit files / run commands in auto mode.
+		_ = client.EnablePermissionProtocol()
+		rt.mu.Lock()
+		rt.sessionID = client.SessionID()
+		rt.mu.Unlock()
+		m.recordEvent(rt, claudeclient.Event{At: time.Now(), Type: "system", Subtype: "init", Text: "claude ready (session " + rt.sessionID + ")"})
+	} else {
+		// No init yet: the first user message on the first turn will emit it.
+		// Surface a hint so the console explains the pending state.
+		_ = client.EnablePermissionProtocol()
+		m.recordEvent(rt, claudeclient.Event{At: time.Now(), Type: "system", Subtype: "init_pending", Text: "claude booting; init will appear with the first turn"})
+	}
+	rt.mu.Lock()
+	rt.status = RuntimeIdle
+	rt.LastUsedAt = time.Now()
+	rt.mu.Unlock()
+	m.notify(rt)
+	return rt, nil
 }
 
 func (m *ClaudeRuntimeManager) dropRuntime(key string, rt *claudeRuntime) {
@@ -502,6 +517,11 @@ func (m *ClaudeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onSta
 		return m.execResult(rt, "", sessionID), err
 	}
 	result, promptErr := client.Prompt(ctx, spec.Prompt)
+	// The first user message triggers the CLI's init event; capture the
+	// session id that arrives with it.
+	if sessionID == "" {
+		sessionID = client.SessionID()
+	}
 	rt.mu.Lock()
 	if result != nil {
 		rt.output = result.Text
@@ -533,17 +553,16 @@ func (m *ClaudeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onSta
 
 // prepareSession resolves the session used by one turn. The retained process
 // owns exactly one conversation, so the init-reported session id (or the
-// persisted ExternalSessionID the process was resumed from) is reused; a
-// mismatch is impossible because the runtime key pins one node/workspace/model.
+// persisted ExternalSessionID the process was resumed from) is reused. An
+// empty id is legal before the first turn: the CLI emits init as a side
+// effect of the first user message, and Execute/Send capture the id from the
+// client afterwards.
 func (m *ClaudeRuntimeManager) prepareSession(_ context.Context, rt *claudeRuntime, _ *claudeclient.SdkClient, spec ExecSpec) (string, error) {
 	rt.mu.Lock()
 	sessionID := strings.TrimSpace(rt.sessionID)
 	rt.mu.Unlock()
 	if sessionID == "" {
 		sessionID = strings.TrimSpace(spec.ExternalSessionID)
-	}
-	if sessionID == "" {
-		return "", fmt.Errorf("claude runtime has no session yet")
 	}
 	return sessionID, nil
 }
@@ -635,7 +654,7 @@ func (m *ClaudeRuntimeManager) Snapshot(runtimeID string) (*RuntimeConsoleSnapsh
 		Output:       target.output,
 		Error:        target.lastErr,
 		Events:       events,
-		CanSend:      target.status == RuntimeIdle && target.sessionID != "",
+		CanSend:      target.status == RuntimeIdle,
 		CanInterrupt: target.status == RuntimeBusy,
 	}, true
 }
@@ -667,11 +686,6 @@ func (m *ClaudeRuntimeManager) Send(ctx context.Context, runtimeID, text string)
 	rt.mu.Lock()
 	sessionID := rt.sessionID
 	rt.mu.Unlock()
-	if sessionID == "" {
-		err := fmt.Errorf("claude runtime has no session yet; run the node first")
-		m.finishTurn(rt, "", err)
-		return "", err
-	}
 	turnID := fmt.Sprintf("turn_%d", time.Now().UnixNano())
 	rt.mu.Lock()
 	rt.turnID = turnID
@@ -683,6 +697,9 @@ func (m *ClaudeRuntimeManager) Send(ctx context.Context, runtimeID, text string)
 		turnCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 		result, promptErr := client.Prompt(turnCtx, text)
+		if sessionID == "" {
+			sessionID = client.SessionID()
+		}
 		rt.mu.Lock()
 		if result != nil {
 			rt.output = result.Text
