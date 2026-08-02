@@ -22,13 +22,42 @@ import (
 	"reasonix/internal/serve"
 )
 
-// user32 helpers for window position persistence (no extra dependencies).
+// user32 helpers for window position + icon (no extra dependencies).
 var (
 	user32               = syscall.NewLazyDLL("user32.dll")
 	procMoveWindow       = user32.NewProc("MoveWindow")
 	procGetWindowRect    = user32.NewProc("GetWindowRect")
 	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
+	procSendMessage      = user32.NewProc("SendMessageW")
+	procExtractIconEx    = user32.NewProc("ExtractIconExW")
 )
+
+const (
+	wmSetIcon = 0x0080
+	iconSmall = 0
+	iconBig   = 1
+)
+
+// setWindowIcon applies this exe's own icon resource to the window. The
+// webview_go shell hardcodes IDI_APPLICATION when creating the window, which
+// would override the taskbar/title-bar icon with the system default.
+func setWindowIcon(hwnd uintptr) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	exePath, _ := syscall.UTF16PtrFromString(exe)
+	var big, small uintptr
+	if ret, _, _ := procExtractIconEx.Call(uintptr(unsafe.Pointer(exePath)), 0, uintptr(unsafe.Pointer(&big)), uintptr(unsafe.Pointer(&small)), 1); ret == 0 {
+		return
+	}
+	if big != 0 {
+		procSendMessage.Call(hwnd, wmSetIcon, iconBig, big)
+	}
+	if small != 0 {
+		procSendMessage.Call(hwnd, wmSetIcon, iconSmall, small)
+	}
+}
 
 type winRect struct{ Left, Top, Right, Bottom int32 }
 
@@ -115,6 +144,7 @@ func main() {
 	// bottom input bar is on screen without dragging on every launch.
 	w.SetSize(defW, defH, webview.HintNone)
 	restoreWindowPos(hwnd, defW, defH)
+	setWindowIcon(hwnd)
 	w.SetTitle("多智能体管家 · 多Agent 编排控制台")
 	w.Navigate(fmt.Sprintf("http://127.0.0.1:%d/orchestrator", port))
 	w.Run()
