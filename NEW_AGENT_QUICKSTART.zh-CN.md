@@ -355,6 +355,7 @@ go test ./internal/orchestrator -run TestClaudeServeReturnsVisibleTextEndToEnd -
 | 重启后旧 Runtime 显示在线 | 已修：`persistence.go` 把 retained 运行时标 stopped 并保留 Thread/Session |
 | 前端看不到新执行器 | 检查 `/nodes/types` 返回（`executors` 数组）；前端是 nodeTypes 驱动，不是写死的 |
 | 想用自配模型但被前端拦截 | 用"✏️ 自定义模型"入口；或确认 `modelSupportsExecutor` 对自配模型放行 |
+| codex 报 "you passed deepseek-flash/deepseek-v4-flash" | 模型名被 workspace 的 `reasonix.toml` 配置解析成了 `provider/model` 格式。已修复：codex/claude 模型 ref **原样透传**（`resolveExecutorModelRef`），不经 reasonix 配置解析；升级到含该修复的版本后重启 Orchestrator |
 
 ---
 
