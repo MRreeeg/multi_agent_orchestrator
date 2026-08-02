@@ -531,8 +531,13 @@ Run ID: %s
 	workDir := "."
 	if exe, err := os.Executable(); err == nil {
 		bin = filepath.Join(filepath.Dir(exe), "reasonix.exe")
-		if _, err := os.Stat(bin); err != nil {
-			bin = "reasonix"
+		if _, statErr := os.Stat(bin); statErr != nil {
+			// Absolute path via PATH: a bare name with a cmd.Dir is rejected
+			// by Go ("cannot run executable found relative to current
+			// directory") inside the desktop app.
+			if lp, lpErr := exec.LookPath("reasonix"); lpErr == nil {
+				bin = lp
+			}
 		}
 		workDir = filepath.Dir(exe)
 	}
@@ -961,8 +966,13 @@ Agent角色:
 	workDir := "."
 	if exe, err := os.Executable(); err == nil {
 		bin = filepath.Join(filepath.Dir(exe), "reasonix.exe")
-		if _, err := os.Stat(bin); err != nil {
-			bin = "reasonix"
+		if _, statErr := os.Stat(bin); statErr != nil {
+			// Absolute path via PATH: a bare name with a cmd.Dir is rejected
+			// by Go ("cannot run executable found relative to current
+			// directory") inside the desktop app.
+			if lp, lpErr := exec.LookPath("reasonix"); lpErr == nil {
+				bin = lp
+			}
 		}
 		workDir = filepath.Dir(exe)
 	}
@@ -1107,8 +1117,13 @@ func (h *orchestratorHandler) expandRequirement(w http.ResponseWriter, r *http.R
 	workDir := filepath.Dir(os.Args[0])
 	if exe, err := os.Executable(); err == nil {
 		bin = filepath.Join(filepath.Dir(exe), "reasonix.exe")
-		if _, err := os.Stat(bin); err != nil {
-			bin = "reasonix"
+		if _, statErr := os.Stat(bin); statErr != nil {
+			// Absolute path via PATH: a bare name with a cmd.Dir is rejected
+			// by Go ("cannot run executable found relative to current
+			// directory") inside the desktop app.
+			if lp, lpErr := exec.LookPath("reasonix"); lpErr == nil {
+				bin = lp
+			}
 		}
 	}
 
@@ -1182,8 +1197,13 @@ func (h *orchestratorHandler) understandRequirement(w http.ResponseWriter, r *ht
 	bin := "reasonix"
 	if exe, err := os.Executable(); err == nil {
 		bin = filepath.Join(filepath.Dir(exe), "reasonix.exe")
-		if _, err := os.Stat(bin); err != nil {
-			bin = "reasonix"
+		if _, statErr := os.Stat(bin); statErr != nil {
+			// Absolute path via PATH: a bare name with a cmd.Dir is rejected
+			// by Go ("cannot run executable found relative to current
+			// directory") inside the desktop app.
+			if lp, lpErr := exec.LookPath("reasonix"); lpErr == nil {
+				bin = lp
+			}
 		}
 	}
 	cmd := exec.Command(bin, "run", "--model", "deepseek-flash", prompt)
