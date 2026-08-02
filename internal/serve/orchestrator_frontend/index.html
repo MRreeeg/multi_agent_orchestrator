@@ -10,27 +10,27 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:oklch(17% .005 280);--bg-2:oklch(20% .006 275);
-  --panel:oklch(21.5% .007 275);--panel-2:oklch(24.5% .008 275);
-  --card:oklch(23.5% .007 275);--card-hover:oklch(26.5% .008 275);
-  --border:oklch(30% .008 275);--border-strong:oklch(38% .01 275);
-  --fg:oklch(96% .004 280);--fg-2:oklch(81% .005 280);
-  --muted:oklch(63% .006 280);--muted-2:oklch(49% .006 280);
-  --accent:oklch(68% .16 38);--accent-soft:oklch(68% .16 38/.15);--accent-strong:oklch(72% .18 36);
-  --success:oklch(70% .14 145);--success-soft:oklch(70% .14 145/.14);
-  --warning:oklch(78% .14 85);--warning-soft:oklch(78% .14 85/.16);
-  --danger:oklch(66% .18 25);--danger-soft:oklch(66% .18 25/.16);
-  --violet:oklch(72% .14 295);--violet-soft:oklch(72% .14 295/.16);
-  --blue:oklch(65% .16 250);--blue-soft:oklch(65% .16 250/.16);
-  --green:oklch(70% .16 155);--green-soft:oklch(70% .16 155/.16);
-  --red:oklch(65% .18 20);--red-soft:oklch(65% .18 20/.16);
+  --bg:oklch(16% .008 262);--bg-2:oklch(19% .009 262);
+  --panel:oklch(20.5% .01 262);--panel-2:oklch(23.5% .011 262);
+  --card:oklch(22% .01 262);--card-hover:oklch(25% .011 262);
+  --border:oklch(29% .012 262);--border-strong:oklch(37% .014 262);
+  --fg:oklch(96% .004 262);--fg-2:oklch(81% .007 262);
+  --muted:oklch(63% .009 262);--muted-2:oklch(49% .009 262);
+  --accent:oklch(78% .11 178);--accent-soft:oklch(78% .11 178/.15);--accent-strong:oklch(82% .12 176);
+  --success:oklch(74% .13 152);--success-soft:oklch(74% .13 152/.14);
+  --warning:oklch(80% .12 88);--warning-soft:oklch(80% .12 88/.16);
+  --danger:oklch(66% .17 22);--danger-soft:oklch(66% .17 22/.16);
+  --violet:oklch(72% .13 296);--violet-soft:oklch(72% .13 296/.16);
+  --blue:oklch(70% .12 250);--blue-soft:oklch(70% .12 250/.16);
+  --green:oklch(74% .12 158);--green-soft:oklch(74% .12 158/.16);
+  --red:oklch(66% .17 22);--red-soft:oklch(66% .17 22/.16);
   --shadow-sm:0 1px 0 oklch(0% 0 0/.35);
   --shadow-md:0 8px 24px -8px oklch(0% 0 0/.5);
   --shadow-lg:0 24px 60px -16px oklch(0% 0 0/.65);
   --radius:8px;--radius-lg:12px;
-  --sans:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  --heading:'Space Grotesk',var(--sans);
-  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Segoe UI Variable Text','Segoe UI','Microsoft YaHei UI','PingFang SC',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  --heading:'Space Grotesk','Segoe UI Variable Display','Segoe UI','Microsoft YaHei UI',sans-serif;
+  --mono:'Cascadia Code','JetBrains Mono',ui-monospace,SFMono-Regular,Consolas,monospace;
   color-scheme:dark;
 }
 html,body{height:100%;overflow:hidden}
@@ -119,7 +119,7 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
 .chat-bubble--user .chat-bubble__meta{text-align:right}
 .chat__input-bar{border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;background:var(--bg)}
-.chat__input{flex:1;height:36px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--card);padding:0 12px;font-size:13px;outline:none;transition:border-color .18s ease}
+.chat__input{flex:1;min-height:38px;max-height:132px;border:1px solid var(--border-strong);border-radius:10px;background:var(--card);padding:8px 12px;font-size:13px;line-height:1.5;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease}
 .chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .chat__input::placeholder{color:var(--muted-2)}
 .chat__send{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius);background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
@@ -133,7 +133,7 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__input{flex:1;min-height:48px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .hero__input::placeholder{color:var(--muted-2)}
-.hero__send{flex-shrink:0;padding:0 18px;border:none;border-radius:14px;background:var(--accent-strong);color:oklch(14% .01 40);font-size:13px;font-weight:700;cursor:pointer;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
+.hero__send{flex-shrink:0;padding:0 18px;border:none;border-radius:14px;background:var(--accent-strong);color:oklch(14% .01 40);font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
 .hero__send:hover{background:var(--accent);box-shadow:0 8px 20px -8px var(--accent-soft)}
 .hero__send:active{transform:scale(.97)}
 .hero__send:disabled{opacity:.55;cursor:default;transform:none;box-shadow:none}
@@ -358,8 +358,8 @@ input,textarea,select{font:inherit;color:inherit}
     <div class="topbar__spacer"></div>
     <div class="topbar__cwd" style="display:flex;align-items:center;gap:6px">
       <span style="font-size:11px;color:var(--muted);white-space:nowrap">工作目录:</span>
-      <span id="cwd-display" style="font-family:var(--mono);font-size:11px;color:var(--fg-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid var(--border)" title="点击修改工作目录" onclick="showCwdEditor()"></span>
-      <input id="cwd-input" type="text" style="display:none;height:22px;width:220px;font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:4px;background:var(--bg);color:var(--fg);padding:0 6px;outline:none" />
+      <span id="cwd-display" style="font-family:var(--mono);font-size:11px;color:var(--fg-2);max-width:min(360px,34vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg)" title="点击修改工作目录（悬停可见完整路径）" onclick="showCwdEditor()"></span>
+      <input id="cwd-input" type="text" style="display:none;height:24px;width:min(400px,40vw);font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:5px;background:var(--bg);color:var(--fg);padding:0 8px;outline:none" />
       <button id="cwd-confirm" class="topbar__btn" style="display:none;height:22px;padding:0 6px;font-size:11px" onclick="confirmCwd()">确定</button>
     </div>
     <div class="topbar__preset">
@@ -424,7 +424,7 @@ input,textarea,select{font:inherit;color:inherit}
               <br>支持 codex / mimo / claude 执行器与 deepseek / ccs 等模型路由。</div>
             <div class="hero__box">
               <textarea class="hero__input" id="hero-input" rows="2" placeholder="描述你的任务，例如：为 another_version729 实现 ParsePortRange 端口解析（单端口/连续范围/逗号组合/边界/错误场景），含 14 场景表格驱动测试，仅标准库"></textarea>
-              <button class="hero__send" id="hero-send">✨ 生成编排</button>
+              <button class="hero__send" id="hero-send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg><span>生成编排</span></button>
             </div>
             <div class="hero__chips">
               <button class="hero__chip" data-sample="实现一个端口范围解析函数，支持单端口/连续范围/逗号组合与边界错误场景，含表格驱动测试，仅标准库">端口范围解析</button>
@@ -434,7 +434,7 @@ input,textarea,select{font:inherit;color:inherit}
           </div>
         </div>
         <div class="chat__input-bar">
-          <input class="chat__input" id="chat-input" type="text" placeholder="输入需求，Enter 生成编排流程…" autocomplete="off" />
+          <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
           <button class="chat__send" id="btn-new-session" title="新建会话" style="background:var(--panel-2);color:var(--fg-2)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
           </button>
@@ -2226,7 +2226,7 @@ async function sendChat() {
   if (heroSendBtn) { heroSendBtn.disabled = true; heroSendBtn.textContent = '分析中…'; }
   chatSend.disabled = true;
   const restoreSend = () => {
-    if (heroSendBtn) { heroSendBtn.disabled = false; heroSendBtn.textContent = '✨ 生成编排'; }
+    if (heroSendBtn) { heroSendBtn.disabled = false; heroSendBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg><span>生成编排</span>'; }
     chatSend.disabled = false;
   };
   addChatMessage('user', text);
@@ -2439,6 +2439,8 @@ function layoutPipeline() {
 
 chatSend.addEventListener('click', sendChat);
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+const growChatInput = () => { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 132) + 'px'; };
+chatInput.addEventListener('input', growChatInput);
 const heroSend = $('#hero-send');
 if (heroSend) heroSend.addEventListener('click', sendChat);
 const heroInputEl = $('#hero-input');
