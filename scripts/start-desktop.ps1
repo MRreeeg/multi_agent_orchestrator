@@ -8,5 +8,10 @@ if (-not (Test-Path "$root\bin")) { New-Item -ItemType Directory -Path "$root\bi
 Write-Host "[start-desktop] building orchestrator-app ..." -ForegroundColor Cyan
 go build -ldflags "-H=windowsgui" -o "$root\bin\orchestrator-app.exe" ./cmd/orchestrator-app
 if ($LASTEXITCODE -ne 0) { Write-Host "[start-desktop] build failed" -ForegroundColor Red; exit 1 }
+# reasonix.exe must live next to the app: the model subprocess calls
+# (analyze/expand/understand) resolve bin\reasonix.exe relative to the exe.
+Write-Host "[start-desktop] building reasonix.exe ..." -ForegroundColor Cyan
+go build -o "$root\bin\reasonix.exe" ./cmd/reasonix
+if ($LASTEXITCODE -ne 0) { Write-Host "[start-desktop] reasonix build failed" -ForegroundColor Red; exit 1 }
 Write-Host "[start-desktop] launching 多智能体管家 ..." -ForegroundColor Green
 & "$root\bin\orchestrator-app.exe"
