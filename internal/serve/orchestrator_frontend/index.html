@@ -158,6 +158,16 @@ input,textarea,select{font:inherit;color:inherit}
 .rd-node__name{font-weight:600;color:var(--fg);font-size:12px}
 .rd-node__type{font-size:10px;color:var(--muted-2)}
 .rd-node__out{flex:1;font-family:var(--mono);font-size:10.5px;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;max-width:55%}
+.rd-review{margin-top:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-size:12px;line-height:1.55}
+.rd-review__head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.rd-review__tag{font-weight:700;font-size:12px;padding:2px 9px;border-radius:999px}
+.rd-review--pass .rd-review__tag{background:var(--success-soft);color:var(--success)}
+.rd-review--revise .rd-review__tag{background:var(--warning-soft);color:var(--warning)}
+.rd-review--blocked .rd-review__tag{background:var(--danger-soft);color:var(--danger)}
+.rd-review__conf{font-family:var(--mono);font-size:10px;color:var(--muted-2)}
+.rd-review__summary{color:var(--fg-2)}
+.rd-review__changes{color:var(--warning);margin-top:4px}
+.rd-review__next{color:var(--accent);margin-top:4px}
 .hero__chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
 .hero__chip{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--fg-2);font-size:12px;cursor:pointer;transition:all .15s}
 .hero__chip:hover{border-color:var(--accent);color:var(--accent)}
@@ -386,6 +396,18 @@ input,textarea,select{font:inherit;color:inherit}
     <!-- Chat panel -->
     <div class="panel panel--active" id="panel-chat">
       <div class="chat">
+        <div class="run-dash hidden" id="run-dash">
+          <div class="run-dash__head">
+            <span class="run-dash__badge" id="rd-badge">● 执行中</span>
+            <span class="run-dash__title">Loop 运行看板</span>
+            <span class="run-dash__spacer"></span>
+            <button class="run-dash__btn" id="rd-stop" title="停止当前 Loop">停止</button>
+            <button class="run-dash__btn" id="rd-close" title="收起看板">收起</button>
+          </div>
+          <div class="run-dash__iter" id="rd-iter"></div>
+          <div class="run-dash__nodes" id="rd-nodes"></div>
+          <div class="rd-review hidden" id="rd-review"></div>
+        </div>
         <div class="chat__messages" id="chat-messages">
           <div class="chat__welcome" id="chat-welcome">
             <div class="hero__title">把任务交给我，剩下的我来编排</div>
@@ -2744,6 +2766,13 @@ function connectSSE() {
           if (e.text) state.nodeOutputs[e.text] = { output: e.detail || '', status: 'done' };
           if (e.text) updateNodeStatus(e.text, 'done');
           if (e.text) updateRunDashboardNode(e.text, 'done', e.detail);
+          {
+            const rvNode = state.nodes.find(x => String(x.id) === String(e.text));
+            if (rvNode && rvNode.type === 'reviewer') {
+              const rv = tryParseReview(e.detail || '');
+              if (rv) showReviewCard(rv);
+            }
+          }
           break;
         case 'pipeline_node_failed':
           addChatMessage('ai', '❌ ' + (e.text || '节点') + ' 失败: ' + (e.detail || e.err || ''), '流水线');
@@ -2794,6 +2823,14 @@ function connectSSE() {
               if (rt.runtimeID) {
                 refreshRuntimeConsole(rt.runtimeID);
               }
+            } catch (_) {}
+          }
+          break;
+        case 'pipeline_iteration':
+          if (e.detail) {
+            try {
+              const it = JSON.parse(e.detail);
+              $('#rd-iter').textContent = '第 ' + (it.iteration ?? '-') + ' 轮 / 共 ' + (it.maxIterations ?? '-') + ' 轮';
             } catch (_) {}
           }
           break;
@@ -3719,6 +3756,30 @@ function updateRunDashboardNode(nodeID, status, output) {
   else if (status === 'failed') out.textContent = '失败: ' + (output || '').substring(0, 120);
   else out.textContent = '';
 }
+function tryParseReview(detail) {
+  const s = String(detail || '');
+  let j = null;
+  try { j = JSON.parse(s); } catch (_) {}
+  if (!j) { const m = s.match(/\{[\s\S]*\}/); if (m) { try { j = JSON.parse(m[0]); } catch (_) {} } }
+  return (j && j.decision && (j.schemaVersion === 'loop-review-v1' || j.requiredChanges || j.summary)) ? j : null;
+}
+function showReviewCard(review) {
+  const box = $('#rd-review');
+  const map = { pass: ['✓ 通过', 'rd-review--pass'], revise: ['🔄 需修改', 'rd-review--revise'], blocked: ['⛔ 阻塞', 'rd-review--blocked'] };
+  const [label, cls] = map[review.decision] || [review.decision || '审查', 'rd-review--revise'];
+  box.className = 'rd-review ' + cls;
+  let changes = '';
+  if (Array.isArray(review.requiredChanges) && review.requiredChanges.length) {
+    changes = '<div class="rd-review__changes"><b>需修改：</b>' + review.requiredChanges.map(escHtml).join('；') + '</div>';
+  }
+  box.innerHTML = '<div class="rd-review__head"><span class="rd-review__tag">' + label + '</span>' +
+    '<span class="rd-review__conf">置信 ' + (review.confidence ?? '-') + '</span></div>' +
+    '<div class="rd-review__summary">' + escHtml(review.summary || '') + '</div>' +
+    changes +
+    (review.nextTask ? '<div class="rd-review__next"><b>下一轮：</b>' + escHtml(review.nextTask) + '</div>' : '');
+  box.classList.remove('hidden');
+}
+
 function finishRunDashboard(ok) {
   if (!runDash.active) return;
   const b = $('#rd-badge');

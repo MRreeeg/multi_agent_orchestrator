@@ -109,6 +109,9 @@ const (
 	// PipelineDone signals the entire pipeline finished. Text carries the final
 	// status. Appended last.
 	PipelineDone
+	// PipelineIteration signals a Loop iteration began. Text carries the run id,
+	// Detail carries JSON with runID/iteration/maxIterations. Appended last.
+	PipelineIteration
 	// KindCount is a sentinel one past the last real Kind. New event kinds must
 	// be inserted above it so completeness tests cover them automatically.
 	KindCount

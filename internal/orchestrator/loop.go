@@ -218,6 +218,7 @@ func (s *Store) executeLoopStateMachine(ctx context.Context, run *PipelineRun, p
 		}
 		run.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		s.mu.Unlock()
+		s.emit(event.Event{Kind: event.PipelineIteration, Text: run.ID, Detail: fmt.Sprintf(`{"runID":"%s","iteration":%d,"maxIterations":%d}`, run.ID, iterationNum, maxIter)})
 		if err := s.persistRun(run, sessionID); err != nil {
 			return fmt.Errorf("persist run after iteration create: %w", err)
 		}
