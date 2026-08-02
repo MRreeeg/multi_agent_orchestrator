@@ -116,10 +116,27 @@ func runtimeAccessMode(executor ExecutorType, mode string) string {
 	return "browser"
 }
 
-// emitRuntimeEvent sends a runtime status event for a node.
-func (s *Store) emitRuntimeEvent(nodeID string, endpoint string, port int, status string, executor string, accessMode string) {
-	detail := fmt.Sprintf(`{"endpoint":"%s","port":%d,"status":"%s","nodeID":"%s","executor":"%s","accessMode":"%s"}`, endpoint, port, status, nodeID, executor, accessMode)
+// emitRuntimeEvent sends a runtime status event for a node. output is a short
+// summary of the latest assistant answer so the canvas can show it without
+// opening the Runtime Console; it is JSON-escaped and truncated.
+func (s *Store) emitRuntimeEvent(nodeID string, endpoint string, port int, status string, executor string, accessMode string, output string) {
+	outJSON := ""
+	if strings.TrimSpace(output) != "" {
+		summary := truncateRune(output, 200)
+		raw, _ := json.Marshal(summary)
+		outJSON = `,"output":` + string(raw)
+	}
+	detail := fmt.Sprintf(`{"endpoint":"%s","port":%d,"status":"%s","nodeID":"%s","executor":"%s","accessMode":"%s"%s}`, endpoint, port, status, nodeID, executor, accessMode, outJSON)
 	s.emit(event.Event{Kind: event.PipelineNodeRuntime, Text: nodeID, Detail: detail})
+}
+
+// truncateRune truncates s to at most n runes (UTF-8 safe).
+func truncateRune(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
 }
 
 // managedRuntimeState returns the live runtime manager view when the runtime is
@@ -3069,7 +3086,7 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	// Execute — pass onStart callback so the frontend shows the port badge
 	// the moment the serve process starts (before waiting for readiness).
 	onStart := func(endpoint string, port int) {
-		s.emitRuntimeEvent(node.ID, endpoint, port, "starting", string(node.Executor), runtimeAccessMode(node.Executor, node.Mode))
+		s.emitRuntimeEvent(node.ID, endpoint, port, "starting", string(node.Executor), runtimeAccessMode(node.Executor, node.Mode), "")
 	}
 	result, execErr := executor.Execute(ctx, spec, onStart)
 	if result == nil {
@@ -3115,7 +3132,7 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		if live, ok := managedRuntimeState(result.RuntimeID); ok && live.AccessMode != "" {
 			accessMode = live.AccessMode
 		}
-		s.emitRuntimeEvent(node.ID, endpoint, port, string(status), string(executorType), accessMode)
+		s.emitRuntimeEvent(node.ID, endpoint, port, string(status), string(executorType), accessMode, output)
 	}
 
 	if execErr != nil {

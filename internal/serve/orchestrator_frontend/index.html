@@ -174,6 +174,7 @@ input,textarea,select{font:inherit;color:inherit}
 .node__status--done{background:var(--success)}
 .node__status--failed{background:var(--danger)}
 .node__status--interrupted{background:var(--warning, #d97706)}
+.node__output{font-size:10px;color:var(--muted-2);line-height:1.35;margin-top:3px;word-break:break-all;max-height:38px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .node__detail-btn{cursor:pointer;font-size:11px;color:var(--muted-2);margin-left:4px;opacity:0.6;transition:opacity .15s}
 .node:hover .node__detail-btn{opacity:1}
 .node__detail-btn:hover{color:var(--accent)}
@@ -1681,6 +1682,7 @@ function renderNodes() {
       <div class="node__body">
         <div class="node__model">${escHtml(node.model || '未选择模型')}</div>
         <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || '默认 Agent') : (node.skill || '无 Skill'))}</div>
+        ${node.runtime && node.runtime.output ? `<div class="node__output">${escHtml(node.runtime.output)}</div>` : ''}
       </div>
     `;
     // Drag handling
@@ -1742,10 +1744,14 @@ function renderNodes() {
       });
     });
     // Port badge for serve runtime — show for starting/ready/idle/busy, gray for stopped/error
-    if (node.runtime && node.runtime.port) {
+    // runtime_console runtimes (codex ws, mimo acp, claude stream-json) expose
+    // their entry through the Orchestrator console even when the provider has
+    // no port (claude has Port=0) — otherwise the user could never open it.
+    const rtConsoleNoPort = node.runtime && node.runtime.accessMode === 'runtime_console';
+    if (node.runtime && (node.runtime.port || rtConsoleNoPort)) {
       const badge = document.createElement('div');
       badge.className = 'node__port-badge';
-      badge.textContent = ':' + node.runtime.port;
+      badge.textContent = node.runtime.port ? ':' + node.runtime.port : (node.runtime.executor || 'rt');
       const s = node.runtime.status;
       const isRuntimeConsole = node.runtime.accessMode === 'runtime_console';
       const isActive = s === 'starting' || s === 'ready' || s === 'idle' || s === 'busy';

@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"reasonix/internal/agent"
+	"reasonix/internal/event"
 	"reasonix/internal/provider"
 )
 
@@ -606,5 +608,34 @@ func TestBuildExecutorPromptDoesNotDuplicateWithoutSkill(t *testing.T) {
 	spec := ExecSpec{Prompt: "只回复OK"}
 	if got := buildExecutorPrompt(spec); got != spec.Prompt {
 		t.Fatalf("buildExecutorPrompt() = %q, want unchanged prompt", got)
+	}
+}
+
+func TestEmitRuntimeEventIncludesOutputSummary(t *testing.T) {
+	s := NewStore()
+	var gotDetail string
+	s.emitter = event.FuncSink(func(ev event.Event) {
+		if ev.Kind == event.PipelineNodeRuntime {
+			gotDetail = ev.Detail
+		}
+	})
+	s.emitRuntimeEvent("n1", "ws://127.0.0.1:1", 123, "idle", "codex", "runtime_console", "第一行输出\n第二行"+strings.Repeat("x", 300))
+	if !strings.Contains(gotDetail, `"output":"`) {
+		t.Fatalf("detail missing output: %s", gotDetail)
+	}
+	var parsed struct {
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal([]byte(gotDetail), &parsed); err != nil {
+		t.Fatalf("detail not valid JSON: %v -> %s", err, gotDetail)
+	}
+	if !strings.Contains(parsed.Output, "第一行输出") || len([]rune(parsed.Output)) > 205 {
+		t.Fatalf("output summary = %q (runes=%d), want truncated first line", parsed.Output, len([]rune(parsed.Output)))
+	}
+	// Empty output must not add the field.
+	gotDetail = ""
+	s.emitRuntimeEvent("n2", "", 0, "starting", "claude", "runtime_console", "")
+	if strings.Contains(gotDetail, `"output"`) {
+		t.Fatalf("empty output should be omitted: %s", gotDetail)
 	}
 }
