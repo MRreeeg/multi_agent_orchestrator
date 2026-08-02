@@ -2069,6 +2069,7 @@ using browser_engine = detail::cocoa_wkwebview_engine;
 
 #define WIN32_LEAN_AND_MEAN
 #include <shlobj.h>
+#include <shellapi.h>
 #include <shlwapi.h>
 #include <stdlib.h>
 #include <windows.h>
@@ -2890,6 +2891,7 @@ public:
     controller->get_CoreWebView2(&webview);
     webview->add_WebMessageReceived(this, &token);
     webview->add_PermissionRequested(this, &token);
+    webview->add_NewWindowRequested(this, &token);
 
     m_cb(controller, webview);
     return S_OK;
@@ -2911,6 +2913,20 @@ public:
     args->get_PermissionKind(&kind);
     if (kind == COREWEBVIEW2_PERMISSION_KIND_CLIPBOARD_READ) {
       args->put_State(COREWEBVIEW2_PERMISSION_STATE_ALLOW);
+    }
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE
+  Invoke(ICoreWebView2 * /*sender*/,
+         ICoreWebView2NewWindowRequestedEventArgs *args) {
+    // Never spawn a browser-looking WebView2 window: open target=_blank /
+    // window.open URLs in the system default browser instead.
+    LPWSTR uri = nullptr;
+    args->get_Uri(&uri);
+    args->put_Handled(TRUE);
+    if (uri != nullptr) {
+      ShellExecuteW(nullptr, L"open", uri, nullptr, nullptr, SW_SHOWNORMAL);
+      CoTaskMemFree(uri);
     }
     return S_OK;
   }
@@ -3380,6 +3396,11 @@ private:
     if (res != S_OK) {
       return false;
     }
+    // App-like shell: hide browser chrome (right-click menu, Ctrl+N etc).
+    // Script dialogs (confirm/prompt) stay enabled so confirmations still
+    // work; the frontend avoids prompt() on the new-session flow.
+    settings->put_AreDefaultContextMenusEnabled(FALSE);
+    settings->put_AreBrowserAcceleratorKeysEnabled(FALSE);
     init("window.external={invoke:s=>window.chrome.webview.postMessage(s)}");
     resize_webview();
     m_controller->put_IsVisible(TRUE);

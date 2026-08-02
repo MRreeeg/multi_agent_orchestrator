@@ -2686,7 +2686,9 @@ function autoSaveState() {
 }
 
 $('#btn-new-session').addEventListener('click', async () => {
-  if (state.chatMessages.length > 0 && !confirm('创建新编排会话并清空当前内容？')) return;
+  // In the desktop app native prompt()/confirm() render as browser dialogs;
+  // create the session directly (previous state is saved below) with a
+  // default title - rename later from history if needed.
   try {
     if (state.sessionID) {
       try {
@@ -2700,7 +2702,7 @@ $('#btn-new-session').addEventListener('click', async () => {
       }
     }
     // Create new orchestration session via new API
-    const title = prompt('请输入会话标题:', '新编排会话') || '新编排会话';
+    const title = '新编排会话';
     const sess = await apiPost('/orch-sessions', {
       title,
       workspace: cwdDisplay && cwdDisplay.textContent !== '-' ? cwdDisplay.textContent : ''
@@ -2713,6 +2715,7 @@ $('#btn-new-session').addEventListener('click', async () => {
     state.loopConfigDirty = false;
     restoreLoopConfigUI({ enabled: false }, { markDirty: false });
     localStorage.setItem('orchestrator-session-id', state.sessionID);
+    toast('已创建新会话（标题可在历史中重命名）', 'success');
     console.log('[orch:init] new session id:', sess.id);
 
     chatMessages.innerHTML = '';
