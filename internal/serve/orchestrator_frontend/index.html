@@ -124,6 +124,18 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__send:hover{transform:scale(1.05)}
 .chat__send:disabled{background:var(--panel-2);color:var(--muted);cursor:default;transform:none}
 .chat__send svg{width:16px;height:16px}
+.topbar__sub{font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:400}
+.hero__title{font-family:var(--heading);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--fg);text-align:center;line-height:1.3}
+.hero__sub{font-size:13px;color:var(--muted-2);text-align:center;max-width:540px;line-height:1.65}
+.hero__box{display:flex;gap:8px;width:min(640px,92%);margin-top:8px}
+.hero__input{flex:1;min-height:48px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s}
+.hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.hero__input::placeholder{color:var(--muted-2)}
+.hero__send{flex-shrink:0;padding:0 18px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--violet));color:oklch(99% 0 0);font-size:13px;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .2s}
+.hero__send:hover{transform:translateY(-1px);box-shadow:0 6px 18px oklch(0% 0 0/.25)}
+.hero__chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
+.hero__chip{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--fg-2);font-size:12px;cursor:pointer;transition:all .15s}
+.hero__chip:hover{border-color:var(--accent);color:var(--accent)}
 .cursor{display:inline-block;width:2px;height:1.1em;background:var(--accent);vertical-align:text-bottom;margin-left:2px;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
 
@@ -296,10 +308,11 @@ input,textarea,select{font:inherit;color:inherit}
   <header class="topbar">
     <div class="topbar__brand">
       <div class="topbar__logo">R</div>
-      <span>Reasonix</span>
+      <span>多智能体管家</span>
+      <span class="topbar__sub">Reasonix Orchestrator</span>
     </div>
     <div class="topbar__sep"></div>
-    <div class="topbar__title">多Agent编排控制台</div>
+    <div class="topbar__title">多Agent 协作编排 · 架构 → 实现 → 审查</div>
     <div class="topbar__spacer"></div>
     <div class="topbar__cwd" style="display:flex;align-items:center;gap:6px">
       <span style="font-size:11px;color:var(--muted);white-space:nowrap">工作目录:</span>
@@ -350,18 +363,26 @@ input,textarea,select{font:inherit;color:inherit}
       <div class="chat">
         <div class="chat__messages" id="chat-messages">
           <div class="chat__welcome" id="chat-welcome">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
-            <div class="chat__welcome-title">多Agent编排控制台</div>
-            <div class="chat__welcome-desc">编排多 Agent (架构师 / 执行者 / 审查者) 协作：架构→实现→审查。
-              <br>💡 顶部选择预设加载 DAG，或点击左侧管道图标查看示例。</div>
+            <div class="hero__title">把任务交给我，剩下的我来编排</div>
+            <div class="hero__sub">多智能体管家自动拆分需求，编排 <b>架构师 → 执行者 → 审查者</b> 协作流程，
+              <br>支持 codex / mimo / claude 执行器与 deepseek / ccs 等模型路由。</div>
+            <div class="hero__box">
+              <textarea class="hero__input" id="hero-input" rows="2" placeholder="描述你的任务，例如：为 another_version729 实现 ParsePortRange 端口解析（单端口/连续范围/逗号组合/边界/错误场景），含 14 场景表格驱动测试，仅标准库"></textarea>
+              <button class="hero__send" id="hero-send">✨ 生成编排</button>
+            </div>
+            <div class="hero__chips">
+              <button class="hero__chip" data-sample="实现一个端口范围解析函数，支持单端口/连续范围/逗号组合与边界错误场景，含表格驱动测试，仅标准库">端口范围解析</button>
+              <button class="hero__chip" data-sample="重构 internal/loopdemo 模块，补齐错误处理与完整测试">重构并补测试</button>
+              <button class="hero__chip" data-sample="审查当前工作区代码质量并给出改进建议">代码审查</button>
+            </div>
           </div>
         </div>
         <div class="chat__input-bar">
-          <input class="chat__input" id="chat-input" type="text" placeholder="输入需求... (Enter 记录)" autocomplete="off" />
+          <input class="chat__input" id="chat-input" type="text" placeholder="输入需求，Enter 生成编排流程…" autocomplete="off" />
           <button class="chat__send" id="btn-new-session" title="新建会话" style="background:var(--panel-2);color:var(--fg-2)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
           </button>
-          <button class="chat__send" id="chat-send" title="记录消息">
+          <button class="chat__send" id="chat-send" title="生成编排">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
           </button>
         </div>
@@ -2140,9 +2161,18 @@ function normalizeGeneratedLoopAnalysis(analysis, sourceText = '') {
 }
 
 async function sendChat() {
-  const text = chatInput.value.trim();
+  const heroInput = $('#hero-input');
+  const text = (heroInput && String(heroInput.value || '').trim()) || chatInput.value.trim();
   if (!text) return;
   chatInput.value = '';
+  if (heroInput) heroInput.value = '';
+  const heroSendBtn = $('#hero-send');
+  if (heroSendBtn) { heroSendBtn.disabled = true; heroSendBtn.textContent = '分析中…'; }
+  chatSend.disabled = true;
+  const restoreSend = () => {
+    if (heroSendBtn) { heroSendBtn.disabled = false; heroSendBtn.textContent = '✨ 生成编排'; }
+    chatSend.disabled = false;
+  };
   addChatMessage('user', text);
 
   // Ensure we have an orchestration session
@@ -2285,7 +2315,12 @@ async function sendChat() {
       addChatMessage('ai', configMsg, '配置建议');
 
       switchPanel('pipeline');
-      toast('流水线已自动配置', 'success');
+      toast('流水线已自动配置，点击「执行」开始', 'success');
+      const execBtn = $('#btn-execute');
+      if (execBtn) {
+        execBtn.classList.add('exec-pulse');
+        setTimeout(() => execBtn.classList.remove('exec-pulse'), 3200);
+      }
     }
     // Persist the rewritten requirement and the generated pipeline together.
     // Saving earlier and again after node generation creates two racing PUTs;
@@ -2293,7 +2328,9 @@ async function sendChat() {
     if (state.sessionID) await saveOrchestratorState(state.sessionID);
   } catch (err) {
     addChatMessage('ai', '分析失败: ' + err.message, '错误');
+    restoreSend();
   }
+  restoreSend();
 }
 
 // 拓扑布局：计算每个节点的层级，同层垂直排列，不同层水平排列
@@ -2346,6 +2383,16 @@ function layoutPipeline() {
 
 chatSend.addEventListener('click', sendChat);
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+const heroSend = $('#hero-send');
+if (heroSend) heroSend.addEventListener('click', sendChat);
+const heroInputEl = $('#hero-input');
+if (heroInputEl) heroInputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+$$('.hero__chip').forEach(chip => chip.addEventListener('click', () => {
+  const h = $('#hero-input');
+  if (!h) return;
+  h.value = chip.dataset.sample || chip.textContent;
+  h.focus();
+}));
 
 // New session button
 // 保存当前 orchestrator 状态到会话
