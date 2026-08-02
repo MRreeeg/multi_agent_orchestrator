@@ -29,6 +29,14 @@
 - `index.html`：topbar 品牌、hero 欢迎区、hero/chips CSS、sendChat 读取 hero 输入 + 加载态 + 恢复、生成后「执行」高亮脉冲。
 - 验证：`node --check` 通过、`go build ./internal/serve` 通过、`go test ./internal/serve` 通过。
 
+## 追加：运行看板 + 审查决策 + 迭代进度（2026-08-02 晚）
+
+- `PipelineIteration` SSE 事件（runID/iteration/maxIterations），Loop 每轮开始时发出；运行看板显示「第 x 轮 / 共 y 轮」。
+- 审查者节点完成时解析 `loop-review-v1` JSON，运行看板下方显示**决策卡片**（✓ 通过 / 🔄 需修改 / ⛔ 阻塞 + 置信 + summary + requiredChanges + nextTask）。
+- 运行看板（chat 顶部）：每节点状态点（等待/运行中脉冲/完成/失败）+ 单行输出摘要 + 停止/收起按钮，启动自动出现。
+- 修复：run-dash HTML 容器中途未落盘导致 CSS/JS 引用空元素的破损中间态。
+- 验证：event/orchestrator/serve 测试全绿；index 渲染断言含 run-dash/rd-nodes/rd-stop/rd-review。
+
 ## 后续可选（方向 B：全量视觉重构，未实施）
 
 - 字体升级（Geist/Satoshi）、emoji → SVG 图标系统、卡片 → 边界分组、stagger/tactile 动效、执行过程实时可视化面板。
