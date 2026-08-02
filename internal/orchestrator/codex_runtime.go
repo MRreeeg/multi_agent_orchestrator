@@ -56,6 +56,7 @@ type codexRuntime struct {
 	done          chan struct{}
 	StartedAt     time.Time
 	LastUsedAt    time.Time
+	failedAt      time.Time
 
 	mu       sync.Mutex
 	client   *codexclient.AppServerClient
@@ -178,6 +179,7 @@ func (m *CodexRuntimeManager) Stop(runtimeID string) error {
 }
 
 func (m *CodexRuntimeManager) Get(runtimeID string) (*RuntimeState, bool) {
+	m.pruneFailed()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, rt := range m.runtimes {
@@ -189,6 +191,7 @@ func (m *CodexRuntimeManager) Get(runtimeID string) (*RuntimeState, bool) {
 }
 
 func (m *CodexRuntimeManager) List() []*RuntimeState {
+	m.pruneFailed()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]*RuntimeState, 0, len(m.runtimes))
@@ -229,6 +232,26 @@ func (m *CodexRuntimeManager) stateFor(rt *codexRuntime, spec ExecSpec, policy C
 		CreatedAt: rt.StartedAt, LastActiveAt: rt.LastUsedAt, CleanupPolicy: policy,
 		AccessMode: "runtime_console", ApprovalMode: approvalMode, ExecutionMode: executionMode,
 		ThreadID: rt.threadID, TurnID: rt.turnID,
+	}
+}
+
+// failedRuntimeTTL keeps a dead runtime registered so the console can show its
+// startup/connection error instead of a 404, then it is pruned lazily.
+const failedRuntimeTTL = 60 * time.Second
+
+// pruneFailed removes dead runtime records that have been error for longer
+// than failedRuntimeTTL. Called lazily from List/Get/ensure.
+func (m *CodexRuntimeManager) pruneFailed() {
+	now := time.Now()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for key, rt := range m.runtimes {
+		rt.mu.Lock()
+		dead := rt.status == RuntimeError && !rt.failedAt.IsZero() && now.Sub(rt.failedAt) > failedRuntimeTTL
+		rt.mu.Unlock()
+		if dead {
+			delete(m.runtimes, key)
+		}
 	}
 }
 
@@ -292,13 +315,14 @@ func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart
 	})
 
 	spawnArgs := []string{"app-server", "--listen", rt.Endpoint}
-	// `codex app-server` does not accept --profile, but it does accept the
-	// global -c key=value override: pin the provider route per retained
-	// runtime (deepseek official vs cc-switch proxy) without touching the
-	// shared base config. Thread-level model selection still flows through
-	// startTurn below.
-	if provider := codexServeProvider(spec); provider != "" {
-		spawnArgs = append(spawnArgs, "-c", "model_provider="+provider)
+	// `codex app-server` does not accept --profile, but it does accept nested
+	// -c key=value overrides. Load the node's profile overlay
+	// ($CODEX_HOME/<profile>.config.toml, generated from cc-switch providers)
+	// and pass every key as -c, so serve mode uses the exact same
+	// machine-local configuration as run mode (`codex --profile`) and never
+	// depends on the shared config.toml that cc-switch rewrites on switch.
+	for _, ov := range codexProfileOverrides(codexProfile(spec)) {
+		spawnArgs = append(spawnArgs, "-c", ov)
 	}
 	cmd := newRetainedRuntimeCommand(ctx, "codex", spawnArgs...)
 	cmd.Dir = spec.Workspace
@@ -320,6 +344,9 @@ func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart
 
 	deadline := time.Now().Add(45 * time.Second)
 	for time.Now().Before(deadline) {
+		if runtimeExited(rt.done) {
+			break
+		}
 		dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		client, err := codexclient.DialAppServer(dialCtx, rt.Endpoint, func(e codexclient.AppServerEvent) { m.recordEvent(rt, e) })
 		cancel()
@@ -339,7 +366,19 @@ func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart
 		}
 	}
 	diagnostic := strings.TrimSpace(stderr.String())
-	_ = m.Stop(rt.ID)
+	// Do NOT Stop the runtime here: watchRuntime already kept the dead record
+	// (status=error) so the Runtime Console can show the exact failure.
+	rt.mu.Lock()
+	if rt.status != RuntimeError {
+		rt.status = RuntimeError
+		rt.lastErr = diagnostic
+		if rt.lastErr == "" {
+			rt.lastErr = "codex app-server exited before accepting WebSocket connections"
+		}
+		rt.failedAt = time.Now()
+	}
+	rt.mu.Unlock()
+	m.notify(rt)
 	return nil, fmt.Errorf("codex app-server %s did not accept WebSocket connections within 45s: %s", rt.Endpoint, diagnostic)
 }
 
@@ -358,6 +397,12 @@ func (m *CodexRuntimeManager) watchRuntime(key string, rt *codexRuntime) {
 	stream := rt.stream
 	rt.stream = nil
 	rt.client = nil
+	if rt.status != RuntimeStopped {
+		// Keep a failed runtime registered for a short window so the Runtime
+		// Console can surface the startup/connection error instead of a 404.
+		// The manager prunes it lazily once it is older than failedRuntimeTTL.
+		rt.failedAt = time.Now()
+	}
 	rt.mu.Unlock()
 	if stream != nil {
 		stream.stop()
@@ -367,7 +412,8 @@ func (m *CodexRuntimeManager) watchRuntime(key string, rt *codexRuntime) {
 	}
 	m.notify(rt)
 	m.mu.Lock()
-	if m.runtimes[key] == rt {
+	if rt.status == RuntimeStopped && m.runtimes[key] == rt {
+		// User-initiated Stop already removed it from the registry in Stop().
 		delete(m.runtimes, key)
 	}
 	m.mu.Unlock()

@@ -8,6 +8,46 @@ import (
 	"time"
 )
 
+// TestCodexServeCCSRightcodeEndToEnd drives a retained `codex app-server`
+// pinned to the cc-switch "Right Code" provider (gpt-5.6-luna via the rightapi
+// relay). This is the reviewer-side route that must coexist with the deepseek
+// executor route while cc-switch stays running. Gated behind RUN_INTEGRATION=1.
+func TestCodexServeCCSRightcodeEndToEnd(t *testing.T) {
+	if os.Getenv("RUN_INTEGRATION") != "1" {
+		t.Skip("set RUN_INTEGRATION=1 to run the real codex+ccs E2E")
+	}
+	mgr := newCodexRuntimeManager()
+	defer func() {
+		for _, rt := range mgr.List() {
+			_ = mgr.Stop(rt.RuntimeID)
+		}
+	}()
+
+	workspace := t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+
+	execResult, err := mgr.Execute(ctx, ExecSpec{
+		Workspace:     workspace,
+		Prompt:        "只回复OK",
+		ModelRef:      "ccs",
+		DisplayModel:  "gpt-5.6-luna",
+		NodeID:        "e2e-ccs",
+		Mode:          "serve",
+		Executor:      "codex",
+		ApprovalMode:  "auto",
+		ProviderRoute: "ccswitch",
+		ContextPolicy: "fresh",
+	}, nil)
+	if err != nil {
+		t.Fatalf("Execute(ccs): %v", err)
+	}
+	if strings.TrimSpace(execResult.FinalText) == "" {
+		t.Fatalf("ccs FinalText empty: %#v", execResult)
+	}
+	t.Logf("ccs E2E OK text=%q thread=%s", execResult.FinalText, execResult.ExternalSessionID)
+}
+
 // TestCodexServeDeepseekOfficialEndToEnd drives a retained `codex app-server`
 // runtime pinned to the DeepSeek official provider (model_provider=deepseek,
 // model=deepseek-v4-flash) and verifies the loop-style turn returns visible
