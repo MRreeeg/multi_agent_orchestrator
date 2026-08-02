@@ -37,7 +37,12 @@
 - 修复：run-dash HTML 容器中途未落盘导致 CSS/JS 引用空元素的破损中间态。
 - 验证：event/orchestrator/serve 测试全绿；index 渲染断言含 run-dash/rd-nodes/rd-stop/rd-review。
 
-## 后续可选（方向 B：全量视觉重构，未实施）
+## 追加：交互式执行分析 + 原生桌面应用（2026-08-02）
+
+- **AI 执行进展分析**：运行看板「分析进展」按钮 → `POST /runs/{id}/analysis`（后端汇总 run 任务/迭代/各节点输出/审查决策 → reasonix deepseek-flash 生成 `{summary,progress,blocking,suggestions}`）→ 前端卡片展示卡点与建议。
+- **原生桌面应用**：`cmd/reasonix-desktop`（WebView2，webview_go）——进程内嵌 HTTP 服务（随机回环端口）+ 原生窗口「多智能体管家 · Reasonix Orchestrator」（1440×900）。`go build ./cmd/reasonix-desktop` → 运行 exe 即应用窗口，关闭即退出。已验证窗口存活。
+
+## 后续可选（方向 B：全量视觉重构，待确认）
 
 - 字体升级（Geist/Satoshi）、emoji → SVG 图标系统、卡片 → 边界分组、stagger/tactile 动效、执行过程实时可视化面板。
 - 若用户确认需要，单独立项执行。
