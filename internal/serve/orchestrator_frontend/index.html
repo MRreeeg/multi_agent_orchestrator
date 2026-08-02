@@ -3074,6 +3074,12 @@ async function openRuntimeConsole(runtimeID) {
   modal.querySelector('.rc-close').addEventListener('click', () => closeRuntimeConsole(runtimeID));
   modal.querySelector('.rc-send').addEventListener('click', () => sendRuntimeConsoleMessage(runtimeID));
   modal.querySelector('.rc-interrupt').addEventListener('click', () => interruptRuntime(runtimeID));
+  modal.querySelector('.rc-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      sendRuntimeConsoleMessage(runtimeID);
+    }
+  });
   // Clicking anywhere on the overlay brings the window to the front.
   modal.addEventListener('mousedown', () => { modal.style.zIndex = ++consoleZ; });
   modal.style.display = 'flex';
@@ -3107,7 +3113,11 @@ function renderRuntimeConsole(runtimeID, data) {
   const send = modal.querySelector('.rc-send');
   const interrupt = modal.querySelector('.rc-interrupt');
   send.disabled = !data.canSend;
+  send.title = data.canSend
+    ? '发送新 Turn（Enter 发送，Shift+Enter 换行）'
+    : (rt.status === 'busy' ? 'Runtime 正在执行，完成后可发送' : 'Runtime 不可用（空闲后可发送）');
   interrupt.disabled = !data.canInterrupt;
+  interrupt.title = data.canInterrupt ? '中断当前 Turn（保留 Runtime 与会话）' : '当前无活动 Turn 可中断';
   modal.querySelector('.rc-output').textContent = data.output || data.error || '等待该 Runtime 的输出…';
   const events = Array.isArray(data.events) ? data.events : [];
   const container = modal.querySelector('.rc-events');
