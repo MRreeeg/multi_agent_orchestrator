@@ -2947,6 +2947,7 @@ const loopReviewerProtocolPrompt = `# LOOP REVIEW PROTOCOL (MANDATORY)
 你现在是本轮 Loop 的唯一审查者，不是执行者。
 
 你的职责：
+- 决策必须对照「原始任务 + 架构师设计文档（若存在，见输入中的文件路径）」中的总体计划，而不是仅凭当轮代码的语法/逻辑；若本轮执行未覆盖总体计划中的任务项，必须 revise 并在 requiredChanges 中列出未覆盖项；
 - 只审查上游节点在本轮产生的输出以及工作区中的已有结果；
 - 可以读取文件和运行只读检查；禁止修改、创建、删除文件，禁止执行写入型命令；
 - 本次调用最多进行一个审查回合：同一命令最多执行一次，最多执行 3 个必要的只读检查；
@@ -3157,9 +3158,42 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		return "", stderr, result.TokenUsage, result.RuntimeID, result.Endpoint, result.ExternalSessionID, fmt.Errorf("%s", errMsg)
 	}
 
+	// Persist the architect's output as a design document so later iterations
+	// (and the reviewer) can reference the overall plan by path instead of
+	// having the full text copied into every downstream prompt. The reviewer
+	// stays read-only and opens the file itself.
+	if node.Type == NodeArchitect {
+		persistArchitectPlan(workspace, node.ID, output)
+	}
+
 	// Send full output in the SSE event.
 	s.emit(event.Event{Kind: event.PipelineNodeDone, Text: node.ID, Detail: output})
 	return output, stderr, result.TokenUsage, result.RuntimeID, result.Endpoint, result.ExternalSessionID, nil
+}
+
+// persistArchitectPlan writes the architect's plan to
+// <workspace>/.reasonix/plans/<nodeID>.md so reviewers can read it by path.
+func persistArchitectPlan(workspace, nodeID, output string) {
+	if strings.TrimSpace(workspace) == "" || strings.TrimSpace(nodeID) == "" || strings.TrimSpace(output) == "" {
+		return
+	}
+	planDir := filepath.Join(workspace, ".reasonix", "plans")
+	if err := os.MkdirAll(planDir, 0o755); err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(planDir, nodeID+".md"), []byte(output), 0o644)
+}
+
+// architectPlanPath returns the on-disk location of the persisted architect
+// design document for a node, and whether the file currently exists. Reviewer
+// prompts reference this path instead of receiving the full architect output.
+func architectPlanPath(workspace, architectNodeID string) (string, bool) {
+	if strings.TrimSpace(workspace) == "" || strings.TrimSpace(architectNodeID) == "" {
+		return "", false
+	}
+	p := filepath.Join(workspace, ".reasonix", "plans", architectNodeID+".md")
+	_, err := os.Stat(p)
+	return p, err == nil
 }
 
 func normalizeExecutionModelRef(workspace, model string) string {

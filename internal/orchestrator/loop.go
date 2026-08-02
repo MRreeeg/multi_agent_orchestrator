@@ -1301,8 +1301,18 @@ func (s *Store) gatherInputForIteration(pipe *Pipeline, run *PipelineRun, iterat
 	// executor did. Include every completed current-iteration node once.
 	if node != nil && node.Type == NodeReviewer {
 		var evidence []string
+		var architectNode *AgentNode
 		for _, candidate := range pipe.Nodes {
 			if candidate.ID == nodeID || included[candidate.ID] {
+				continue
+			}
+			// The architect's plan is persisted as a design document and passed
+			// to the reviewer as a path reference below, never copied in full
+			// (architect output is long; the reviewer should read the file).
+			if candidate.Type == NodeArchitect {
+				if architectNode == nil {
+					architectNode = &candidate
+				}
 				continue
 			}
 			for _, attID := range run.NodeAttemptIDs {
@@ -1320,6 +1330,18 @@ func (s *Store) gatherInputForIteration(pipe *Pipeline, run *PipelineRun, iterat
 		}
 		if len(evidence) > 0 {
 			parts = append(parts, "## 本轮执行结果（供审查）\n"+strings.Join(evidence, "\n\n"))
+		}
+		// Reference the architect's overall plan so the reviewer decides
+		// against the full task plan, not just this iteration's code.
+		if architectNode != nil {
+			planPath, exists := architectPlanPath(runWorkspace(run), architectNode.ID)
+			if exists && planPath != "" {
+				parts = append(parts, "## 架构师设计文档（总体计划，必须先阅读再决策）\n"+
+					"文件路径："+planPath+"\n"+
+					"在作出 pass/revise 决策前，请用只读工具阅读该设计文档，并对照原始任务与总体计划判断本轮执行是否覆盖计划中的任务项；未覆盖或不完整必须 revise 并列出未覆盖项。")
+			} else {
+				parts = append(parts, "## 架构师设计文档\n未找到总体计划文件（"+planPath+"），请以原始任务为准。")
+			}
 		}
 	}
 

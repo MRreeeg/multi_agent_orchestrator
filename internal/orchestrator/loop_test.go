@@ -760,6 +760,78 @@ func TestLoopResumeStartsFromInterruptedIteration(t *testing.T) {
 	}
 }
 
+// TestGatherInputForIterationReviewerReferencesArchitectPlan verifies the
+// reviewer receives a path reference to the architect's persisted design
+// document (not the full text), so it can judge the whole plan instead of only
+// the current-round code.
+func TestGatherInputForIterationReviewerReferencesArchitectPlan(t *testing.T) {
+	store := newLoopTestStore(t)
+	ws := t.TempDir()
+	planDir := filepath.Join(ws, ".reasonix", "plans")
+	if err := os.MkdirAll(planDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	archPlan := "三轮总体计划：\n第一轮：基础功能\n第二轮：错误处理\n第三轮：最终验证"
+	if err := os.WriteFile(filepath.Join(planDir, "arch.md"), []byte(archPlan), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	pipe := &Pipeline{ID: "p1", Name: "t", Nodes: []AgentNode{
+		{ID: "arch", Type: NodeArchitect, Label: "架构师", Model: "m", Executor: ExecutorReasonix, Mode: "serve"},
+		{ID: "exec", Type: NodeExecutor, Label: "执行者", Model: "m", Executor: ExecutorReasonix, Mode: "serve"},
+		{ID: "rev", Type: NodeReviewer, Label: "审查者", Model: "m", Executor: ExecutorReasonix, Mode: "serve"},
+	}, Edges: []Edge{{ID: "e1", FromID: "arch", ToID: "exec"}, {ID: "e2", FromID: "exec", ToID: "rev"}}}
+
+	run := &PipelineRun{ID: "run1", SessionID: "s1", Task: "解析端口范围", ExecOptions: ExecutionOptions{Workspace: ws}, LoopConfig: LoopConfig{ReviewNodeID: "rev", Mode: "review_decides"}}
+	iter := LoopIteration{ID: "iter1", RunID: run.ID, Number: 1, Status: "running", InputTask: "任务", StartedAt: time.Now().UTC().Format(time.RFC3339)}
+
+	store.mu.Lock()
+	store.runs[run.ID] = run
+	store.iterations[iter.ID] = &iter
+	run.IterationIDs = append(run.IterationIDs, iter.ID)
+	run.NodeAttemptIDs = append(run.NodeAttemptIDs, "att_arch", "att_exec")
+	store.attempts["att_arch"] = &NodeAttempt{ID: "att_arch", RunID: run.ID, NodeID: "arch", IterationID: "iter1", Status: "complete", Output: "完整架构设计：" + archPlan}
+	store.attempts["att_exec"] = &NodeAttempt{ID: "att_exec", RunID: run.ID, NodeID: "exec", IterationID: "iter1", Status: "complete", Output: "func ParsePortRange(){...} 第一轮代码"}
+	store.mu.Unlock()
+
+	input := store.gatherInputForIteration(pipe, run, "iter1", "rev")
+	if !strings.Contains(input, "架构师设计文档") {
+		t.Fatalf("reviewer input missing architect plan section:\n%s", input)
+	}
+	if !strings.Contains(input, filepath.Join("plans", "arch.md")) {
+		t.Fatalf("reviewer input missing plan path reference:\n%s", input)
+	}
+	if strings.Contains(input, "完整架构设计：") {
+		t.Fatalf("reviewer input must not copy the architect full text:\n%s", input)
+	}
+	if !strings.Contains(input, "func ParsePortRange") {
+		t.Fatalf("reviewer input must include the executor round output:\n%s", input)
+	}
+	if !strings.Contains(input, "必须 revise") {
+		t.Fatalf("reviewer input should instruct plan-coverage decision:\n%s", input)
+	}
+}
+
+func TestPersistArchitectPlanWritesDesignDoc(t *testing.T) {
+	ws := t.TempDir()
+	persistArchitectPlan(ws, "arch", "三轮计划内容")
+	data, err := os.ReadFile(filepath.Join(ws, ".reasonix", "plans", "arch.md"))
+	if err != nil || string(data) != "三轮计划内容" {
+		t.Fatalf("plan file = %q, err=%v", string(data), err)
+	}
+	// Empty/whitespace output must not create a file.
+	persistArchitectPlan(ws, "arch2", "   ")
+	if _, err := os.Stat(filepath.Join(ws, ".reasonix", "plans", "arch2.md")); err == nil {
+		t.Fatal("empty output should not persist a plan file")
+	}
+}
+
+func TestReviewerProtocolPromptRequiresPlanAwareness(t *testing.T) {
+	if !strings.Contains(loopReviewerProtocolPrompt, "总体计划") || !strings.Contains(loopReviewerProtocolPrompt, "必须 revise") {
+		t.Fatalf("reviewer protocol prompt must require plan-coverage decisions:\n%s", loopReviewerProtocolPrompt)
+	}
+}
+
 // TestResumeRejectsWrongRevision verifies ResumeLoop rejects mismatched revision.
 func TestResumeRejectsWrongRevision(t *testing.T) {
 	store := newLoopTestStore(t)
