@@ -364,6 +364,26 @@ func TestOrchestratorPipelineExecutePersistsNodeOutput(t *testing.T) {
 	}
 }
 
+func TestOrchestratorIndexContainsStewardHome(t *testing.T) {
+	bc := NewBroadcaster()
+	ctrl := control.New(control.Options{Sink: bc})
+	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/orchestrator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	html := string(body)
+	for _, want := range []string{"多智能体管家", "hero-input", "hero-send", "hero__chip", "把任务交给我"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("orchestrator index missing %q", want)
+		}
+	}
+}
+
 func TestOrchestratorNodeTypesExposeExecutorSpecificModels(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})
