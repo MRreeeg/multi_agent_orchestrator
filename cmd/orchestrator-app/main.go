@@ -1,4 +1,4 @@
-// Command reasonix-desktop runs the Reasonix Orchestrator console as a native
+// Command orchestrator-app runs the multi-agent steward console as a native
 // desktop app window (WebView2) instead of a browser tab. The HTTP server is
 // embedded in-process on a loopback random port; the window is the only
 // surface the user interacts with.
@@ -42,7 +42,7 @@ func main() {
 
 	w := webview.New(false)
 	defer w.Destroy()
-	w.SetTitle("多智能体管家 · Reasonix Orchestrator")
+	w.SetTitle("多智能体管家 · 多Agent 编排控制台")
 	w.SetSize(1440, 900, webview.HintNone)
 	w.Navigate(fmt.Sprintf("http://127.0.0.1:%d/orchestrator", port))
 	w.Run()
