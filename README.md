@@ -1,212 +1,153 @@
-<p align="center">
-  <img src="docs/logo.svg" alt="Reasonix" width="640"/>
-</p>
+# 🧭 多智能体管家 · Multi-Agent Orchestrator
 
-<p align="center">
-  <strong>English</strong>
-  &nbsp;·&nbsp;
-  <a href="./README.zh-CN.md">简体中文</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/GUIDE.md">Guide</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/SPEC.md">Spec</a>
-  &nbsp;·&nbsp;
-  <a href="https://esengine.github.io/DeepSeek-Reasonix/">Website</a>
-  &nbsp;·&nbsp;
-  <strong><a href="https://discord.gg/XF78rEME2D">Discord</a></strong>
-</p>
-
-> [!IMPORTANT]
-> **Reasonix 1.0 is a ground-up rewrite in Go** — this branch (`main-v2`) is the new default and where development happens now.
-> The earlier `0.x` TypeScript releases are **legacy**, living on the [`v1`](https://github.com/esengine/DeepSeek-Reasonix/tree/v1) branch (maintenance only).
-> See the **[migration guide](./docs/MIGRATING.md)**. `npm i -g reasonix` stays the install command — `1.0.0`+ delivers the Go binary, `0.x` is the legacy TS build.
-
-<p align="center">
-  <a href="https://www.npmjs.com/package/reasonix"><img src="https://img.shields.io/npm/v/reasonix.svg?style=flat-square&color=cb3837&labelColor=161b22&logo=npm&logoColor=white" alt="npm version"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/esengine/DeepSeek-Reasonix/ci.yml?style=flat-square&label=ci&labelColor=161b22&logo=githubactions&logoColor=white" alt="CI"/></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/npm/l/reasonix.svg?style=flat-square&color=8b949e&labelColor=161b22" alt="license"/></a>
-  <a href="https://www.npmjs.com/package/reasonix"><img src="https://img.shields.io/npm/dm/reasonix.svg?style=flat-square&color=3fb950&labelColor=161b22&label=downloads" alt="downloads"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/stargazers"><img src="https://img.shields.io/github/stars/esengine/DeepSeek-Reasonix.svg?style=flat-square&color=dbab09&labelColor=161b22&logo=github&logoColor=white" alt="GitHub stars"/></a>
-  <a href="https://atomgit.com/esengine/DeepSeek-Reasonix"><img src="https://atomgit.com/esengine/DeepSeek-Reasonix/star/badge.svg" alt="AtomGit stars"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors"><img src="https://img.shields.io/github/contributors/esengine/DeepSeek-Reasonix.svg?style=flat-square&color=bc8cff&labelColor=161b22&logo=github&logoColor=white" alt="contributors"/></a>
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/discussions"><img src="https://img.shields.io/github/discussions/esengine/DeepSeek-Reasonix.svg?style=flat-square&color=58a6ff&labelColor=161b22&logo=github&logoColor=white" alt="Discussions"/></a>
-  <a href="https://discord.gg/XF78rEME2D"><img src="https://img.shields.io/badge/discord-join-5865F2.svg?style=flat-square&labelColor=161b22&logo=discord&logoColor=white" alt="Discord"/></a>
-</p>
-
-<br/>
-
-<h3 align="center">A DeepSeek-native AI coding agent for your terminal.</h3>
-<p align="center">A config- and plugin-driven harness — a single static Go binary, tuned around DeepSeek's prefix cache so token costs stay low across long sessions.</p>
-
-<br/>
-
-> [!IMPORTANT]
-> **Community · 加入社区** — bilingual Discord for setup help (`#help` / `#求助`), workflow showcases, and feature ideas. → **<https://discord.gg/XF78rEME2D>**
-
-<br/>
-
-## Features
-
-- **Config-driven.** Providers, the agent, enabled tools, and plugins are all
-  declared in `reasonix.toml`. No hardcoded models.
-- **Multi-model & composable.** DeepSeek ships as a preset; any
-  OpenAI-compatible endpoint is a config entry, not new code. Optionally run
-  two models together (executor + planner) in separate, cache-stable sessions.
-- **Plugin-driven.** External tools run as subprocesses over stdio JSON-RPC
-  (MCP-compatible). Built-in tools self-register at compile time.
-- **Cache-aware context maintenance.** Startup injects a small stable environment
-  summary, stale tool output is snipped/pruned before summary compaction, and the
-  built-in tool schema contract is documented for regression review.
-- **Zero-friction distribution.** `CGO_ENABLED=0` single binary; cross-compile
-  to six targets with one command. The only dependency is a TOML parser.
-
-## Install
-
-```sh
-npm i -g reasonix                  # any OS; pulls the prebuilt native binary
-brew install esengine/reasonix/reasonix   # macOS
-```
-
-Prebuilt archives (`darwin|linux|windows × amd64|arm64`) and `SHA256SUMS` are on
-every [GitHub release](https://github.com/esengine/DeepSeek-Reasonix/releases).
-
-### Code signing
-
-Windows builds are code-signed with a free certificate provided by the
-[SignPath Foundation](https://signpath.org/), with signing through
-[SignPath.io](https://signpath.io/).
-
-### Build from source
-
-```sh
-make build      # -> bin/reasonix(.exe)
-make cross      # -> dist/ (darwin|linux|windows × amd64|arm64)
-```
-
-## Quick start
-
-```sh
-reasonix setup                      # config wizard → ./reasonix.toml
-export DEEPSEEK_API_KEY=sk-...      # or let setup save it to Reasonix home .env
-reasonix                            # then run /init to generate AGENTS.md (project memory)
-reasonix run "implement the TODOs in main.go"
-reasonix run --model deepseek-pro "add unit tests for this function"
-echo "explain this code" | reasonix run
-```
-
-## Configuration
-
-A minimal `reasonix.toml` — one provider and a default model — is enough to start:
-
-```toml
-default_model = "deepseek-flash"
-
-[[providers]]
-name        = "deepseek-flash"
-kind        = "openai"
-base_url    = "https://api.deepseek.com"
-model       = "deepseek-v4-flash"
-api_key_env = "DEEPSEEK_API_KEY"
-```
-
-Resolution order is **flag > `./reasonix.toml` > the user config file >
-built-in defaults**; starting with **Reasonix v1.8.1**, the user file lives at
-`~/.reasonix/config.toml` on macOS/Linux and
-`%AppData%\reasonix\config.toml` on Windows. See
-**[Configuration paths](./docs/CONFIG_PATHS.md)** for migration details and the
-full `config.toml` / `.env` structure. Provider entries name secrets with
-`api_key_env`; the secret values themselves live in Reasonix's global
-`<Reasonix home>/.env`, shared by CLI and desktop. Project `.env` files are not
-provider-key runtime fallbacks, but still feed workspace-scoped, non-provider
-`${VAR}` expansion for MCP/plugin settings without importing Reasonix control
-variables. Permissions, the sandbox, plugins (MCP), slash
-commands, `@` references, and two-model setup are all in the
-**[Guide](./docs/GUIDE.md)**.
-
-## Documentation
-
-- **[Guide](./docs/GUIDE.md)** — configuration, permissions & sandbox, plugins
-  (MCP), slash commands, `@` references, two-model collaboration.
-- **[Subagent profiles](./docs/SUBAGENT_PROFILES.md)** — create, share, preview,
-  run, edit, and safely delete isolated agent profiles from desktop or CLI.
-- **[Capability diagnostics](./docs/CAPABILITY_DIAGNOSTICS.md)** —
-  `reasonix doctor capabilities`, desktop Settings → Diagnostics, and the
-  `/reasonix-guide` skill for skills/hooks/MCP/plugin troubleshooting.
-- **[Bot guide](./docs/BOT_GUIDE.md)** — connect Feishu, Lark, and WeChat bots
-  from the desktop app, then use approvals, YOLO, and commands from IM.
-- **[Spec](./docs/SPEC.md)** — engineering contract: architecture, registries,
-  data types, and roadmap.
-- **[Task contracts & pause policy](./docs/TASK_CONTRACT.md)** — structure
-  complex requests with context, output boundaries, constraints, and when to ask.
-- **[Tool contract](./docs/TOOL_CONTRACT.md)** — provider-visible built-in tool
-  names, read-only flags, and schema snapshot guard.
-- **[Migrating from 0.x](./docs/MIGRATING.md)** — moving from the legacy
-  TypeScript releases to the 1.0 Go rewrite.
-- **[Checkpoints & rewind](./docs/CHECKPOINTS.md)** — the snapshot-based edit
-  safety net (Esc-Esc / `/rewind`).
-- **[Multi-Agent Orchestrator Pack](./MULTI_AGENT_README.md)** — local
-  Architect/Executor/Reviewer pipelines, Loop iterations, retained Codex
-  `app-server` Runtime Console, and portable Windows startup guidance.
-
-<br/>
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=esengine%2FDeepSeek-Reasonix&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=esengine/DeepSeek-Reasonix&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=esengine/DeepSeek-Reasonix&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=esengine/DeepSeek-Reasonix&type=date&legend=top-left" />
- </picture>
-</a>
-
-<br/>
-
-## Support
-
-If Reasonix has been useful and you'd like to say thanks, you can. It stays a coffee, not a contract — donations don't buy feature priority or change how issues get triaged.
-
-- **International** — PayPal: [paypal.me/yuhuahui](https://paypal.me/yuhuahui)
-- **国内** — 微信支付（扫码）
-
-<p align="center">
-  <img src=".github/sponsor/wechat-pay.jpg" alt="WeChat Pay QR code" width="240"/>
-</p>
-
-<br/>
-
-## Acknowledgments
-
-A small list of folks whose work has shaped Reasonix the most — the current top
-20 contributors by commit count. The full contributor graph is on
-[GitHub](https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors?all=1).
-
-<!-- reasonix-top-contributors:start -->
-| Contributor | Contributor | Contributor | Contributor |
-| --- | --- | --- | --- |
-| [**SivanCola**](https://github.com/SivanCola) | [**esengine**](https://github.com/esengine) | [**ttmouse**](https://github.com/ttmouse) | [**lifu963**](https://github.com/lifu963) |
-| **reasonix** (anonymous) | [**HUQIANTAO**](https://github.com/HUQIANTAO) | [**GTC2080**](https://github.com/GTC2080) | [**light-front-theory**](https://github.com/light-front-theory) |
-| **merge-order-check** (anonymous) | [**Li-Charles-One**](https://github.com/Li-Charles-One) | [**eghrhegpe**](https://github.com/eghrhegpe) | **wufengfan** (anonymous) |
-| [**CVEngineer66**](https://github.com/CVEngineer66) | [**dependabot\[bot\]**](https://github.com/apps/dependabot) | [**lanshi17**](https://github.com/lanshi17) | [**SuMuxi66**](https://github.com/SuMuxi66) |
-| [**CnsMaple**](https://github.com/CnsMaple) | [**cyq1017**](https://github.com/cyq1017) | [**JesonChou**](https://github.com/JesonChou) | [**XTLine**](https://github.com/XTLine) |
-<!-- reasonix-top-contributors:end -->
-
-Also a separate thank-you to [**Bernardxu123**](https://github.com/Bernardxu123)
-for designing the project logo, and to
-[AIGC Link](https://xhslink.com/m/80ngts127cA) for promoting the project on XiaoHongShu.
-
-<p align="center">
-  <a href="https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=esengine/DeepSeek-Reasonix&max=100&columns=12" alt="Contributors to esengine/DeepSeek-Reasonix" width="860"/>
-  </a>
-</p>
-
-<br/>
+> 把任务交给我，剩下的我来编排。
+> 一个把「**说一句话 → 自动编排 → 多 Agent 协作执行 → 审查决策 → 迭代收敛**」串成一条完整流水线的编排控制台。
 
 ---
 
-<p align="center">
-  <sub>MIT — see <a href="./LICENSE">LICENSE</a></sub>
-  <br/>
-  <sub>Built by the community at <a href="https://github.com/esengine/DeepSeek-Reasonix/graphs/contributors">esengine/DeepSeek-Reasonix</a></sub>
-</p>
+## ✨ 它是什么
+
+这是一个 **多 Agent 协作编排系统**：你只需要描述任务，它会自动拆解、自动组建一支"虚拟团队"（架构师 → 执行者 → 审查者），让它们像真人团队一样分工协作、互相审查、迭代到通过为止。
+
+不再是"你手动拖节点、逐个配置、盯着一堆日志"的工程工具，而是一个 **管家式的智能工作台**：
+
+- 🗣️ **一句话编排**：输入任务 → 自动分析 → 自动生成「架构师 → 执行者 → 审查者」流程 → 一键执行
+- 👀 **运行看板**：执行时实时看到每个 Agent 在做什么、输出什么、进行到第几轮，随时可停止/干预
+- ✅ **审查决策卡**：审查者的 pass / revise / blocked 结论 + 置信度 + 修改清单 + 下一步，一眼看清
+- 🧠 **AI 进展分析**：随时点「分析进展」，管家告诉你"现在到哪了、卡在哪、下一步该干嘛"
+- 💬 **人工介入**：随时向保留的 Agent 会话发消息、打断、追问，不影响 Loop 历史
+- 📦 **原生桌面应用**：WebView2 独立窗口（不再是浏览器标签页），带应用图标、记住窗口位置
+- 🔌 **多执行器 + 多模型路由**：codex / mimo / claude 混用；deepseek 官方直连 / ccs（中转站）按节点自由路由
+
+---
+
+## 🚀 快速开始
+
+### 方式一：桌面应用（推荐）
+```powershell
+scripts\start-desktop.bat     # 双击：自动构建并打开「多智能体管家」窗口
+```
+打开后，在首页输入框描述你的任务，点「✨ 生成编排」，检查自动生成的三个节点，点「执行」。
+
+### 方式二：浏览器控制台
+```powershell
+.\start.bat                   # 或 .\scripts\start-orchestrator.ps1
+# 自动打开 http://127.0.0.1:8788/orchestrator
+```
+
+### 依赖
+| 项 | 说明 |
+|---|---|
+| Go 工具链 | 构建用 |
+| gcc（CGO）+ WebView2 运行时 | 桌面应用需要（Win11 / Edge 自带 WebView2） |
+| codex / mimo / claude CLI | 执行器；按节点配置 provider/模型 |
+| DeepSeek / 中转站 API key | 模型路由（见下方模型配置） |
+
+---
+
+## 🧩 一个典型 Loop 长什么样
+
+```
+你："为项目 X 实现端口解析功能，含 14 场景测试，仅标准库"
+
+   ┌─────────┐   方案     ┌─────────┐   代码     ┌─────────┐
+   │  架构师  │ ───────▶ │  执行者  │ ───────▶ │  审查者  │
+   │ 设计&规划│          │ 实现&测试│          │ 核对计划 │
+   └─────────┘           └─────────┘           └─────────┘
+        ▲                                        │
+        └──────────── revise（返回修改）──────────┘
+        （pass → 结束；fixed → 跑满 N 轮）
+```
+
+- **架构师**：只读分析，产出设计文档（自动落盘到 `工作区/.reasonix/plans/`），列出每轮计划；
+- **执行者**：按方案写代码、跑测试，只做当前一轮；
+- **审查者**：**对照架构师设计文档 + 原始任务**判断覆盖度（不是只看当轮语法），输出 `pass / revise / blocked` + 修改清单；
+- 循环由 Orchestrator 控制，审查者决定要不要进入下一轮（`review_decides`）或固定轮数（`fixed`）。
+
+---
+
+## 🎛️ 执行器与模型路由
+
+| 执行器 | run（一次性） | serve（保留 Runtime + Console） |
+|---|---|---|
+| **codex** | `codex exec` | `codex app-server`（WebSocket）+ Thread 复用 + 中断/恢复 |
+| **mimo** | `mimo run` | `mimo acp`（ACP JSON-RPC over stdio）+ 会话复用 |
+| **claude** | `claude -p --output-format json` | stream-json stdio 保留进程 + Console + 人工消息 |
+
+**模型路由（每节点独立）：**
+- `providerRoute=ccswitch` / `model=ccs` → 省略 `--model`，走 cc-switch / 中转站（如 rightapi 的 gpt）
+- `providerRoute=` 空 + `model=deepseek-v4-flash` 等 → 原样透传，DeepSeek 官方直连（codex/claude 均支持）
+- 执行者 codex + deepseek 官方直连、审查者 codex + ccs 中转，**同一个 Loop 里可共存互不干扰**（cc-switch 配置器机制已适配，见手册）
+
+---
+
+## 🖥️ 前端体验（管家感）
+
+- 浅色主题：暖白 + 青绿强调色，现代字体栈（Segoe UI Variable / Space Grotesk / Cascadia Code）
+- 首屏 hero：「把任务交给我，剩下的我来编排」+ 大输入框 + 示例 chips
+- 运行看板：节点状态点 + 实时输出摘要 + 迭代进度 + 停止/收起
+- Runtime Console：流式事件（问答展开、系统日志折叠）、两步确认发送、Enter 发送
+- 节点卡片直接显示输出摘要；启动失败保留错误供诊断
+
+---
+
+## 📚 文档（随仓库分发，其他电脑拿到即可照做）
+
+| 文档 | 内容 |
+|---|---|
+| [`MULTI_AGENT_README.md`](MULTI_AGENT_README.md) | 功能总览、运行方式、Codex/Mimo/Claude 与 CCSwitch 说明 |
+| [`NEW_AGENT_QUICKSTART.zh-CN.md`](NEW_AGENT_QUICKSTART.zh-CN.md) | **新 Agent / 模型快速接入执行手册**（10 个接入点 + 8 步实操 + 验收 + 排查） |
+| [`docs/superpowers/specs/`](docs/superpowers/specs) | 设计文档（Mimo ACP、控制台 UX、执行器接入等） |
+| [`REASONIX.md`](REASONIX.md) | 底层引擎说明 |
+
+> 💡 想接入新的 Agent / 模型（如本机装个 Claude Code、或换个模型）？直接看 `NEW_AGENT_QUICKSTART.zh-CN.md`，按步骤改 10 个接入点即可，无需改框架核心。
+
+---
+
+## 🏗️ 技术架构（简）
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  桌面应用 cmd/orchestrator-app（WebView2，无控制台窗口）  │
+│    或 浏览器控制台（start.bat → 127.0.0.1:8788）          │
+├─────────────────────────────────────────────────────────┤
+│  前端（单页 HTML）：hero / 画布 / 运行看板 / Console / 历史 │
+├─────────────────────────────────────────────────────────┤
+│  internal/serve：Orchestrator HTTP/SSE API + 前端         │
+├─────────────────────────────────────────────────────────┤
+│  internal/orchestrator：                                │
+│    Loop 状态机（迭代/审查/终止） · Pipeline DAG          │
+│    RuntimeManager（codex/mimo/claude 保留进程）          │
+│    审查者对照设计文档 · AI 进展分析接口                    │
+├─────────────────────────────────────────────────────────┤
+│  internal/executor/{codex,mimo,claude}：CLI/协议适配      │
+│  （codex app-server WS · mimo ACP stdio · claude stream-json）│
+└─────────────────────────────────────────────────────────┘
+浏览器 / 应用窗口 永远只连 Orchestrator 的 HTTP/SSE，不直连 Provider。
+```
+
+---
+
+## 📦 目录结构
+
+```
+├─ cmd/orchestrator-app      # 原生桌面应用（WebView2）
+├─ cmd/reasonix              # CLI / serve 入口
+├─ internal/executor/        # codex / mimo / claude 执行器适配
+├─ internal/orchestrator/    # Loop、Pipeline、RuntimeManager、审查协议
+├─ internal/serve/           # HTTP/SSE 服务 + 前端（orchestrator_frontend）
+├─ scripts/                  # start-desktop / start-orchestrator 等
+├─ docs/                     # 设计文档、使用说明
+└─ NEW_AGENT_QUICKSTART.zh-CN.md  # 新 Agent 快速接入手册
+```
+
+---
+
+## ⚠️ 安全
+
+- **API Key 绝不进入仓库**：key 只存在于本机（`~/.codex`、`~/.claude-deepseek` 等），代码/文档用占位符；
+- 桌面应用内嵌的模型子进程（reasonix）从 `bin/` 或 PATH 解析，需与 `orchestrator-app.exe` 同目录。
+
+## 📄 License
+
+MIT —— 见 [LICENSE](LICENSE)。
