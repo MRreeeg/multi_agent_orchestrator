@@ -385,6 +385,10 @@ input,textarea,select{font:inherit;color:inherit}
       <span id="sse-status">未连接</span>
     </div>
     <div class="topbar__sep"></div>
+    <button class="topbar__btn" id="btn-new-session" title="新建会话">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      新建会话
+    </button>
     <button class="topbar__btn" id="btn-save-pipeline" title="保存管道">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       保存
@@ -439,10 +443,9 @@ input,textarea,select{font:inherit;color:inherit}
         <div class="chat__messages" id="chat-messages">
           <div class="chat__welcome" id="chat-welcome">
             <div class="hero__title">把任务交给我，剩下的我来编排</div>
-            <div class="hero__sub">多智能体管家自动拆分需求，编排 <b>架构师 → 执行者 → 审查者</b> 协作流程，
-              <br>支持 codex / mimo / claude 执行器与 deepseek / ccs 等模型路由。</div>
+            <div class="hero__sub"><b>架构师 → 执行者 → 审查者</b> 协作完成你的任务</div>
             <div class="hero__box">
-              <textarea class="hero__input" id="hero-input" rows="2" placeholder="描述你的任务，例如：为 another_version729 实现 ParsePortRange 端口解析（单端口/连续范围/逗号组合/边界/错误场景），含 14 场景表格驱动测试，仅标准库"></textarea>
+              <textarea class="hero__input" id="hero-input" rows="2" placeholder="描述你的任务，例如：实现端口范围解析函数并补测试"></textarea>
               <button class="hero__send" id="hero-send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg><span>生成编排</span></button>
             </div>
             <div class="hero__chips">
@@ -452,11 +455,8 @@ input,textarea,select{font:inherit;color:inherit}
             </div>
           </div>
         </div>
-        <div class="chat__input-bar">
+        <div class="chat__input-bar" id="chat-input-bar">
           <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
-          <button class="chat__send" id="btn-new-session" title="新建会话" style="background:var(--panel-2);color:var(--fg-2)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
           <button class="chat__send" id="chat-send" title="生成编排">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
           </button>
@@ -985,6 +985,7 @@ const chatMessages = $('#chat-messages');
 const chatInput = $('#chat-input');
   const chatSend = $('#chat-send');
 const chatWelcome = $('#chat-welcome');
+const chatInputBar = $('#chat-input-bar');
 
 // Clears conversation bubbles while keeping the hero (welcome) node alive.
 // Replacing innerHTML would detach #chat-welcome and leave a blank chat area.
@@ -995,7 +996,19 @@ function resetChatToWelcome() {
   if (!chatMessages.querySelector('#chat-welcome')) {
     chatMessages.appendChild(chatWelcome);
   }
+  showChatWelcome();
+}
+
+// The welcome hero owns the only input box; the bottom composer is hidden
+// while the hero is shown and appears once a conversation starts.
+function showChatWelcome() {
   chatWelcome.style.display = '';
+  chatInputBar.style.display = 'none';
+}
+
+function hideChatWelcome() {
+  chatWelcome.style.display = 'none';
+  chatInputBar.style.display = 'flex';
 }
 
   const canvas = $('#canvas');
@@ -2120,7 +2133,7 @@ $('#btn-auto-layout').addEventListener('click', () => {
 
 // ── Chat ──
 function addChatMessage(role, text, meta, persist = true) {
-  chatWelcome.style.display = 'none';
+  hideChatWelcome();
   const div = document.createElement('div');
   div.className = 'chat-bubble chat-bubble--' + role;
   div.innerHTML = `
@@ -2148,7 +2161,7 @@ async function refreshChatHistory() {
     state.requirementMessages = [];
     state.pipelineMessages = [];
     if (!Array.isArray(msgs) || msgs.length === 0) {
-      chatWelcome.style.display = '';
+      showChatWelcome();
       return;
     }
     for (const m of msgs) {
@@ -2171,10 +2184,10 @@ async function loadOrchestrationConversation(sessionID) {
   state.pipelineMessages = data.pipelineMessages || [];
   const messages = data.chatMessages || [];
   if (messages.length === 0) {
-    chatWelcome.style.display = '';
+    showChatWelcome();
     return true;
   }
-  chatWelcome.style.display = 'none';
+  hideChatWelcome();
   for (const m of messages) {
     addChatMessage(m.role, m.text || '', m.meta || '', false);
     state.chatMessages.push({ role: m.role, text: m.text || '', meta: m.meta || '' });
@@ -2802,7 +2815,7 @@ async function createNewOrchestrationSession(title) {
   state.nodes = [];
   state.edges = [];
   state.nextNodeId = 1;
-  chatWelcome.style.display = '';
+  showChatWelcome();
   renderNodes();
   renderEdges();
   switchPanel('chat');
@@ -2960,7 +2973,7 @@ let streamTarget = null;
 function ensureStreamTarget() {
   if (!streamTarget) {
     streamTarget = { el: null, text: '' };
-    chatWelcome.style.display = 'none';
+    hideChatWelcome();
     const div = document.createElement('div');
     div.className = 'chat-bubble chat-bubble--ai';
     div.innerHTML = '<div class="chat-bubble__inner"><span class="cursor"></span></div>';
