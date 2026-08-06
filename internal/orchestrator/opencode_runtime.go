@@ -1,8 +1,10 @@
 package orchestrator
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -38,6 +40,9 @@ type opencodeRuntime struct {
 	lastErr   string
 	events    []RuntimeConsoleEvent
 	stream    *consoleStreamCoalescer
+	sseCancel context.CancelFunc
+	partLast  map[string]int
+	partType  map[string]string
 }
 
 // OpenCodeRuntimeManager starts `opencode serve` as a retained, loopback-only
@@ -140,6 +145,7 @@ func (m *OpenCodeRuntimeManager) Stop(runtimeID string) error {
 		_ = client.Abort(ctx, target.sessionID)
 		cancel()
 	}
+	m.stopSSE(target)
 	if target.Cmd != nil {
 		stopRuntimeProcess(target.Cmd, target.done)
 	}
@@ -191,6 +197,7 @@ func (m *OpenCodeRuntimeManager) cleanupAll() {
 			_ = client.Abort(ctx, rt.sessionID)
 			cancel()
 		}
+		m.stopSSE(rt)
 		stopRuntimeProcess(rt.Cmd, rt.done)
 	}
 }
@@ -260,6 +267,8 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 		LastUsedAt:   time.Now(),
 		done:         make(chan struct{}),
 		status:       RuntimeStarting,
+		partLast:     make(map[string]int),
+		partType:     make(map[string]string),
 	}
 	m.runtimes[key] = rt
 	m.mu.Unlock()
@@ -334,6 +343,7 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 	rt.LastUsedAt = time.Now()
 	rt.mu.Unlock()
 	m.notify(rt)
+	m.subscribeSSE(ctx, rt)
 	return rt, nil
 }
 
@@ -357,6 +367,7 @@ func (m *OpenCodeRuntimeManager) watchRuntime(key string, rt *opencodeRuntime) {
 		}
 	}
 	rt.mu.Unlock()
+	m.stopSSE(rt)
 	m.notify(rt)
 	m.mu.Lock()
 	if m.runtimes[key] == rt {
@@ -364,6 +375,150 @@ func (m *OpenCodeRuntimeManager) watchRuntime(key string, rt *opencodeRuntime) {
 	}
 	m.mu.Unlock()
 	close(rt.done)
+}
+
+func (m *OpenCodeRuntimeManager) stopSSE(rt *opencodeRuntime) {
+	rt.mu.Lock()
+	cancel := rt.sseCancel
+	rt.sseCancel = nil
+	rt.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// opencodeSSEEvent mirrors the opencode /event SSE payload (discriminated by
+// "type"; relevant payload fields are kept).
+type opencodeSSEEvent struct {
+	Type string `json:"type"`
+	Properties struct {
+		SessionID string `json:"sessionID"`
+		MessageID string `json:"messageID"`
+		PartID    string `json:"partID"`
+		Field     string `json:"field"`
+		Delta     string `json:"delta"`
+		Part      struct {
+			ID    string `json:"id"`
+			Type  string `json:"type"`
+			Text  string `json:"text"`
+			State string `json:"state"`
+		} `json:"part"`
+	} `json:"properties"`
+}
+
+// subscribeSSE opens the opencode instance event stream and feeds console
+// events live. The stream is best-effort: it reconnects on errors and is
+// cancelled when the runtime stops.
+func (m *OpenCodeRuntimeManager) subscribeSSE(ctx context.Context, rt *opencodeRuntime) {
+	sseCtx, cancel := context.WithCancel(ctx)
+	rt.mu.Lock()
+	rt.sseCancel = cancel
+	rt.mu.Unlock()
+	go func() {
+		defer cancel()
+		client := &http.Client{}
+		for {
+			if opencodeRuntimeStopped(rt) {
+				return
+			}
+			req, err := http.NewRequestWithContext(sseCtx, http.MethodGet, rt.Endpoint+"/event", nil)
+			if err != nil {
+				return
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				if !opencodeSleepAbort(sseCtx, 2*time.Second) {
+					return
+				}
+				continue
+			}
+			sc := bufio.NewScanner(resp.Body)
+			sc.Buffer(make([]byte, 0, 1<<20), 4<<20)
+			for sc.Scan() {
+				line := strings.TrimSpace(sc.Text())
+				if !strings.HasPrefix(line, "data:") {
+					continue
+				}
+				var ev opencodeSSEEvent
+				if err := json.Unmarshal([]byte(strings.TrimSpace(strings.TrimPrefix(line, "data:"))), &ev); err != nil {
+					continue
+				}
+				m.handleSSEEvent(rt, ev)
+			}
+			_ = resp.Body.Close()
+			if !opencodeSleepAbort(sseCtx, 2*time.Second) {
+				return
+			}
+		}
+	}()
+}
+
+func opencodeRuntimeStopped(rt *opencodeRuntime) bool {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	return rt.status == RuntimeStopped || rt.status == RuntimeError
+}
+
+func opencodeSleepAbort(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(d):
+		return true
+	}
+}
+
+// handleSSEEvent routes opencode stream events into the Runtime Console.
+// Streaming text arrives as message.part.delta chunks; message.part.updated
+// carries the accumulated text (fed as the suffix not yet streamed), which
+// also reveals the part type (text vs reasoning).
+func (m *OpenCodeRuntimeManager) handleSSEEvent(rt *opencodeRuntime, ev opencodeSSEEvent) {
+	if rt.stream == nil {
+		return
+	}
+	switch ev.Type {
+	case "message.part.delta":
+		if ev.Properties.Field != "text" || ev.Properties.Delta == "" {
+			return
+		}
+		partID := ev.Properties.PartID
+		rt.mu.Lock()
+		category := "assistant"
+		if rt.partType[partID] == "reasoning" {
+			category = "reasoning"
+		}
+		rt.mu.Unlock()
+		rt.stream.append("message", partID, category, ev.Properties.Delta)
+	case "message.part.updated":
+		p := ev.Properties.Part
+		if p.ID == "" {
+			return
+		}
+		if p.Type != "text" && p.Type != "reasoning" {
+			rt.stream.flushNow()
+			return
+		}
+		category := "assistant"
+		if p.Type == "reasoning" {
+			category = "reasoning"
+		}
+		rt.mu.Lock()
+		rt.partType[p.ID] = p.Type
+		last := rt.partLast[p.ID]
+		rt.mu.Unlock()
+		if len(p.Text) > last {
+			rt.stream.append("message", p.ID, category, p.Text[last:])
+			rt.mu.Lock()
+			rt.partLast[p.ID] = len(p.Text)
+			rt.mu.Unlock()
+		} else {
+			rt.stream.flushNow()
+		}
+	case "message.part.removed":
+		rt.stream.flushNow()
+	case "session.idle", "message.updated", "session.status":
+		rt.stream.flushNow()
+	}
 }
 
 // Execute runs one orchestration node turn against the retained opencode

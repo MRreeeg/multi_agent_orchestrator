@@ -45,7 +45,9 @@
   - `POST /session/{id}/abort` → 中断（保留会话）；
   - `GET /session/{id}/message` → 历史（Runtime Console）；
   - `POST /session/{id}/permissions/{pid}` `{response:"deny"}` → 自动拒绝权限请求；
-  - 事件通过轮询 + Orchestrator SSE 唤醒（复用 codex/mimo Runtime Console 模式）。
+  - 实时事件：订阅 `GET /event`（SSE），解析 `message.part.delta` /
+    `message.part.updated` 喂入 Runtime Console（推理/回答分块）；
+    控制台轮询由前端负责（复用 codex/mimo Runtime Console 模式）。
 - 新 `internal/orchestrator/opencode_runtime.go`：
   - OpenCodeRuntimeManager：spawn、状态机（starting/idle/busy/error/stopped）、
     Runtime Console 快照、interrupt/stop；

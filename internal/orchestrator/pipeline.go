@@ -1491,6 +1491,7 @@ func (s *Store) SetEmitter(em event.Sink) {
 	}
 	codexRuntimeMgr.SetUpdateSink(mirrorRuntimeState)
 	mimoRuntimeMgr.SetUpdateSink(mirrorRuntimeState)
+	opencodeRuntimeMgr.SetUpdateSink(mirrorRuntimeState)
 }
 
 // emit sends an event if an emitter is configured; otherwise no-op.
