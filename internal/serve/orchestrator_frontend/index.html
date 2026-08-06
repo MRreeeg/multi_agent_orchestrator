@@ -983,9 +983,22 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 const chatMessages = $('#chat-messages');
 const chatInput = $('#chat-input');
-const chatSend = $('#chat-send');
+  const chatSend = $('#chat-send');
 const chatWelcome = $('#chat-welcome');
-const canvas = $('#canvas');
+
+// Clears conversation bubbles while keeping the hero (welcome) node alive.
+// Replacing innerHTML would detach #chat-welcome and leave a blank chat area.
+function resetChatToWelcome() {
+  Array.from(chatMessages.children).forEach(child => {
+    if (child.id !== 'chat-welcome') child.remove();
+  });
+  if (!chatMessages.querySelector('#chat-welcome')) {
+    chatMessages.appendChild(chatWelcome);
+  }
+  chatWelcome.style.display = '';
+}
+
+  const canvas = $('#canvas');
 const svgEdges = $('#svg-edges');
 const canvasWrap = $('#canvas-wrap');
 const configPanel = $('#config-panel');
@@ -2130,7 +2143,7 @@ function addChatMessage(role, text, meta, persist = true) {
 async function refreshChatHistory() {
   try {
     const msgs = await mainApi('GET', '/history');
-    chatMessages.innerHTML = '';
+    resetChatToWelcome();
     state.chatMessages = [];
     state.requirementMessages = [];
     state.pipelineMessages = [];
@@ -2152,7 +2165,7 @@ async function refreshChatHistory() {
 async function loadOrchestrationConversation(sessionID) {
   if (!sessionID) return false;
   const data = await apiGet('/orch-sessions/' + sessionID + '/conversation');
-  chatMessages.innerHTML = '';
+  resetChatToWelcome();
   state.chatMessages = [];
   state.requirementMessages = data.requirementMessages || [];
   state.pipelineMessages = data.pipelineMessages || [];
@@ -2780,7 +2793,7 @@ async function createNewOrchestrationSession(title) {
   localStorage.setItem('orchestrator-session-id', state.sessionID);
   console.log('[orch:init] new session id:', sess.id);
 
-  chatMessages.innerHTML = '';
+  resetChatToWelcome();
   state.chatMessages = [];
   state.nodeOutputs = {};
   state.rewrittenTask = '';
