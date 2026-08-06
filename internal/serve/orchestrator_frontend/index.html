@@ -1005,6 +1005,11 @@ function resetChatToWelcome() {
   if (!chatMessages.querySelector('#chat-welcome')) {
     chatMessages.appendChild(chatWelcome);
   }
+  // A hidden config panel must not reserve its grid column; otherwise the
+  // welcome hero centers inside a main area that is visibly wider.
+  if (configPanel.classList.contains('config--hidden')) {
+    $('#app').classList.add('app--no-config');
+  }
   showChatWelcome();
 }
 
@@ -4235,6 +4240,9 @@ async function init() {
   try { loadAgents(); } catch (e) { console.error('[init] loadAgents failed:', e); }
   try { loadRuns(); } catch (e) { console.error('[init] loadRuns failed:', e); }
   try { await refreshHistory(); } catch (e) { console.warn('[init] refreshHistory:', e); }
+  if (configPanel.classList.contains('config--hidden')) {
+    $('#app').classList.add('app--no-config');
+  }
   console.log('[init] done');
 }
 
