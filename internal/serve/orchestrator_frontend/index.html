@@ -688,6 +688,25 @@ input,textarea,select{font:inherit;color:inherit}
   </div>
 </div>
 
+<!-- Session name modal (new session / rename) -->
+<div class="modal-overlay" id="session-name-modal" style="display:none">
+  <div class="modal" style="width:min(420px,90vw)">
+    <div class="modal__head">
+      <span id="session-name-modal-title">新建会话</span>
+      <span class="modal__close" id="session-name-modal-close">&times;</span>
+    </div>
+    <div class="modal__body">
+      <input id="session-name-input" type="text" placeholder="会话名称"
+        style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--fg);font-size:13px;outline:none" />
+    </div>
+    <div class="modal__foot">
+      <button class="run-dash__btn" id="session-name-cancel">取消</button>
+      <button class="run-dash__btn" id="session-name-confirm"
+        style="background:var(--accent);color:oklch(99% 0 0);border-color:var(--accent)">确定</button>
+    </div>
+  </div>
+</div>
+
 <!-- Provider-neutral retained Runtime Console. One window per runtime can be
      open at a time; each window polls the orchestrator API (provider WebSocket
      credentials/endpoints stay server-side). -->
@@ -1314,6 +1333,26 @@ function renderSessionList(sessions) {
 
     const actions = document.createElement('div');
     actions.className = 'session-card__actions';
+    if (s.orchestrationSessionID) {
+      const renameBtn = document.createElement('button');
+      renameBtn.className = 'session-card__btn';
+      renameBtn.title = '重命名会话';
+      renameBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+      renameBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const oldTitle = s.orchestrationTitle || name;
+        const newTitle = await openSessionNameModal('重命名会话', oldTitle);
+        if (newTitle === null || newTitle === oldTitle) return;
+        try {
+          await apiPut('/orch-sessions/' + encodeURIComponent(s.orchestrationSessionID), { title: newTitle });
+          toast('会话已重命名: ' + newTitle, 'success');
+          await refreshHistory();
+        } catch (err) {
+          toast('重命名失败: ' + err.message, 'error');
+        }
+      });
+      actions.appendChild(renameBtn);
+    }
     if (s.current) {
       const span = document.createElement('span');
       span.style.cssText = 'font-size:10px;color:var(--accent);padding:0 6px';
@@ -2690,49 +2729,83 @@ function autoSaveState() {
   if (state.sessionID) saveOrchestratorState(state.sessionID);
 }
 
-$('#btn-new-session').addEventListener('click', async () => {
-  // In the desktop app native prompt()/confirm() render as browser dialogs;
-  // create the session directly (previous state is saved below) with a
-  // default title - rename later from history if needed.
-  try {
-    if (state.sessionID) {
-      try {
-        await saveOrchestratorState(state.sessionID);
-      } catch (saveErr) {
-        // The current session may have been removed by another server
-        // instance. Creating a new session should still be possible.
-        if (!String(saveErr.message || '').includes('404')) throw saveErr;
-        state.sessionID = null;
-        localStorage.removeItem('orchestrator-session-id');
-      }
-    }
-    // Create new orchestration session via new API
-    const title = '新编排会话';
-    const sess = await apiPost('/orch-sessions', {
-      title,
-      workspace: cwdDisplay && cwdDisplay.textContent !== '-' ? cwdDisplay.textContent : ''
-    });
-    state.sessionID = sess.id;
-    state.pipelineHydrated = true;
-    state.pipelineRevisionID = '';
-    state.pipelineId = null;
-    state.loadedLoopConfig = { enabled: false };
-    state.loopConfigDirty = false;
-    restoreLoopConfigUI({ enabled: false }, { markDirty: false });
-    localStorage.setItem('orchestrator-session-id', state.sessionID);
-    toast('已创建新会话（标题可在历史中重命名）', 'success');
-    console.log('[orch:init] new session id:', sess.id);
+// ── Session name modal (used by new-session and rename) ──
+let sessionNameModalResolve = null;
+function openSessionNameModal(titleLabel, defaultValue) {
+  $('#session-name-modal-title').textContent = titleLabel;
+  $('#session-name-input').value = defaultValue;
+  $('#session-name-modal').style.display = 'flex';
+  const input = $('#session-name-input');
+  input.focus();
+  input.select();
+  return new Promise(resolve => { sessionNameModalResolve = resolve; });
+}
+function closeSessionNameModal(result) {
+  $('#session-name-modal').style.display = 'none';
+  if (sessionNameModalResolve) {
+    const resolve = sessionNameModalResolve;
+    sessionNameModalResolve = null;
+    resolve(result);
+  }
+}
+$('#session-name-confirm').addEventListener('click', () => closeSessionNameModal($('#session-name-input').value.trim()));
+$('#session-name-cancel').addEventListener('click', () => closeSessionNameModal(null));
+$('#session-name-modal-close').addEventListener('click', () => closeSessionNameModal(null));
+$('#session-name-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSessionNameModal(null); });
+$('#session-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') closeSessionNameModal($('#session-name-input').value.trim());
+  else if (e.key === 'Escape') closeSessionNameModal(null);
+});
 
-    chatMessages.innerHTML = '';
-    chatWelcome.style.display = '';
-    state.chatMessages = [];
-    state.nodeOutputs = {};
-    state.rewrittenTask = '';
-    state.nodes.forEach(n => n.status = 'idle');
-    renderNodes();
-    renderEdges();
-    await refreshHistory();
-    toast('新会话已创建: ' + title, 'success');
+async function createNewOrchestrationSession(title) {
+  if (state.sessionID) {
+    try {
+      await saveOrchestratorState(state.sessionID);
+    } catch (saveErr) {
+      // The current session may have been removed by another server
+      // instance. Creating a new session should still be possible.
+      if (!String(saveErr.message || '').includes('404')) throw saveErr;
+      state.sessionID = null;
+      localStorage.removeItem('orchestrator-session-id');
+    }
+  }
+  // Create new orchestration session via new API
+  const sess = await apiPost('/orch-sessions', {
+    title,
+    workspace: cwdDisplay && cwdDisplay.textContent !== '-' ? cwdDisplay.textContent : ''
+  });
+  state.sessionID = sess.id;
+  state.pipelineHydrated = true;
+  state.pipelineRevisionID = '';
+  state.pipelineId = null;
+  state.loadedLoopConfig = { enabled: false };
+  state.loopConfigDirty = false;
+  restoreLoopConfigUI({ enabled: false }, { markDirty: false });
+  localStorage.setItem('orchestrator-session-id', state.sessionID);
+  console.log('[orch:init] new session id:', sess.id);
+
+  chatMessages.innerHTML = '';
+  state.chatMessages = [];
+  state.nodeOutputs = {};
+  state.rewrittenTask = '';
+  // A brand-new session starts from the initial welcome screen: empty canvas,
+  // empty conversation, chat panel active.
+  state.nodes = [];
+  state.edges = [];
+  state.nextNodeId = 1;
+  chatWelcome.style.display = '';
+  renderNodes();
+  renderEdges();
+  switchPanel('chat');
+  await refreshHistory();
+  toast('新会话已创建: ' + title, 'success');
+}
+
+$('#btn-new-session').addEventListener('click', async () => {
+  try {
+    const title = await openSessionNameModal('新建会话', '新编排会话');
+    if (title === null) return; // user canceled
+    await createNewOrchestrationSession(title || '新编排会话');
   } catch (err) {
     toast('创建新会话失败: ' + err.message, 'error');
   }
@@ -3242,7 +3315,12 @@ async function refreshRuntimeConsole(runtimeID) {
     const data = await apiGet('/runtimes/' + encodeURIComponent(runtimeID) + '/console');
     renderRuntimeConsole(runtimeID, data || {});
   } catch (err) {
-    modal.querySelector('.rc-events').textContent = '读取 Runtime Console 失败：' + (err.message || err);
+    // Do not wipe an already-rendered log on a transient API error; only show
+    // the failure when there is nothing to preserve.
+    const container = modal.querySelector('.rc-events');
+    if (container && !container.children.length) {
+      container.textContent = '读取 Runtime Console 失败：' + (err.message || err);
+    }
   }
 }
 
@@ -3268,36 +3346,99 @@ function renderRuntimeConsole(runtimeID, data) {
   modal.querySelector('.rc-output').textContent = data.output || data.error || '等待该 Runtime 的输出…';
   const events = Array.isArray(data.events) ? data.events : [];
   const container = modal.querySelector('.rc-events');
-  const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
-  container.innerHTML = events.map(e => {
-    const stamp = e.at ? new Date(e.at).toLocaleTimeString() : '--:--:--';
-    const detail = e.text || e.payload || '';
-    // Streaming deltas are already merged into one block per message by the
-    // backend; reasoning stays dim and collapsed-looking so the assistant
-    // answer is the visual focus.
-    const reasoning = e.category === 'reasoning';
-    const assistant = e.category === 'assistant';
-    const color = e.level === 'error' ? '#d1242f' : assistant ? '#0969da' : reasoning ? '#57606a' : '#57606a';
-    const prefix = reasoning ? '🧠 推理 · ' : assistant ? '💬 回答 · ' : '';
-    const label = (reasoning || assistant) ? prefix + (e.method || 'text') : (e.method || 'event');
-    if (reasoning || assistant) {
-      // QA content stays expanded.
-      return '<div style="padding:5px 4px;border-bottom:1px solid rgba(15,23,42,.07)">' +
-        '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
-        '<span style="color:' + color + (reasoning ? ';font-style:italic' : '') + '">' + escHtml(label) + '</span>' +
-        (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#57606a' : '#24292f') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
-        '</div>';
+  renderRuntimeEvents(container, events, modal);
+}
+
+function runtimeEventKey(e) {
+  return String(e.at || '') + '|' + String(e.method || '') + '|' + String(e.category || '');
+}
+
+function runtimeEventHtml(e) {
+  const stamp = e.at ? new Date(e.at).toLocaleTimeString() : '--:--:--';
+  const detail = e.text || e.payload || '';
+  // Streaming deltas are already merged into one block per message by the
+  // backend; reasoning stays dim and collapsed-looking so the assistant
+  // answer is the visual focus.
+  const reasoning = e.category === 'reasoning';
+  const assistant = e.category === 'assistant';
+  const color = e.level === 'error' ? '#d1242f' : assistant ? '#0969da' : reasoning ? '#57606a' : '#57606a';
+  const prefix = reasoning ? '🧠 推理 · ' : assistant ? '💬 回答 · ' : '';
+  const label = (reasoning || assistant) ? prefix + (e.method || 'text') : (e.method || 'event');
+  if (reasoning || assistant) {
+    // QA content stays expanded.
+    return '<div style="padding:5px 4px;border-bottom:1px solid rgba(15,23,42,.07)">' +
+      '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
+      '<span style="color:' + color + (reasoning ? ';font-style:italic' : '') + '">' + escHtml(label) + '</span>' +
+      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#57606a' : '#24292f') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
+      '</div>';
+  }
+  // Non-QA (system/tool/usage) events are folded; click to expand the raw log.
+  return '<details class="rc-ev">' +
+    '<summary><span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
+    '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
+    (e.level === 'error' ? ' <span style="color:#d1242f">⚠</span>' : '') +
+    '<span style="margin-left:auto;color:#8c959f">' + (detail ? '展开日志' : '') + '</span></summary>' +
+    (detail ? '<pre>' + escHtml(detail) + '</pre>' : '<pre style="color:#57606a">（无内容）</pre>') +
+    '</details>';
+}
+
+// Incremental renderer for the Runtime Console event list. Existing DOM nodes
+// are kept (so expanded <details> survive refreshes); only new events are
+// appended, and the scroll position is only advanced when the user is already
+// at the bottom.
+function renderRuntimeEvents(container, events, modal) {
+  const prev = modal._rcEvents || [];
+  const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+
+  // Detect non-append changes (fewer events, or a rewritten prefix) that
+  // require a full rebuild; preserve expanded state and scroll position.
+  let prefixDiffers = events.length < prev.length;
+  if (!prefixDiffers) {
+    for (let i = 0; i < prev.length; i++) {
+      if (runtimeEventKey(prev[i]) !== runtimeEventKey(events[i])) {
+        prefixDiffers = true;
+        break;
+      }
     }
-    // Non-QA (system/tool/usage) events are folded; click to expand the raw log.
-    return '<details class="rc-ev">' +
-      '<summary><span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
-      '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
-      (e.level === 'error' ? ' <span style="color:#d1242f">⚠</span>' : '') +
-      '<span style="margin-left:auto;color:#8c959f">' + (detail ? '展开日志' : '') + '</span></summary>' +
-      (detail ? '<pre>' + escHtml(detail) + '</pre>' : '<pre style="color:#57606a">（无内容）</pre>') +
-      '</details>';
-  }).join('') || '<div style="color:#8c959f;padding:8px">等待 Runtime 事件…</div>';
-  if (wasNearBottom) container.scrollTop = container.scrollHeight;
+  }
+
+  if (prefixDiffers || events.length === 0) {
+    const openStates = Array.from(container.querySelectorAll('details.rc-ev')).map(d => d.open);
+    const scrollTop = container.scrollTop;
+    container.innerHTML = events.map(runtimeEventHtml).join('') ||
+      '<div style="color:#8c959f;padding:8px">等待 Runtime 事件…</div>';
+    const details = container.querySelectorAll('details.rc-ev');
+    openStates.forEach((open, i) => { if (details[i]) details[i].open = open; });
+    container.scrollTop = Math.min(scrollTop, container.scrollHeight);
+  } else {
+    if (prev.length === 0) container.innerHTML = '';
+    // Update the last event(s) in place when the backend accumulates streaming
+    // deltas into the same logical event.
+    for (let i = 0; i < prev.length; i++) {
+      const oldText = String(prev[i].text || prev[i].payload || '');
+      const newText = String(events[i].text || events[i].payload || '');
+      if (oldText !== newText) {
+        const node = container.children[i];
+        if (node) {
+          const wasOpen = node.tagName === 'DETAILS' ? node.open : false;
+          const wrap = document.createElement('div');
+          wrap.innerHTML = runtimeEventHtml(events[i]);
+          const freshNode = wrap.firstElementChild;
+          if (freshNode && freshNode.tagName === 'DETAILS' && wasOpen) freshNode.open = true;
+          if (freshNode) node.replaceWith(freshNode);
+        }
+      }
+    }
+    // Append only the newly arrived events.
+    for (let i = prev.length; i < events.length; i++) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = runtimeEventHtml(events[i]);
+      const node = wrap.firstElementChild;
+      if (node) container.appendChild(node);
+    }
+    if (nearBottom) container.scrollTop = container.scrollHeight;
+  }
+  modal._rcEvents = events;
 }
 
 async function sendRuntimeConsoleMessage(runtimeID) {
