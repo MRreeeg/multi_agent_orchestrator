@@ -600,9 +600,10 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 				orchestrator.ExecutorMimo:     {"mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5"},
 				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
+				orchestrator.ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
 			},
 			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude},
+			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude, orchestrator.ExecutorOpencode},
 		},
 		{
 			Type:   orchestrator.NodeReviewer,
@@ -613,9 +614,10 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5"},
 				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
+				orchestrator.ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
 			},
 			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude},
+			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude, orchestrator.ExecutorOpencode},
 		},
 		{
 			Type:   orchestrator.NodeExecutor,
@@ -626,9 +628,10 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5", "xiaomi/mimo-v2.5-pro"},
 				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
+				orchestrator.ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
 			},
 			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude},
+			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude, orchestrator.ExecutorOpencode},
 		},
 	}
 	writeJSON(w, types)
@@ -709,6 +712,7 @@ func (h *orchestratorHandler) listRuntimes(w http.ResponseWriter, _ *http.Reques
 	all = append(all, orchestrator.ListReasonixRuntimes()...)
 	all = append(all, orchestrator.ListCodexRuntimes()...)
 	all = append(all, orchestrator.ListClaudeRuntimes()...)
+	all = append(all, orchestrator.ListOpencodeRuntimes()...)
 	writeJSON(w, all)
 }
 
@@ -726,6 +730,10 @@ func (h *orchestratorHandler) getRuntime(w http.ResponseWriter, _ *http.Request,
 		return
 	}
 	if rt, ok := orchestrator.GetClaudeRuntime(id); ok {
+		writeJSON(w, rt)
+		return
+	}
+	if rt, ok := orchestrator.GetOpencodeRuntime(id); ok {
 		writeJSON(w, rt)
 		return
 	}
@@ -749,6 +757,10 @@ func (h *orchestratorHandler) stopRuntime(w http.ResponseWriter, _ *http.Request
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if err := orchestrator.StopOpencodeRuntime(id); err == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	writeErr(w, "runtime not found", http.StatusNotFound)
 }
 
@@ -761,6 +773,10 @@ func (h *orchestratorHandler) getRuntimeConsole(w http.ResponseWriter, _ *http.R
 		return
 	}
 	if snapshot, ok := orchestrator.GetClaudeRuntimeConsole(id); ok {
+		writeJSON(w, snapshot)
+		return
+	}
+	if snapshot, ok := orchestrator.SnapshotOpencodeRuntime(id); ok {
 		writeJSON(w, snapshot)
 		return
 	}
@@ -791,11 +807,15 @@ func (h *orchestratorHandler) sendRuntimeMessage(w http.ResponseWriter, r *http.
 		return
 	}
 	turnID, err = orchestrator.SendClaudeRuntimeMessage(r.Context(), id, body.Text)
-	if err != nil {
+	if err == nil {
+		writeJSON(w, map[string]string{"turnID": turnID})
+		return
+	}
+	if err := orchestrator.SendOpencodeRuntimeMessage(id, body.Text); err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, map[string]string{"turnID": turnID})
+	writeJSON(w, map[string]string{"turnID": "manual"})
 }
 
 func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Request, id string) {
@@ -808,8 +828,10 @@ func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if err := orchestrator.InterruptClaudeRuntime(r.Context(), id); err != nil {
-		writeErr(w, err.Error(), http.StatusBadRequest)
-		return
+		if err := orchestrator.InterruptOpencodeRuntime(id); err != nil {
+			writeErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
