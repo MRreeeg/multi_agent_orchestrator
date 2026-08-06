@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -86,6 +87,17 @@ func restoreWindowPos(hwnd uintptr, defW, defH int) {
 }
 
 func main() {
+	// Share history with the browser start scripts (start-orchestrator.ps1 sets
+	// REASONIX_ORCHESTRATOR_DATA_DIR). The desktop binary lives in <repo>/bin,
+	// so default the persistence root to <repo>/.data/orchestrator unless the
+	// environment already points somewhere else.
+	if strings.TrimSpace(os.Getenv("REASONIX_ORCHESTRATOR_DATA_DIR")) == "" {
+		if exe, err := os.Executable(); err == nil {
+			root := filepath.Clean(filepath.Join(filepath.Dir(exe), "..", ".data", "orchestrator"))
+			_ = os.Setenv("REASONIX_ORCHESTRATOR_DATA_DIR", root)
+		}
+	}
+
 	bc := serve.NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})
 	defer ctrl.Close()

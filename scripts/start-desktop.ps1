@@ -4,6 +4,11 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 if (-not $env:GOPROXY) { $env:GOPROXY = "https://goproxy.cn,direct" }
+# Persist orchestrator history in <repo>/.data/orchestrator, same location as
+# the browser start script, so desktop and browser share the same history.
+if (-not $env:REASONIX_ORCHESTRATOR_DATA_DIR) {
+    $env:REASONIX_ORCHESTRATOR_DATA_DIR = Join-Path $root ".data\orchestrator"
+}
 if (-not (Test-Path "$root\bin")) { New-Item -ItemType Directory -Path "$root\bin" | Out-Null }
 Write-Host "[start-desktop] building orchestrator-app ..." -ForegroundColor Cyan
 go build -ldflags "-H=windowsgui" -o "$root\bin\orchestrator-app.exe" ./cmd/orchestrator-app

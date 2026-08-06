@@ -2813,7 +2813,8 @@ class webview2_com_handler
     : public ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler,
       public ICoreWebView2CreateCoreWebView2ControllerCompletedHandler,
       public ICoreWebView2WebMessageReceivedEventHandler,
-      public ICoreWebView2PermissionRequestedEventHandler {
+      public ICoreWebView2PermissionRequestedEventHandler,
+      public ICoreWebView2NewWindowRequestedEventHandler {
   using webview2_com_handler_cb_t =
       std::function<void(ICoreWebView2Controller *, ICoreWebView2 *webview)>;
 
@@ -3400,7 +3401,20 @@ private:
     // Script dialogs (confirm/prompt) stay enabled so confirmations still
     // work; the frontend avoids prompt() on the new-session flow.
     settings->put_AreDefaultContextMenusEnabled(FALSE);
-    settings->put_AreBrowserAcceleratorKeysEnabled(FALSE);
+    // AreBrowserAcceleratorKeysEnabled lives on ICoreWebView2Settings3
+    // (introduced in a newer SDK); query it defensively so older runtimes
+    // still work when the property is unavailable.
+    static const IID IID_ICoreWebView2Settings3_Local = {
+        0xfdb5ab74, 0xaf33, 0x4854,
+        {0x84, 0xf0, 0x0a, 0x63, 0x1d, 0xeb, 0x5e, 0xba}};
+    ICoreWebView2Settings3 *settings3 = nullptr;
+    HRESULT qir = settings->QueryInterface(
+        IID_ICoreWebView2Settings3_Local,
+        reinterpret_cast<void **>(&settings3));
+    if (SUCCEEDED(qir) && settings3 != nullptr) {
+      settings3->put_AreBrowserAcceleratorKeysEnabled(FALSE);
+      settings3->Release();
+    }
     init("window.external={invoke:s=>window.chrome.webview.postMessage(s)}");
     resize_webview();
     m_controller->put_IsVisible(TRUE);
