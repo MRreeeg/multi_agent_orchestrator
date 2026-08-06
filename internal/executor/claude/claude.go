@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"reasonix/internal/proc"
 )
 
 // ExecutorResult holds the result of a Claude CLI execution.
@@ -86,6 +88,9 @@ func (e *ClaudeExecutor) Exec(ctx context.Context, prompt string, opts ExecOptio
 	}
 
 	cmd := exec.CommandContext(ctx, bin, args...)
+	// One-shot claude -p must not flash a console window on Windows (the
+	// desktop app has no console to inherit).
+	proc.HideWindow(cmd)
 	if strings.TrimSpace(opts.Workspace) != "" {
 		cmd.Dir = opts.Workspace
 	}

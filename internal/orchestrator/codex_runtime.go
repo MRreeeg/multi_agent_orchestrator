@@ -324,6 +324,13 @@ func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart
 	for _, ov := range codexProfileOverrides(codexProfile(spec)) {
 		spawnArgs = append(spawnArgs, "-c", ov)
 	}
+	// Match run-mode trust semantics: trusted Loop nodes get full sandbox
+	// access so they can write deliverable files. Without this override the
+	// app-server inherits the read-only sandbox_mode default and every node
+	// produces output that can never be persisted to the workspace.
+	if spec.Trust {
+		spawnArgs = append(spawnArgs, "-c", "sandbox_mode=danger-full-access")
+	}
 	cmd := newRetainedRuntimeCommand(ctx, "codex", spawnArgs...)
 	cmd.Dir = spec.Workspace
 	cmd.Stdout = io.Discard
