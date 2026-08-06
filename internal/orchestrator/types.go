@@ -26,6 +26,7 @@ const (
 	ExecutorMimo     ExecutorType = "mimo"
 	ExecutorCodex    ExecutorType = "codex"
 	ExecutorClaude   ExecutorType = "claude"
+	ExecutorOpencode ExecutorType = "opencode"
 )
 
 // validateContextPolicy checks that a context policy value is valid.

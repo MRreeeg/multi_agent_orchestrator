@@ -575,3 +575,47 @@ func SendOpencodeRuntimeMessage(id, text string) error   { return opencodeRuntim
 func SnapshotOpencodeRuntime(id string) (*RuntimeConsoleSnapshot, bool) {
 	return opencodeRuntimeMgr.Snapshot(id)
 }
+
+// OpenCodePipelineExecutor executes a node via the opencode CLI.
+type OpenCodePipelineExecutor struct{}
+
+func (e *OpenCodePipelineExecutor) Name() string { return "opencode" }
+
+func (e *OpenCodePipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*ExecResult, error) {
+	if strings.EqualFold(strings.TrimSpace(spec.Mode), "run") {
+		return executeOpencodeRun(ctx, spec)
+	}
+	return opencodeRuntimeMgr.Execute(ctx, spec, onStart)
+}
+
+func executeOpencodeRun(ctx context.Context, spec ExecSpec) (*ExecResult, error) {
+	executor := &opencodeclient.Executor{}
+	opts := opencodeclient.ExecOptions{
+		Model:     spec.ModelRef,
+		Workspace: spec.Workspace,
+	}
+	if spec.ContextPolicy != "fresh" && spec.ContextPolicy != "fresh_per_run" {
+		opts.ResumeSessionID = strings.TrimSpace(spec.ExternalSessionID)
+	}
+	start := time.Now()
+	res, err := executor.Execute(ctx, opts, buildExecutorPrompt(spec))
+	duration := time.Since(start).Milliseconds()
+	if err != nil {
+		if res == nil {
+			return &ExecResult{ExitCode: -1}, err
+		}
+		return &ExecResult{ExitCode: res.ExitCode, RawStderr: res.Stderr}, err
+	}
+	result := &ExecResult{
+		ExitCode:          res.ExitCode,
+		FinalText:         res.Output,
+		RawStdout:         res.RawStdout,
+		RawStderr:         res.Stderr,
+		ExternalSessionID: res.SessionID,
+		DurationMs:        duration,
+	}
+	if res.TotalTokens > 0 {
+		result.TokenUsage = &TokenUsage{TotalTokens: int(res.TotalTokens)}
+	}
+	return result, nil
+}

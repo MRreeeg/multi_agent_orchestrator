@@ -26,6 +26,7 @@ import (
 	"reasonix/internal/agent"
 	"reasonix/internal/config"
 	"reasonix/internal/event"
+	"reasonix/internal/proc"
 	"reasonix/internal/provider"
 )
 
@@ -350,7 +351,12 @@ func readinessDiagnostics(endpoint string, hadTCPListener bool, lastHTTPStatus i
 // terminated by RuntimeManager.Stop or cleanupAll. The context is still passed
 // at the call site to make this lifecycle distinction explicit and testable.
 func newRetainedRuntimeCommand(_ context.Context, name string, args ...string) *exec.Cmd {
-	return exec.Command(name, args...)
+	cmd := exec.Command(name, args...)
+	// Retained runtimes (codex app-server / mimo acp / claude serve / reasonix
+	// serve) must not pop console windows on Windows; the desktop app has no
+	// console of its own to inherit.
+	proc.HideWindow(cmd)
+	return cmd
 }
 
 // runtimeExited reports whether the manager's Wait watcher observed process
@@ -394,7 +400,9 @@ func killProcessTree(cmd *exec.Cmd) {
 	}
 	if runtime.GOOS == "windows" {
 		pid := strconv.Itoa(cmd.Process.Pid)
-		if err := exec.Command("taskkill", "/T", "/F", "/PID", pid).Run(); err == nil {
+		kill := exec.Command("taskkill", "/T", "/F", "/PID", pid)
+		proc.HideWindow(kill)
+		if err := kill.Run(); err == nil {
 			return
 		}
 	}
@@ -709,6 +717,7 @@ func (o *synchronizedOutput) String() string {
 // waiting for cmd.Run() would burn tokens until the outer 30-minute timeout.
 func runMimoCommand(ctx context.Context, args []string, workspace string) (string, string, error) {
 	cmd := exec.Command("mimo", args...)
+	proc.HideWindow(cmd)
 	if strings.TrimSpace(workspace) != "" {
 		cmd.Dir = workspace
 	}
@@ -1139,6 +1148,7 @@ func executeReasonixRun(ctx context.Context, spec ExecSpec) (*ExecResult, error)
 	// context is still used for startup readiness and task HTTP requests; the
 	// process itself is stopped explicitly by RuntimeManager.Stop.
 	cmd := exec.CommandContext(ctx, bin, args...)
+	proc.HideWindow(cmd)
 	if spec.Workspace != "" {
 		cmd.Dir = spec.Workspace
 	}
@@ -1392,6 +1402,7 @@ var (
 		ExecutorMimo:     &MimoExecutor{},
 		ExecutorCodex:    &CodexPipelineExecutor{},
 		ExecutorClaude:   &ClaudePipelineExecutor{},
+		ExecutorOpencode: &OpenCodePipelineExecutor{},
 	}
 	executorsMu sync.Mutex
 )
@@ -3230,8 +3241,8 @@ func resolveExecutorModelRef(workspace string, executor ExecutorType, mode strin
 	switch executor {
 	case ExecutorMimo:
 		return normalizeMimoExecutionModelRef(workspace, model)
-	case ExecutorCodex, ExecutorClaude:
-		// Codex/Claude pass model refs through verbatim: the CLI owns provider
+	case ExecutorCodex, ExecutorClaude, ExecutorOpencode:
+		// Codex/Claude/opencode pass model refs through verbatim: the CLI owns provider
 		// resolution (deepseek-v4-flash, gpt-5.6-luna, o3, ...). They must NOT
 		// be run through the Reasonix config resolver, which rewrites bare
 		// model names into "provider/model" pairs (e.g. deepseek-v4-flash ->
@@ -3321,6 +3332,20 @@ func validateNodeExecutionConfigAtWorkspaceWithRoute(executor ExecutorType, mode
 		}
 		if providerRoute != "" && !ccswitchRoute {
 			return fmt.Errorf("unsupported claude provider route %q; use ccswitch", providerRoute)
+		}
+	case ExecutorOpencode:
+		// `run` is the one-shot `opencode run --format json` path. `serve` is
+		// the retained `opencode serve` HTTP runtime owned by
+		// OpenCodeRuntimeManager. Models are provider/model refs passed
+		// through verbatim (opencode/deepseek-v4-flash-free, deepseek/deepseek-v4-flash).
+		if mode != "run" && mode != "serve" {
+			return fmt.Errorf("unsupported opencode mode %q; supported modes are run and serve", mode)
+		}
+		if strings.TrimSpace(model) == "" {
+			return fmt.Errorf("model is required for opencode executor")
+		}
+		if !strings.Contains(model, "/") {
+			return fmt.Errorf("opencode executor requires provider/model ref (e.g. opencode/deepseek-v4-flash-free)")
 		}
 	}
 	return nil
@@ -4061,6 +4086,7 @@ func (s *Store) understandTask(ctx context.Context, task string, pipe *Pipeline)
 
 	bin := findReasonixBin()
 	cmd := exec.CommandContext(ctx, bin, "run", "--model", "deepseek-flash", prompt)
+	proc.HideWindow(cmd)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 
