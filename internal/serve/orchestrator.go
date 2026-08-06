@@ -213,7 +213,7 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		}
 
 	// Runtimes within orchestration session
-	case strings.HasSuffix(path, "/runtimes") && r.Method == http.MethodGet:
+	case strings.HasPrefix(path, "/orch-sessions/") && strings.HasSuffix(path, "/runtimes") && r.Method == http.MethodGet:
 		sessionID := strings.TrimSuffix(strings.TrimPrefix(path, "/orch-sessions/"), "/runtimes")
 		h.listOrchRuntimes(w, r, sessionID)
 

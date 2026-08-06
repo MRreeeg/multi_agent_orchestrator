@@ -77,7 +77,13 @@ func (c *Client) Prompt(ctx context.Context, sessionID, model, prompt string) (s
 		"parts": []map[string]string{{"type": "text", "text": prompt}},
 	}
 	if model != "" {
-		payload["model"] = model
+		// opencode expects the model as an object: {providerID, modelID}.
+		parts := strings.SplitN(model, "/", 2)
+		if len(parts) == 2 {
+			payload["model"] = map[string]string{"providerID": parts[0], "modelID": parts[1]}
+		} else {
+			payload["model"] = model
+		}
 	}
 	body, _ := json.Marshal(payload)
 	resp, err := c.post(ctx, "/session/"+sessionID+"/message", body)

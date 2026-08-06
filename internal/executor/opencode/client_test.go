@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -64,5 +65,26 @@ func TestClientHistory(t *testing.T) {
 	msgs, err := c.History(context.Background(), "ses_test")
 	if err != nil || len(msgs) != 1 || msgs[0].Text != "hi" {
 		t.Fatalf("History = %+v, %v", msgs, err)
+	}
+}
+
+func TestClientPromptModelObject(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/session/ses_test/message" {
+			buf := make([]byte, r.ContentLength)
+			_, _ = r.Body.Read(buf)
+			gotBody = string(buf)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"info":{"id":"m1"},"parts":[{"type":"text","text":"ok"}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, _ = c.Prompt(context.Background(), "ses_test", "opencode/deepseek-v4-flash-free", "hi")
+	if !strings.Contains(gotBody, `"providerID":"opencode"`) || !strings.Contains(gotBody, `"modelID":"deepseek-v4-flash-free"`) {
+		t.Fatalf("model was not sent as object: %s", gotBody)
 	}
 }
