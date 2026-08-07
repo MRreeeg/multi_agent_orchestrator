@@ -85,7 +85,8 @@ input,textarea,select{font:inherit;color:inherit}
 /* ── Main area ── */
 .main{grid-column:2;overflow:hidden;position:relative}
 .panel{display:none;height:100%;overflow:hidden}
-.panel--active{display:flex;flex-direction:column}
+.panel--active{display:flex;flex-direction:column;animation:panel-in .22s ease}
+@keyframes panel-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ── Config panel (right) ── */
 .config{grid-column:3;background:var(--bg-2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
@@ -115,10 +116,14 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__welcome svg{width:40px;height:40px;opacity:.3}
 .chat__welcome-title{font-family:var(--heading);font-size:16px;font-weight:600;color:var(--fg-2)}
 .chat__welcome-desc{font-size:13px;text-align:center;max-width:320px}
-.chat-bubble{max-width:720px;animation:msg-in .25s ease}
+.chat-bubble{width:90%;max-width:1080px;animation:msg-in .25s ease}
 @keyframes msg-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .chat-bubble--user{align-self:flex-end}
+.chat-bubble--user{width:78%;max-width:1080px}
+.chat-bubble--user{margin-left:auto}
+.chat-bubble--ai{margin-right:auto}
 .chat-bubble__inner{padding:10px 14px;border-radius:var(--radius-lg);font-size:13.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.chat-bubble__inner{font-size:14.5px;line-height:1.75}
 .chat-bubble--user .chat-bubble__inner{background:var(--accent-soft);color:var(--fg);border:1px solid oklch(68% .16 38/.2)}
 .chat-bubble--ai .chat-bubble__inner{background:var(--card);color:var(--fg-2);border:1px solid var(--border)}
 .chat-bubble__inner h2,.chat-bubble__inner h3,.chat-bubble__inner h4{margin:8px 0 4px;font-weight:700;line-height:1.35}
@@ -130,6 +135,10 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__inner pre{margin:6px 0;padding:8px 10px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;overflow:auto;font-size:12px;line-height:1.5}
 .chat-bubble__inner pre code{border:none;background:none;padding:0}
 .chat-bubble__inner a{color:var(--accent)}
+.chat-bubble__inner blockquote{margin:6px 0;padding:6px 12px;border-left:3px solid var(--accent);background:var(--bg-2);border-radius:0 6px 6px 0;color:var(--muted)}
+.chat-bubble__inner table{border-collapse:collapse;margin:6px 0;font-size:13px;width:100%}
+.chat-bubble__inner th,.chat-bubble__inner td{border:1px solid var(--border);padding:5px 9px;text-align:left}
+.chat-bubble__inner th{background:var(--bg-2);font-weight:600}
 .chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
 .chat-bubble--user .chat-bubble__meta{text-align:right}
 .chat__input-bar{border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;background:var(--bg)}
@@ -340,8 +349,11 @@ input,textarea,select{font:inherit;color:inherit}
 .toast--error{border-color:var(--danger);background:var(--danger-soft);color:var(--danger)}
 
 /* ── Modal overlay ── */
-.modal-overlay{position:fixed;inset:0;background:oklch(0% 0 0/.55);display:flex;align-items:center;justify-content:center;z-index:100;animation:msg-in .15s ease}
+.modal-overlay{position:fixed;inset:0;background:oklch(0% 0 0/.55);display:flex;align-items:center;justify-content:center;z-index:100;animation:fade-in .18s ease}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
 .modal{background:var(--panel);border:1px solid var(--border-strong);border-radius:var(--radius-lg);width:min(520px,90vw);max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal{animation:modal-in .22s cubic-bezier(.16,1,.3,1)}
+@keyframes modal-in{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
 .modal__head{padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--heading);font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}
 .modal__close{margin-left:auto;cursor:pointer;color:var(--muted-2);width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .15s}
 .modal__close:hover{background:var(--card-hover);color:var(--fg)}
@@ -1348,7 +1360,10 @@ function renderSessionList(sessions) {
     historyList.innerHTML = '<div class="history-empty">暂无历史会话</div>';
     return;
   }
-  const sorted = sessions.slice().sort((a, b) => (Number(b.modTime) || 0) - (Number(a.modTime) || 0));
+  // The currently open session stays pinned on top; the rest follow recency.
+  const sorted = sessions.slice().sort((a, b) =>
+    (b.current ? 1 : 0) - (a.current ? 1 : 0) ||
+    (Number(b.modTime) || 0) - (Number(a.modTime) || 0));
   const maxVisible = 200;
   const visible = sorted.slice(0, maxVisible);
   historyList.innerHTML = '';
@@ -2112,9 +2127,10 @@ function renderLoopOverlay() {
 }
 
 // ── Auto layout ──
-$('#btn-auto-layout').addEventListener('click', () => {
+// Left-to-right topological layout, centered inside the canvas so generated
+// pipelines appear in the middle of the editor instead of the top-left.
+function applyAutoLayout() {
   if (state.nodes.length === 0) return;
-  // Simple left-to-right topological layout
   const levels = {};
   const visited = new Set();
   function getLevel(id) {
@@ -2135,13 +2151,16 @@ $('#btn-auto-layout').addEventListener('click', () => {
   });
   Object.keys(byLevel).forEach(l => {
     byLevel[l].forEach((n, i) => {
-      n.x = 60 + parseInt(l) * 240;
-      n.y = 40 + i * 120;
+      n.x = parseInt(l) * 240;
+      n.y = i * 120;
     });
   });
+  centerPipelineGraph();
   renderNodes();
   renderEdges();
-});
+}
+
+$('#btn-auto-layout').addEventListener('click', applyAutoLayout);
 
 // ── Chat ──
 // Lightweight Markdown renderer for chat bubbles. Input is escaped first, so
@@ -2161,6 +2180,8 @@ function renderMarkdown(text) {
   let codeBuf = [];
   let listType = null;
   let listBuf = [];
+  let tableBuf = null;
+  let bqBuf = null;
   const flushList = () => {
     if (listBuf.length) {
       html += '<' + listType + '>' + listBuf.map(i => '<li>' + inlineMd(i) + '</li>').join('') + '</' + listType + '>';
@@ -2185,6 +2206,25 @@ function renderMarkdown(text) {
       codeBuf.push(line);
       continue;
     }
+    if (line.startsWith('|')) {
+      if (!tableBuf) tableBuf = [];
+      tableBuf.push(line);
+      continue;
+    }
+    if (tableBuf) {
+      html += renderTable(tableBuf);
+      tableBuf = null;
+    }
+    const bq = line.match(/^&gt;\s?(.*)$/);
+    if (bq) {
+      if (!bqBuf) bqBuf = [];
+      bqBuf.push(bq[1] || '');
+      continue;
+    }
+    if (bqBuf) {
+      html += '<blockquote>' + bqBuf.map(b => '<p>' + inlineMd(b) + '</p>').join('') + '</blockquote>';
+      bqBuf = null;
+    }
     const h = line.match(/^(#{1,4})\s+(.*)$/);
     if (h) {
       flushList();
@@ -2208,8 +2248,23 @@ function renderMarkdown(text) {
     html += '<p>' + inlineMd(line.trim()) + '</p>';
   }
   if (inCode) html += '<pre><code>' + codeBuf.join('\n') + '</code></pre>';
+  if (tableBuf) html += renderTable(tableBuf);
+  if (bqBuf) html += '<blockquote>' + bqBuf.map(b => '<p>' + inlineMd(b) + '</p>').join('') + '</blockquote>';
   flushList();
   return html;
+}
+
+function renderTable(rows) {
+  const cells = r => r.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => inlineMd(c.trim()));
+  let header = null;
+  let body = rows;
+  if (rows.length >= 2 && /^[\s|:\-]+$/.test(rows[1]) && rows[1].includes('-')) {
+    header = cells(rows[0]);
+    body = rows.slice(2);
+  }
+  let h = '<table>' + (header ? '<thead><tr>' + header.map(c => '<th>' + c + '</th>').join('') + '</tr></thead>' : '') + '<tbody>';
+  body.forEach(r => { h += '<tr>' + cells(r).map(c => '<td>' + c + '</td>').join('') + '</tr>'; });
+  return h + '</tbody></table>';
 }
 
 function addChatMessage(role, text, meta, persist = true) {
@@ -2577,18 +2632,36 @@ function layoutPipeline() {
     if (!byLevel[l]) byLevel[l] = [];
     byLevel[l].push(n);
   });
-  // 放置
+  // 放置（相对坐标，随后整体居中到画布）
   const LEVEL_W = 250;
   const NODE_H = 80;
   Object.keys(byLevel).forEach(l => {
     const nodes = byLevel[l];
-    const totalH = nodes.length * NODE_H;
-    const startY = (200 - totalH) / 2;
     nodes.forEach((n, i) => {
-      n.x = 60 + parseInt(l) * LEVEL_W;
-      n.y = startY + i * (NODE_H + 40);
+      n.x = parseInt(l) * LEVEL_W;
+      n.y = i * (NODE_H + 40);
     });
   });
+  centerPipelineGraph();
+}
+
+// Translates the whole pipeline graph so its bounding box sits in the middle
+// of the canvas viewport (falls back to a 900x520 virtual canvas).
+function centerPipelineGraph() {
+  if (!state.nodes.length) return;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  state.nodes.forEach(n => {
+    minX = Math.min(minX, n.x);
+    maxX = Math.max(maxX, n.x + 190);
+    minY = Math.min(minY, n.y);
+    maxY = Math.max(maxY, n.y + 80);
+  });
+  const wrap = $('#canvas-wrap');
+  const wrapW = wrap ? Math.max(wrap.clientWidth, 900) : 900;
+  const wrapH = wrap ? Math.max(wrap.clientHeight, 520) : 520;
+  const dx = Math.max(0, (wrapW - (maxX - minX)) / 2 - minX);
+  const dy = Math.max(0, (wrapH - (maxY - minY)) / 2 - minY);
+  state.nodes.forEach(n => { n.x += dx; n.y += dy; });
 }
 
 chatSend.addEventListener('click', sendChat);
@@ -2768,6 +2841,7 @@ async function loadOrchestratorState(sessionID) {
       }
       state.nextNodeId = Math.max(1, ...state.nodes.map(n => Number(n.id) || 0)) + 1;
       backfillRuntimeToNodes();
+      applyAutoLayout();
       renderNodes();
       renderEdges();
       state.loopConfigDirty = false;
@@ -3794,6 +3868,7 @@ presetSelect.addEventListener('change', async () => {
   console.log('[preset-change] state.nodes now:', state.nodes.length, 'rendering...');
   switchPanel('pipeline');
   requestAnimationFrame(() => {
+    applyAutoLayout();
     renderNodes();
     renderEdges();
     console.log('[preset-change] done, canvas children:', canvas.children.length, 'canvas dims:', canvas.offsetWidth, 'x', canvas.offsetHeight);
