@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -283,13 +284,18 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 		m.notify(rt)
 	})
 
+	bin := opencodeclient.DiscoverBin()
+	if bin == "" {
+		bin = "opencode"
+	}
 	args := []string{"serve", "--port", fmt.Sprint(port), "--hostname", "127.0.0.1"}
-	cmd := newRetainedRuntimeCommand(ctx, "opencode", args...)
+	cmd := newRetainedRuntimeCommand(ctx, bin, args...)
 	if spec.Workspace != "" {
 		cmd.Dir = spec.Workspace
 	}
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
+	slog.Info("opencode serve: spawning", "bin", bin, "port", port, "workspace", spec.Workspace)
 	if err := cmd.Start(); err != nil {
 		m.dropRuntime(key, rt)
 		return nil, fmt.Errorf("start opencode serve: %w", err)
@@ -306,7 +312,10 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 	rt.client = client
 	rt.mu.Unlock()
 
-	// Wait for the server health endpoint.
+	// Wait for the server health endpoint. The polling loop also watches
+	// rt.done: the watcher closes it when the process exits, so a crash on
+	// startup (bad binary, port conflict, missing login) fails fast with the
+	// captured stderr instead of spinning for the full 60s against a corpse.
 	deadline := time.Now().Add(60 * time.Second)
 	for {
 		healthy := false
@@ -325,8 +334,21 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 		if healthy {
 			break
 		}
+		select {
+		case <-rt.done:
+			rt.mu.Lock()
+			exitErr := rt.lastErr
+			rt.mu.Unlock()
+			if exitErr == "" {
+				exitErr = "process exited"
+			}
+			diagnostic := truncateStderr(stderr.String())
+			m.Stop(rt.ID)
+			return nil, fmt.Errorf("opencode serve exited before becoming healthy: %s; stderr: %s", exitErr, diagnostic)
+		default:
+		}
 		if time.Now().After(deadline) {
-			diagnostic := strings.TrimSpace(stderr.String())
+			diagnostic := truncateStderr(stderr.String())
 			m.Stop(rt.ID)
 			return nil, fmt.Errorf("opencode serve did not become healthy within 60s: %s", diagnostic)
 		}
@@ -342,9 +364,19 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 	rt.status = RuntimeIdle
 	rt.LastUsedAt = time.Now()
 	rt.mu.Unlock()
+	slog.Info("opencode serve: healthy", "port", port, "runtime", rt.ID)
 	m.notify(rt)
 	m.subscribeSSE(ctx, rt)
 	return rt, nil
+}
+
+// truncateStderr keeps startup diagnostics bounded; opencode banners can
+// exceed what is useful in an error string.
+func truncateStderr(s string) string {
+	if len(s) > 2000 {
+		return s[:2000] + "..."
+	}
+	return s
 }
 
 func (m *OpenCodeRuntimeManager) dropRuntime(key string, rt *opencodeRuntime) {

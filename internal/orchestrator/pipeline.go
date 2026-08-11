@@ -3447,6 +3447,7 @@ func listInstalledMimoModels() []string {
 		return append([]string(nil), mimoModelsCache.models...)
 	}
 	cmd := exec.Command("mimo", "models")
+	proc.HideWindow(cmd)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = io.Discard

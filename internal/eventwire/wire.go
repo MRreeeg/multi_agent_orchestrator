@@ -347,4 +347,6 @@ var kindNames = map[event.Kind]string{
 	event.PipelineNodeFailed:       "pipeline_node_failed",
 	event.PipelineNodeRuntime:      "pipeline_node_runtime",
 	event.PipelineDone:             "pipeline_done",
+	event.PipelineIteration:        "pipeline_iteration",
+	event.AnalyzeProgress:          "analyze_progress",
 }

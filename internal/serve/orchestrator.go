@@ -19,11 +19,15 @@ import (
 
 	"reasonix/internal/event"
 	"reasonix/internal/orchestrator"
+	"reasonix/internal/proc"
 )
 
 // orchestratorHandler routes /orchestrator/api/* requests to the store.
 type orchestratorHandler struct {
 	store *orchestrator.Store
+	// emitter forwards progress/status events (e.g. analyze_progress) to the
+	// SSE frontend. May be nil in tests.
+	emitter event.Sink
 
 	// Loading the complete directory tree synchronously made the first browser
 	// request wait for tens of thousands of JSON files. Keep the small index
@@ -44,6 +48,7 @@ func legacyPersistPath() string {
 func newOrchestratorHandler(emitter event.Sink) *orchestratorHandler {
 	h := &orchestratorHandler{
 		store:          orchestrator.NewStore(),
+		emitter:        emitter,
 		loadedSessions: make(map[string]bool),
 	}
 	h.store.SetEmitter(emitter)
@@ -294,6 +299,20 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// emitAnalyzeProgress forwards one analyze progress event to the SSE frontend
+// (no-op when the handler has no emitter, e.g. in tests).
+func (h *orchestratorHandler) emitAnalyzeProgress(stage string, elapsedSec, attempt int, line string) {
+	if h.emitter == nil {
+		return
+	}
+	lineJSON, _ := json.Marshal(line)
+	h.emitter.Emit(event.Event{
+		Kind:   event.AnalyzeProgress,
+		Text:   stage,
+		Detail: fmt.Sprintf(`{"elapsed":%d,"attempt":%d,"line":%s}`, elapsedSec, attempt, lineJSON),
+	})
+}
+
 // writeErr writes a text error response.
 func writeErr(w http.ResponseWriter, msg string, code int) {
 	http.Error(w, msg, code)
@@ -304,6 +323,54 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// spawnReasonixAnalysis runs a `reasonix run --model deepseek-flash` subprocess
+// with the prompt on stdin. Every spawn hides the console window so the
+// desktop app (GUI subsystem) does not flash a black window while analyzing.
+// onProgress, when non-nil, is called with each non-empty stdout line while
+// the subprocess runs (reasonix run streams thinking text to stdout before the
+// final JSON), letting the frontend show live progress.
+func spawnReasonixAnalysis(ctx context.Context, bin, workDir, prompt string, onProgress func(line string)) (string, string, error) {
+	cmd := exec.CommandContext(ctx, bin, "run", "--model", "deepseek-flash")
+	proc.HideWindow(cmd)
+	cmd.Dir = workDir
+	cmd.Stdin = strings.NewReader(prompt)
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", "", err
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return "", "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", "", err
+	}
+	var stdout bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sc := bufio.NewScanner(stdoutPipe)
+		sc.Buffer(make([]byte, 0, 1<<20), 4<<20)
+		for sc.Scan() {
+			line := sc.Text()
+			stdout.WriteString(line + "\n")
+			if onProgress != nil && strings.TrimSpace(line) != "" {
+				onProgress(line)
+			}
+		}
+	}()
+	stderrBytes, _ := io.ReadAll(stderrPipe)
+	<-done
+	errMsg := string(stderrBytes)
+	if err := cmd.Wait(); err != nil {
+		if errMsg == "" {
+			errMsg = err.Error()
+		}
+		return stdout.String(), errMsg, fmt.Errorf("%s", errMsg)
+	}
+	return stdout.String(), errMsg, nil
 }
 
 // cleanJSON fixes corrupted UTF-8 bytes and broken \uXXXX escape sequences
@@ -545,24 +612,21 @@ Run ID: %s
 	ctx, cancel := context.WithTimeout(r.Context(), analysisTimeout)
 	defer cancel()
 	slog.Info("analyzeRunProgress: starting", "run", id, "attempts", len(attempts), "prompt_len", len(prompt))
-	cmd := exec.CommandContext(ctx, bin, "run", "--model", "deepseek-flash")
-	cmd.Dir = workDir
-	cmd.Stdin = strings.NewReader(prompt)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		errMsg := stderr.String()
-		if errMsg == "" {
-			errMsg = err.Error()
-		}
+	h.emitAnalyzeProgress("spawning", 0, 1, "")
+	start := time.Now()
+	stdout, errMsg, err := spawnReasonixAnalysis(ctx, bin, workDir, prompt, func(line string) {
+		h.emitAnalyzeProgress("thinking", int(time.Since(start).Seconds()), 1, line)
+	})
+	if err != nil {
+		h.emitAnalyzeProgress("failed", int(time.Since(start).Seconds()), 1, errMsg)
 		slog.Error("analyzeRunProgress failed", "err", errMsg, "run", id)
 		writeErr(w, "analysis failed: "+errMsg, http.StatusInternalServerError)
 		return
 	}
+	h.emitAnalyzeProgress("done", int(time.Since(start).Seconds()), 1, "")
 
 	var result map[string]any
-	scanner := bufio.NewScanner(strings.NewReader(stdout.String()))
+	scanner := bufio.NewScanner(strings.NewReader(stdout))
 	var lastJSON string
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -1009,27 +1073,21 @@ Agent角色:
 	// Log input dimensions for debugging second-call failures
 	slog.Info("analyze: starting", "history_count", len(body.History), "prompt_len", len(prompt), "text_len", len(body.Text))
 	// Pass prompt via stdin to avoid Windows 32K command-line length limit.
-	// Pass prompt via stdin to avoid Windows 32K command-line length limit.
-	runOnce := func(p string) (string, error) {
-		cmd := exec.CommandContext(ctx, bin, "run", "--model", "deepseek-flash")
-		cmd.Dir = workDir
-		cmd.Stdin = strings.NewReader(p)
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-		if err := cmd.Run(); err != nil {
-			errMsg := stderr.String()
-			if errMsg == "" {
-				errMsg = err.Error()
-			}
-			slog.Error("analyze failed", "err", errMsg, "bin", bin, "stdout", truncate(stdout.String(), 200))
+	runOnce := func(attempt int, p string) (string, error) {
+		start := time.Now()
+		stdout, errMsg, err := spawnReasonixAnalysis(ctx, bin, workDir, p, func(line string) {
+			h.emitAnalyzeProgress("thinking", int(time.Since(start).Seconds()), attempt, line)
+		})
+		if err != nil {
+			h.emitAnalyzeProgress("failed", int(time.Since(start).Seconds()), attempt, errMsg)
+			slog.Error("analyze failed", "err", errMsg, "bin", bin, "stdout", truncate(stdout, 200))
 			return "", fmt.Errorf("%s", errMsg)
 		}
-		slog.Info("analyze: subprocess completed", "stdout_len", stdout.Len())
+		slog.Info("analyze: subprocess completed", "stdout_len", len(stdout))
 		// Parse the JSON response. reasonix run outputs thinking text BEFORE the
 		// JSON and token stats AFTER it; find the LAST complete JSON object
 		// containing the "analysis" key.
-		raw := stdout.String()
+		raw := stdout
 		var jsonStr string
 		for k := 0; k < len(raw); k++ {
 			if raw[k] != '{' {
@@ -1062,17 +1120,20 @@ Agent角色:
 		}
 		return jsonStr, nil
 	}
-	jsonStr, err := runOnce(prompt)
+	h.emitAnalyzeProgress("spawning", 0, 1, "")
+	jsonStr, err := runOnce(1, prompt)
 	if err != nil {
 		// Retry once with a strict instruction; models often emit thinking text
 		// on the first attempt which then lacks the analysis JSON.
+		h.emitAnalyzeProgress("retrying", 0, 2, "")
 		strict := prompt + "\n\n重要：你必须只输出一个 JSON 对象，禁止输出思考过程、解释或 Markdown 代码围栏。"
-		jsonStr, err = runOnce(strict)
+		jsonStr, err = runOnce(2, strict)
 		if err != nil {
 			writeErr(w, "analysis failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
+	h.emitAnalyzeProgress("done", 0, 0, "")
 	// Fix corrupted UTF-8 and escape sequences from model output
 	raw := cleanJSON(jsonStr)
 
@@ -1149,23 +1210,14 @@ func (h *orchestratorHandler) expandRequirement(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	cmd := exec.Command(bin, "run", "--model", "deepseek-flash", prompt)
-	cmd.Dir = workDir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		errMsg := stderr.String()
-		if errMsg == "" {
-			errMsg = err.Error()
-		}
+	stdout, errMsg, err := spawnReasonixAnalysis(context.Background(), bin, workDir, prompt, nil)
+	if err != nil {
 		slog.Error("expand requirement failed", "err", errMsg)
 		writeJSON(w, map[string]string{"expanded": body.Text}) // fallback to original
 		return
 	}
 
-	expanded := strings.TrimSpace(stdout.String())
+	expanded := strings.TrimSpace(stdout)
 	if expanded == "" {
 		expanded = body.Text
 	}
@@ -1217,6 +1269,7 @@ func (h *orchestratorHandler) understandRequirement(w http.ResponseWriter, r *ht
 5. 审查者只审查不修改`
 
 	bin := "reasonix"
+	workDir := "."
 	if exe, err := os.Executable(); err == nil {
 		bin = filepath.Join(filepath.Dir(exe), "reasonix.exe")
 		if _, statErr := os.Stat(bin); statErr != nil {
@@ -1227,17 +1280,10 @@ func (h *orchestratorHandler) understandRequirement(w http.ResponseWriter, r *ht
 				bin = lp
 			}
 		}
+		workDir = filepath.Dir(exe)
 	}
-	cmd := exec.Command(bin, "run", "--model", "deepseek-flash", prompt)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		errMsg := stderr.String()
-		if errMsg == "" {
-			errMsg = err.Error()
-		}
+	stdout, errMsg, err := spawnReasonixAnalysis(context.Background(), bin, workDir, prompt, nil)
+	if err != nil {
 		slog.Error("understand requirement failed", "err", errMsg)
 		// Fallback: return original text and roles
 		roles := make([]map[string]string, len(body.Nodes))
@@ -1249,7 +1295,7 @@ func (h *orchestratorHandler) understandRequirement(w http.ResponseWriter, r *ht
 	}
 
 	// Parse the JSON response from Flash
-	raw := strings.TrimSpace(stdout.String())
+	raw := strings.TrimSpace(stdout)
 	// Remove markdown code block if present
 	raw = strings.TrimPrefix(raw, "```json")
 	raw = strings.TrimPrefix(raw, "```")

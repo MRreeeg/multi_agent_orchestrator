@@ -112,6 +112,11 @@ const (
 	// PipelineIteration signals a Loop iteration began. Text carries the run id,
 	// Detail carries JSON with runID/iteration/maxIterations. Appended last.
 	PipelineIteration
+	// AnalyzeProgress signals progress of an in-flight AI analysis subprocess
+	// (requirement analysis or run-progress analysis). Text carries the stage
+	// (spawning|thinking|parsing|done|failed|retrying); Detail carries JSON
+	// with elapsedSec/stdoutLen/attempt/line. Appended last.
+	AnalyzeProgress
 	// KindCount is a sentinel one past the last real Kind. New event kinds must
 	// be inserted above it so completeness tests cover them automatically.
 	KindCount
