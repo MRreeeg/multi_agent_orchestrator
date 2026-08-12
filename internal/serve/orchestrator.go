@@ -9,9 +9,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -256,6 +258,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.skills(w, r)
 	case path == "/nodes/types" && r.Method == http.MethodGet:
 		h.nodeTypes(w, r)
+	case path == "/selfcheck" && r.Method == http.MethodGet:
+		h.selfcheck(w, r)
 	case path == "/presets" && r.Method == http.MethodGet:
 		h.presets(w, r)
 	case path == "/stats" && r.Method == http.MethodGet:
@@ -294,6 +298,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	case strings.HasSuffix(path, "/stop") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/stop")
 		h.stopRuntime(w, r, id)
+	case path == "/runtime/open" && r.Method == http.MethodPost:
+		h.openRuntimeBrowser(w, r)
 	default:
 		http.Error(w, "not found", http.StatusNotFound)
 	}
@@ -654,51 +660,26 @@ func (h *orchestratorHandler) listAgents(w http.ResponseWriter, _ *http.Request)
 }
 
 func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) {
-	types := []orchestrator.NodeTypeInfo{
-		{
-			Type:   orchestrator.NodeArchitect,
-			Label:  "架构师",
-			Models: []string{"deepseek-pro", "deepseek-flash", "deepseek", "deepseek-v4-flash", "mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5", "ccs", "o3", "codex-default"},
-			ModelsByExecutor: map[orchestrator.ExecutorType][]string{
-				orchestrator.ExecutorReasonix: {"deepseek-pro", "deepseek-flash", "deepseek"},
-				orchestrator.ExecutorMimo:     {"mimo-v2.5-pro", "mimo-v2.5", "xiaomi/mimo-v2.5"},
-				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
-				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
-				orchestrator.ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
-			},
-			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude, orchestrator.ExecutorOpencode},
-		},
-		{
-			Type:   orchestrator.NodeReviewer,
-			Label:  "审查者",
-			Models: []string{"deepseek-flash", "deepseek", "xiaomi/mimo-v2.5"},
-			ModelsByExecutor: map[orchestrator.ExecutorType][]string{
-				orchestrator.ExecutorReasonix: {"deepseek-flash", "deepseek"},
-				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5"},
-				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
-				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
-				orchestrator.ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
-			},
-			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude, orchestrator.ExecutorOpencode},
-		},
-		{
-			Type:   orchestrator.NodeExecutor,
-			Label:  "执行者",
-			Models: []string{"deepseek-flash", "deepseek-pro", "deepseek-v4-flash", "xiaomi/mimo-v2.5", "xiaomi/mimo-v2.5-pro", "o3", "codex-default"},
-			ModelsByExecutor: map[orchestrator.ExecutorType][]string{
-				orchestrator.ExecutorReasonix: {"deepseek-flash", "deepseek-pro"},
-				orchestrator.ExecutorMimo:     {"xiaomi/mimo-v2.5", "xiaomi/mimo-v2.5-pro"},
-				orchestrator.ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
-				orchestrator.ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
-				orchestrator.ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
-			},
-			Skills:    listSkills(),
-			Executors: []orchestrator.ExecutorType{orchestrator.ExecutorReasonix, orchestrator.ExecutorMimo, orchestrator.ExecutorCodex, orchestrator.ExecutorClaude, orchestrator.ExecutorOpencode},
-		},
+	writeJSON(w, orchestrator.NodeTypeCatalog())
+}
+
+// selfcheck returns the one-click self-check report: agent catalog, live
+// runtime states, skill catalog, and per-executor binary availability.
+func (h *orchestratorHandler) selfcheck(w http.ResponseWriter, r *http.Request) {
+	report := orchestrator.SelfCheckSnapshot(r.Context())
+	running := h.store.ListAgents()
+	if running == nil {
+		running = []orchestrator.AgentInstance{}
 	}
-	writeJSON(w, types)
+	writeJSON(w, map[string]interface{}{
+		"checkedAt": report.CheckedAt,
+		"agents":    report.Agents,
+		"running":   running,
+		"runtimes":  report.Runtimes,
+		"skills":    report.Skills,
+		"skillRoots": report.SkillRoots,
+		"health":    report.Health,
+	})
 }
 
 func (h *orchestratorHandler) presets(w http.ResponseWriter, _ *http.Request) {
@@ -826,6 +807,57 @@ func (h *orchestratorHandler) stopRuntime(w http.ResponseWriter, _ *http.Request
 		return
 	}
 	writeErr(w, "runtime not found", http.StatusNotFound)
+}
+
+// openRuntimeBrowser opens a runtime's HTTP endpoint in the system default
+// browser. Only loopback endpoints are accepted so the API cannot be abused
+// to launch arbitrary URLs.
+func (h *orchestratorHandler) openRuntimeBrowser(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Endpoint string `json:"endpoint"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Endpoint) == "" {
+		writeErr(w, "endpoint is required", http.StatusBadRequest)
+		return
+	}
+	u, err := url.Parse(strings.TrimSpace(body.Endpoint))
+	if err != nil {
+		writeErr(w, fmt.Sprintf("invalid endpoint: %v", err), http.StatusBadRequest)
+		return
+	}
+	host := u.Hostname()
+	if u.Scheme != "http" && u.Scheme != "https" {
+		writeErr(w, "only http(s) endpoints are allowed", http.StatusBadRequest)
+		return
+	}
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+		writeErr(w, "only loopback endpoints are allowed", http.StatusBadRequest)
+		return
+	}
+	if err := openSystemBrowser(u.String()); err != nil {
+		writeErr(w, fmt.Sprintf("failed to open browser: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// openSystemBrowser launches the OS default browser for a URL in a detached
+// process, mirroring the pattern used by the MCP manager.
+func openSystemBrowser(target string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", target)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", target)
+	default:
+		cmd = exec.Command("xdg-open", target)
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go cmd.Wait()
+	return nil
 }
 
 // getRuntimeConsole returns the server-proxied Codex WebSocket console state.

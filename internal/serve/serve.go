@@ -503,6 +503,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /orchestrator/api/runtimes", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/runtimes/", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/runtimes/", s.orchestratorAPI)
+	mux.HandleFunc("POST /orchestrator/api/runtime/open", s.orchestratorAPI)
 	// New Orchestration Session API routes
 	mux.HandleFunc("POST /orchestrator/api/orch-sessions", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/orch-sessions", s.orchestratorAPI)
