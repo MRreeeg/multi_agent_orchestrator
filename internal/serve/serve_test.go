@@ -436,6 +436,43 @@ func TestOrchestratorNodeTypesExposeExecutorSpecificModels(t *testing.T) {
 	}
 }
 
+func TestOrchestratorSelfCheckReport(t *testing.T) {
+	bc := NewBroadcaster()
+	ctrl := control.New(control.Options{Sink: bc})
+	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/orchestrator/api/selfcheck")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("selfcheck status = %d, body = %s", resp.StatusCode, string(body))
+	}
+	var report map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&report); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"agents", "running", "runtimes", "skills", "skillRoots", "health", "checkedAt"} {
+		if _, ok := report[key]; !ok {
+			t.Fatalf("selfcheck missing %q", key)
+		}
+	}
+	agents, _ := report["agents"].([]any)
+	if len(agents) < 3 {
+		t.Fatalf("selfcheck agents = %d, want >= 3", len(agents))
+	}
+	health, _ := report["health"].([]any)
+	for _, item := range health {
+		row, _ := item.(map[string]any)
+		if row["executor"] == nil || row["available"] == nil {
+			t.Fatalf("selfcheck health row malformed: %v", item)
+		}
+	}
+}
+
 func TestServeCompactEndpoint(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})
