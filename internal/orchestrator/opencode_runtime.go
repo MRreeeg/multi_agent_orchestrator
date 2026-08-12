@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -570,7 +571,40 @@ func (m *OpenCodeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onS
 		m.finishTurn(rt, sessionID, err)
 		return m.execResult(rt, "", sessionID), err
 	}
-	text, promptErr := client.Prompt(ctx, sessionID, spec.ModelRef, spec.Prompt)
+	budget := opencodeDiscipline{}.turnBudget()
+	if spec.TurnTimeout > 0 {
+		budget = spec.TurnTimeout
+	}
+	turnCtx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	turnStart := time.Now()
+	discipline := opencodeDiscipline{}
+	denyTools := discipline.denyTools(spec)
+	text, promptErr := client.Prompt(turnCtx, sessionID, spec.ModelRef, discipline.system(spec.ToolsReadOnly), spec.Prompt, denyTools)
+	// Only a budget expiry (not a transport/API error) is recoverable: the
+	// model may have streamed a usable partial document before the deadline.
+	// Any other failure aborts nothing and surfaces as-is.
+	if promptErr != nil && ctx.Err() == nil && errors.Is(turnCtx.Err(), context.DeadlineExceeded) {
+		// Abort so the runtime is left usable and the pipeline fails fast
+		// instead of stalling on the wedged turn.
+		abortCtx, abortCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer abortCancel()
+		_ = client.Abort(abortCtx, sessionID)
+		// Recover partial output produced by THIS turn only: the message must
+		// be an assistant text created after the turn started. Without the
+		// anchor, a reused session could silently substitute a previous
+		// turn's document for the aborted one.
+		if history, histErr := client.History(abortCtx, sessionID); histErr == nil {
+			anchorMs := turnStart.Add(-time.Second).UnixMilli()
+			for i := len(history) - 1; i >= 0; i-- {
+				if history[i].Role == "assistant" && history[i].CreatedMs >= anchorMs && strings.TrimSpace(history[i].Text) != "" {
+					text = strings.TrimSpace(history[i].Text)
+					promptErr = nil
+					break
+				}
+			}
+		}
+	}
 	rt.mu.Lock()
 	if text != "" {
 		rt.output = text
@@ -740,7 +774,7 @@ func (m *OpenCodeRuntimeManager) SendMessage(runtimeID, text string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	out, err := client.Prompt(ctx, sessionID, model, text)
+	out, err := client.Prompt(ctx, sessionID, model, "", text, nil)
 	if err != nil {
 		return err
 	}
@@ -780,6 +814,7 @@ func executeOpencodeRun(ctx context.Context, spec ExecSpec) (*ExecResult, error)
 	opts := opencodeclient.ExecOptions{
 		Model:     spec.ModelRef,
 		Workspace: spec.Workspace,
+		MaxSteps:  spec.MaxSteps,
 	}
 	if spec.ContextPolicy != "fresh" && spec.ContextPolicy != "fresh_per_run" {
 		opts.ResumeSessionID = strings.TrimSpace(spec.ExternalSessionID)
@@ -805,4 +840,58 @@ func executeOpencodeRun(ctx context.Context, spec ExecSpec) (*ExecResult, error)
 		result.TokenUsage = &TokenUsage{TotalTokens: int(res.TotalTokens)}
 	}
 	return result, nil
+}
+
+// opencodeDiscipline bounds each serve-mode turn and hardens weak models
+// against the runaway "explore forever" loop that previously stalled
+// orchestrator pipelines until the HTTP client timed out (10 minutes).
+type opencodeDiscipline struct{}
+
+// turnBudget is the hard per-turn deadline before the turn is aborted.
+func (opencodeDiscipline) turnBudget() time.Duration { return 300 * time.Second }
+
+// denyTools returns the serve-API tools map for the given spec: nil keeps the
+// server default; a named deny list keeps read-only exploration while blocking
+// everything that mutates state or runs commands (bash, edits, writes, moves,
+// sub-agents, web fetch/search, MCP).
+func (opencodeDiscipline) denyTools(spec ExecSpec) map[string]bool {
+	if spec.ToolsReadOnly {
+		return map[string]bool{
+			"bash":      false,
+			"edit":      false,
+			"write":     false,
+			"move":      false,
+			"patch":     false,
+			"create":    false,
+			"delete":    false,
+			"task":      false,
+			"webfetch":  false,
+			"websearch": false,
+			"mcp__*":    false,
+		}
+	}
+	return nil
+}
+
+// system returns the system-slot discipline prompt applied to every turn.
+// The serve API's "system" field is higher authority than the user prompt,
+// so this lands before anything node-specific the pipeline injected. With
+// readOnly the model may inspect the codebase, just never change anything.
+func (opencodeDiscipline) system(readOnly bool) string {
+	if readOnly {
+		return `You are a node in an automated multi-agent pipeline. Your final response text IS the deliverable: it will be saved verbatim as a document and passed to the next node. You cannot write files, run commands, or use any tool except read-only exploration (read, grep, glob). Writing and executing are other nodes' jobs.
+
+Rules:
+1. Read the codebase as needed to ground your answer, but be economical: at most 5 reads per turn, and never repeat the same exploration twice.
+2. Answer directly and completely. Never narrate your plan, never restate the task, never ask rhetorical questions, never reply "I'll explore the codebase first" — if you need to look, just do it once and then produce the deliverable.
+3. If information is insufficient, produce the best possible answer based on what you have and clearly mark assumptions — do not stall.
+4. Output only the deliverable content (the document text). No preamble, no summary of steps taken, no trailing commentary.`
+	}
+	return `You are a node in an automated multi-agent pipeline. Your final response text IS the deliverable: it will be saved verbatim as a document and passed to the next node. You cannot write files — writing is the executor node's job. 
+
+Rules:
+1. Answer directly and completely in one pass. Never narrate your plan, never restate the task, never ask rhetorical questions, never reply "I'll explore the codebase first".
+2. Limit exploration: at most 3 file reads. If the answer can be produced from the task text alone, produce it immediately.
+3. If information is insufficient, produce the best possible answer based on what you have and clearly mark assumptions — do not stall.
+4. Output only the deliverable content (the document text). No preamble, no summary of steps taken, no trailing commentary.`
 }

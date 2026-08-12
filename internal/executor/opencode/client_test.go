@@ -29,7 +29,7 @@ func TestClientPrompt(t *testing.T) {
 	if err != nil || id != "ses_test" {
 		t.Fatalf("NewSession = %q, %v", id, err)
 	}
-	text, err := c.Prompt(ctx, id, "opencode/deepseek-v4-flash-free", "hello")
+	text, err := c.Prompt(ctx, id, "opencode/deepseek-v4-flash-free", "", "hello", nil)
 	if err != nil || text != "hello opencode" {
 		t.Fatalf("Prompt = %q, %v", text, err)
 	}
@@ -68,6 +68,69 @@ func TestClientHistory(t *testing.T) {
 	}
 }
 
+func TestClientPromptSystem(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/session/ses_test/message" {
+			buf := make([]byte, r.ContentLength)
+			_, _ = r.Body.Read(buf)
+			gotBody = string(buf)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"info":{"id":"m1"},"parts":[{"type":"text","text":"ok"}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, _ = c.Prompt(context.Background(), "ses_test", "", "discipline-beacon", "hi", nil)
+	if !strings.Contains(gotBody, `"system":"discipline-beacon"`) {
+		t.Fatalf("system was not sent in payload: %s", gotBody)
+	}
+}
+
+func TestClientPromptNoTools(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/session/ses_test/message" {
+			buf := make([]byte, r.ContentLength)
+			_, _ = r.Body.Read(buf)
+			gotBody = string(buf)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"info":{"id":"m1"},"parts":[{"type":"text","text":"ok"}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, _ = c.Prompt(context.Background(), "ses_test", "", "", "hi", map[string]bool{"*": false})
+	if !strings.Contains(gotBody, `"*":false`) {
+		t.Fatalf("noTools did not produce deny-all tools map: %s", gotBody)
+	}
+}
+
+func TestClientPromptDenyMap(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/session/ses_test/message" {
+			buf := make([]byte, r.ContentLength)
+			_, _ = r.Body.Read(buf)
+			gotBody = string(buf)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"info":{"id":"m1"},"parts":[{"type":"text","text":"ok"}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL)
+	_, _ = c.Prompt(context.Background(), "ses_test", "", "", "hi", map[string]bool{"bash": false, "edit": false})
+	if !strings.Contains(gotBody, `"bash":false`) || !strings.Contains(gotBody, `"edit":false`) {
+		t.Fatalf("deny map not sent as-is: %s", gotBody)
+	}
+}
+
 func TestClientPromptModelObject(t *testing.T) {
 	var gotBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +146,7 @@ func TestClientPromptModelObject(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL)
-	_, _ = c.Prompt(context.Background(), "ses_test", "opencode/deepseek-v4-flash-free", "hi")
+	_, _ = c.Prompt(context.Background(), "ses_test", "opencode/deepseek-v4-flash-free", "", "hi", nil)
 	if !strings.Contains(gotBody, `"providerID":"opencode"`) || !strings.Contains(gotBody, `"modelID":"deepseek-v4-flash-free"`) {
 		t.Fatalf("model was not sent as object: %s", gotBody)
 	}

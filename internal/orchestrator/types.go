@@ -73,6 +73,14 @@ type ExecSpec struct {
 	// MaxSteps limits provider tool-call rounds for bounded orchestration nodes.
 	// Zero keeps the provider default.
 	MaxSteps int
+	// ToolsReadOnly keeps read-only exploration (read/grep/glob) but denies
+	// everything that can mutate state or run commands (bash/edit/write/
+	// task/web/*). Used when the node must inspect the codebase before
+	// producing its deliverable, without the risk of a runaway tool loop.
+	ToolsReadOnly bool
+	// TurnTimeout is the hard per-turn budget for the opencode serve turn.
+	// Zero uses the runtime default (5 minutes).
+	TurnTimeout time.Duration
 }
 
 // ExecResult is the unified execution result from any executor.

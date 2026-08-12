@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // Client drives a retained `opencode serve` process over its loopback HTTP
@@ -22,7 +21,10 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	return &Client{
 		BaseURL: strings.TrimRight(baseURL, "/"),
-		HTTP:    &http.Client{Timeout: 10 * time.Minute},
+		// No client-side timeout: the caller owns the deadline via the
+		// request context (per-turn budget), so a 5-minute client timeout
+		// cannot fire before a 15-minute executor budget.
+		HTTP: &http.Client{},
 	}
 }
 
@@ -72,9 +74,21 @@ func (c *Client) NewSession(ctx context.Context, title string) (string, error) {
 }
 
 // Prompt sends one message and waits for the complete assistant response.
-func (c *Client) Prompt(ctx context.Context, sessionID, model, prompt string) (string, error) {
+// system is injected into the opencode session's system slot (the serve API
+// accepts a "system" field); an empty value leaves the server default.
+// denyTools maps tool/permission names to false and is sent as the serve API's
+// "tools" field (Record<toolID, boolean> → permission rules). A nil map sends
+// nothing and keeps the server default. Use {"*": false} to disable every
+// tool, or a specific deny list to keep read-only exploration only.
+func (c *Client) Prompt(ctx context.Context, sessionID, model, system, prompt string, denyTools map[string]bool) (string, error) {
 	payload := map[string]any{
 		"parts": []map[string]string{{"type": "text", "text": prompt}},
+	}
+	if strings.TrimSpace(system) != "" {
+		payload["system"] = system
+	}
+	if len(denyTools) > 0 {
+		payload["tools"] = denyTools
 	}
 	if model != "" {
 		// opencode expects the model as an object: {providerID, modelID}.
@@ -130,6 +144,9 @@ type HistoryMessage struct {
 	ID   string `json:"id"`
 	Role string `json:"role"`
 	Text string `json:"text"`
+	// CreatedMs is the message creation time in Unix milliseconds, used to
+	// anchor recovery scans to the current turn.
+	CreatedMs int64 `json:"createdMs"`
 }
 
 // History lists the most recent messages of a session for the Runtime Console.
@@ -146,6 +163,9 @@ func (c *Client) History(ctx context.Context, sessionID string) ([]HistoryMessag
 		Info struct {
 			ID   string `json:"id"`
 			Role string `json:"role"`
+			Time struct {
+				Created int64 `json:"created"`
+			} `json:"time"`
 		} `json:"info"`
 		Parts []struct {
 			Type string `json:"type"`
@@ -163,7 +183,7 @@ func (c *Client) History(ctx context.Context, sessionID string) ([]HistoryMessag
 				text.WriteString(p.Text)
 			}
 		}
-		out = append(out, HistoryMessage{ID: m.Info.ID, Role: m.Info.Role, Text: text.String()})
+		out = append(out, HistoryMessage{ID: m.Info.ID, Role: m.Info.Role, Text: text.String(), CreatedMs: m.Info.Time.Created})
 	}
 	return out, nil
 }
