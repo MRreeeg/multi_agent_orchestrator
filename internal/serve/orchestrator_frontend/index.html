@@ -652,8 +652,8 @@ input,textarea,select{font:inherit;color:inherit}
           </select>
         </div>
         <div class="field">
-          <label class="field__label">职责描述</label>
-          <textarea class="field__textarea" id="cfg-role" placeholder="描述该节点的职责..."></textarea>
+          <label class="field__label">职责描述（点击打开大窗口编辑）</label>
+          <textarea class="field__textarea" id="cfg-role" placeholder="描述该节点的职责...（点击打开大窗口）" readonly style="cursor:pointer"></textarea>
         </div>
       </div>
       <!-- Loop Configuration (pipeline-level) -->
@@ -736,6 +736,25 @@ input,textarea,select{font:inherit;color:inherit}
       <button class="run-dash__btn" id="selfcheck-refresh">重新检查</button>
       <button class="run-dash__btn" id="selfcheck-close-btn"
         style="background:var(--accent);color:oklch(99% 0 0);border-color:var(--accent)">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Role description editor modal (opens from the node config card) -->
+<div class="modal-overlay" id="role-editor-modal" style="display:none">
+  <div class="modal modal--win" style="width:min(720px,94vw);max-height:88vh">
+    <div class="modal__head modal__head--drag">
+      <span id="role-editor-title">职责描述</span>
+      <span class="modal__close" id="role-editor-close">&times;</span>
+    </div>
+    <div class="modal__body" style="display:flex;flex-direction:column;min-height:0">
+      <textarea id="role-editor-input" spellcheck="false"
+        style="flex:1;min-height:320px;width:100%;box-sizing:border-box;resize:none;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--fg);font-size:13px;line-height:1.6;outline:none"></textarea>
+    </div>
+    <div class="modal__foot">
+      <button class="run-dash__btn" id="role-editor-cancel">取消</button>
+      <button class="run-dash__btn" id="role-editor-save"
+        style="background:var(--accent);color:oklch(99% 0 0);border-color:var(--accent)">保存</button>
     </div>
   </div>
 </div>
@@ -3401,6 +3420,37 @@ function makeModalDraggable(modalEl) {
 }
 makeModalDraggable($('#node-detail-modal').querySelector('.modal'));
 makeModalDraggable($('#selfcheck-modal').querySelector('.modal'));
+
+// ── Role description editor (big window from the node config card) ──
+const roleEditorModal = $('#role-editor-modal');
+function openRoleEditor() {
+  if (!state.selectedNode) return;
+  const node = state.nodes.find(n => n.id === state.selectedNode);
+  if (!node) return;
+  $('#role-editor-title').textContent = '职责描述 · ' + (node.name || node.id);
+  $('#role-editor-input').value = node.role || '';
+  roleEditorModal.style.display = 'flex';
+  $('#role-editor-input').focus();
+}
+function closeRoleEditor() { roleEditorModal.style.display = 'none'; }
+function saveRoleEditor() {
+  const val = $('#role-editor-input').value;
+  const el = $('#cfg-role');
+  el.value = val;
+  // Mirror the field's own input listener so node.role updates + rerender.
+  el.dispatchEvent(new Event('input'));
+  closeRoleEditor();
+  toast('职责描述已更新', 'success');
+}
+$('#cfg-role').addEventListener('click', openRoleEditor);
+$('#role-editor-close').addEventListener('click', closeRoleEditor);
+$('#role-editor-cancel').addEventListener('click', closeRoleEditor);
+$('#role-editor-save').addEventListener('click', saveRoleEditor);
+roleEditorModal.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeRoleEditor(); });
+$('#role-editor-input').addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveRoleEditor(); }
+});
+makeModalDraggable(roleEditorModal.querySelector('.modal'));
 
 // ── Self-check modal ──
 $('#selfcheck-close').addEventListener('click', () => { $('#selfcheck-modal').style.display = 'none'; });
