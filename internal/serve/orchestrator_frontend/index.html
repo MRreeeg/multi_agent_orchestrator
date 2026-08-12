@@ -1149,10 +1149,13 @@ const API_TIMEOUTS = {
 
 // Run-progress analysis drives a model subprocess server-side (same class of
 // slow call as /requirements/analyze) and the path embeds a dynamic run ID,
-// so exact keys cannot cover it — match by shape.
+// so exact keys cannot cover it — match by shape. Runtime console messages
+// run a full model turn on the retained opencode serve (up to 10 minutes
+// server-side); the default 15s deadline would abort before the answer.
 function apiTimeoutMs(path) {
   if (API_TIMEOUTS[path]) return API_TIMEOUTS[path];
   if (/^\/runs\/[^/]+\/analysis$/.test(path)) return 260000;
+  if (/^\/runtimes\/[^/]+\/message$/.test(path)) return 300000;
   return 15000;
 }
 
@@ -3765,15 +3768,16 @@ function runtimeEventHtml(e) {
       '<summary><span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
       '<span style="color:#57606a;font-style:italic">' + escHtml(label) + '</span>' +
       '<span style="margin-left:auto;color:#8c959f">' + (detail ? '展开推理' : '') + '</span></summary>' +
-      (detail ? '<pre style="white-space:pre-wrap;color:#57606a;font:inherit">' + escHtml(detail) + '</pre>' : '<pre style="color:#57606a">（无推理内容）</pre>') +
+      (detail ? '<div class="chat-bubble__inner rc-md">' + renderMarkdown(detail) + '</div>' : '<pre style="color:#57606a">（无推理内容）</pre>') +
       '</details>';
   }
   if (assistant) {
-    // QA content stays expanded.
+    // QA content stays expanded, rendered as Obsidian-style markdown like
+    // the main chat (headings, tables, code blocks, bold…).
     return '<div style="padding:5px 4px;border-bottom:1px solid rgba(15,23,42,.07)">' +
       '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
       '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
-      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:#24292f;font:inherit">' + escHtml(detail) + '</pre>' : '') +
+      (detail ? '<div class="chat-bubble__inner rc-md">' + renderMarkdown(detail) + '</div>' : '') +
       '</div>';
   }
   // Non-QA (system/tool/usage) events are folded; click to expand the raw log.
