@@ -489,6 +489,34 @@ func TestServeCompactEndpoint(t *testing.T) {
 	}
 }
 
+func TestServeKatexAssets(t *testing.T) {
+	bc := NewBroadcaster()
+	ctrl := control.New(control.Options{Sink: bc})
+	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	defer srv.Close()
+
+	for _, path := range []string{"/katex/katex.min.js", "/katex/katex.min.css"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || len(body) == 0 {
+			t.Errorf("GET %s = %d, %d bytes", path, resp.StatusCode, len(body))
+		}
+	}
+	// Path traversal must be rejected. (The mux cleans ../ segments itself, so
+	// exercise the handler directly to hit the traversal guard.)
+	srv2 := New(ctrl, bc, config.ServeConfig{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/katex/../../serve.go", nil)
+	srv2.katexStatic(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("traversal = %d, want 404", rec.Code)
+	}
+}
+
 func TestServeIndexPage(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})

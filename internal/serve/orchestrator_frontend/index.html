@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/katex/katex.min.css" />
+<script src="/katex/katex.min.js" defer></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -136,6 +138,9 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__inner pre code{border:none;background:none;padding:0}
 .chat-bubble__inner a{color:var(--accent)}
 .chat-bubble__inner blockquote{margin:6px 0;padding:6px 12px;border-left:3px solid var(--accent);background:var(--bg-2);border-radius:0 6px 6px 0;color:var(--muted)}
+.chat-bubble__inner .math-block{margin:8px 0;padding:8px 10px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;overflow-x:auto;text-align:center}
+.chat-bubble__inner .math-block .katex{font-size:1.05em}
+.chat-bubble__inner .katex{font-size:1.02em}
 .chat-bubble__inner table{border-collapse:collapse;margin:6px 0;font-size:13px;width:100%}
 .chat-bubble__inner th,.chat-bubble__inner td{border:1px solid var(--border);padding:5px 9px;text-align:left}
 .chat-bubble__inner th{background:var(--bg-2);font-weight:600}
@@ -2239,8 +2244,38 @@ function inlineMd(s) {
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 }
 
+// Extract $$...$$ (block, may span lines) and $...$ (inline) LaTeX and
+// render them with the embedded KaTeX. Rendered HTML is stashed in frags and
+// replaced by control-char placeholders so the markdown pipeline (which
+// escapes text) cannot mangle it; placeholders are restored on the way out.
+// Fenced code blocks are masked first so shell $vars / $$ are never parsed.
+function extractMath(src) {
+  const frags = [];
+  if (!window.katex) return { text: String(src || ''), frags };
+  const raw = String(src || '');
+  const lines = raw.split('\n');
+  const codeLines = new Set();
+  let inCode = false;
+  lines.forEach((line, i) => {
+    if (line.startsWith('```')) { inCode = !inCode; codeLines.add(i); return; }
+    if (inCode) codeLines.add(i);
+  });
+  const masked = lines.map((line, i) => codeLines.has(i) ? '\u0003c' + i + '\u0003' : line).join('\n');
+  let s = masked.replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
+    frags.push('<div class="math-block">' + katex.renderToString(tex, { throwOnError: false, displayMode: true }) + '</div>');
+    return '\u0002b' + (frags.length - 1) + '\u0002';
+  });
+  s = s.replace(/\$([^$\n]+?)\$/g, (_, tex) => {
+    frags.push(katex.renderToString(tex, { throwOnError: false }));
+    return '\u0001m' + (frags.length - 1) + '\u0001';
+  });
+  s = s.replace(/\u0003c(\d+)\u0003/g, (_, i) => lines[+i]);
+  return { text: s, frags };
+}
+
 function renderMarkdown(text) {
-  const esc = escHtml(String(text || ''));
+  const math = extractMath(String(text || ''));
+  const esc = escHtml(math.text);
   let html = '';
   let inCode = false;
   let codeBuf = [];
@@ -2291,6 +2326,14 @@ function renderMarkdown(text) {
       html += '<blockquote>' + bqBuf.map(b => '<p>' + inlineMd(b) + '</p>').join('') + '</blockquote>';
       bqBuf = null;
     }
+    // A block formula occupies its own line: emit the rendered div directly
+    // instead of wrapping it in <p>.
+    const bm = line.match(/^\u0002b(\d+)\u0002$/);
+    if (bm) {
+      flushList();
+      html += math.frags[+bm[1]];
+      continue;
+    }
     const h = line.match(/^(#{1,4})\s+(.*)$/);
     if (h) {
       flushList();
@@ -2317,7 +2360,9 @@ function renderMarkdown(text) {
   if (tableBuf) html += renderTable(tableBuf);
   if (bqBuf) html += '<blockquote>' + bqBuf.map(b => '<p>' + inlineMd(b) + '</p>').join('') + '</blockquote>';
   flushList();
-  return html;
+  return html
+    .replace(/\u0002b(\d+)\u0002/g, (_, i) => math.frags[+i])
+    .replace(/\u0001m(\d+)\u0001/g, (_, i) => math.frags[+i]);
 }
 
 function renderTable(rows) {
