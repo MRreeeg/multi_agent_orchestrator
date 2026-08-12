@@ -39,6 +39,10 @@ type ExecOptions struct {
 	Model           string // provider/model, e.g. opencode/deepseek-v4-flash-free
 	Workspace       string
 	ResumeSessionID string
+	// MaxSteps bounds the tool-call rounds for one run. Zero keeps the CLI
+	// default; provisioned in the orchestrator for free/streaming models so a
+	// "let me explore" loop cannot run forever.
+	MaxSteps int
 }
 
 // Executor executes tasks via the opencode CLI (`opencode run`).
@@ -117,6 +121,9 @@ func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string)
 	}
 	if opts.Model != "" {
 		args = append(args, "-m", opts.Model)
+	}
+	if opts.MaxSteps > 0 {
+		args = append(args, "--max-steps", fmt.Sprint(opts.MaxSteps))
 	}
 	args = append(args, "--format", "json", prompt)
 

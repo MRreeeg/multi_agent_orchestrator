@@ -2944,6 +2944,18 @@ func loadRolePrompt(nodeType NodeType) string {
 	return string(data)
 }
 
+const opencodeExecutionDisciplinePrompt = `# EXECUTION DISCIPLINE (MANDATORY)
+
+免费/流式模型容易把思考过程当作输出。本节点必须遵守：
+
+- 禁止复述任务、禁止输出"我将要做/让我先…/我来探索…"之类的计划清单或思考常规；直接执行。
+- 探索最小化：最多读取 3 个文件/目录（read/glob/grep 各最多 2 次），读完立即产出最终结果。
+- 禁止连续自我循环：不得反复说"开始探索""继续探索""再确认一下"；同一意图只做一次。
+- 最终响应必须是完整交付物正文（方案、文档、实现、结论），不能是计划、洋葱式思考或角色能力自述（例如"我不能写文件"）。
+- 如果你只负责分析并产出 Markdown 文档，直接把完整 Markdown 写在最终响应里，不要创建文件，也不要让人再帮你复制。
+- 输出完毕后立即结束；不要自我审查、不要再次总结、不要生成第二个版本。
+`
+
 const loopNodeBoundaryPrompt = `# LOOP NODE EXECUTION BOUNDARY (MANDATORY)
 你只处理当前这一轮、当前节点的一次调用。
 
@@ -3006,9 +3018,20 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	if loopReview {
 		rolePrompt += "\n\n---\n\n" + loopReviewerProtocolPrompt
 	}
+	executorName := node.Executor
+	if executorName == "" {
+		executorName = ExecutorReasonix
+	}
 	task := input
 	if rolePrompt != "" {
 		task = rolePrompt + "\n\n---\n\n## 当前节点\n\n- 名称: " + node.Label + "\n- 模型: " + node.Model + "\n\n## 执行上下文\n\n" + input
+	}
+	// Free/streaming models (e.g. deepseek-v4-flash-free) tend to burn their
+	// output budget restating plans and "let me explore" loops, then fail with
+	// an empty assistant turn. Hardening the prompt keeps those models on a
+	// single bounded pass for opencode nodes.
+	if executorName == ExecutorOpencode {
+		task += "\n\n---\n\n" + opencodeExecutionDisciplinePrompt
 	}
 
 	workspace = strings.TrimSpace(workspace)
@@ -3016,7 +3039,6 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		workspace = detectWorkspace()
 	}
 	modelRef := strings.TrimSpace(node.Model)
-	executorName := node.Executor
 	providerRoute := strings.ToLower(strings.TrimSpace(node.ProviderRoute))
 	// "ccs" is a frontend-friendly alias. Treat it as a route selection, not
 	// as a real Codex/Claude model name.
@@ -3033,9 +3055,6 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	executionMode := node.ExecutionMode
 	if loopActive {
 		executionMode = "task"
-	}
-	if executorName == "" {
-		executorName = ExecutorReasonix
 	}
 	// Codex/Claude are local CLIs whose active provider/model may be supplied
 	// by CCSwitch. An empty model therefore defaults to the CCSwitch route.
@@ -3088,6 +3107,29 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 			// The format-correction call must not start another review/tool
 			// cycle; give it only one finalization round.
 			spec.MaxSteps = 1
+		}
+	} else if executorName == ExecutorOpencode && spec.MaxSteps == 0 {
+		// Bound free/streaming models (deepseek-v4-flash-free) to a single
+		// bounded pass so a "let me explore" loop cannot run forever. opencode
+		// run honors it via --max-steps; serve mode relies on the prompt
+		// discipline block plus the turn timeout.
+		spec.MaxSteps = 25
+	}
+	if executorName == ExecutorOpencode {
+		// Per-role serve-mode tuning: the architect gets read-only tools so
+		// it can inspect the codebase without a write/execute exploration
+		// loop; the executor reads the codebase and writes the real
+		// deliverable, so it gets the longest budget. A budget timeout still
+		// recovers partial output from session history (see
+		// OpenCodeRuntimeManager.Execute).
+		switch node.Type {
+		case NodeArchitect:
+			spec.ToolsReadOnly = true
+			spec.TurnTimeout = 5 * time.Minute
+		case NodeReviewer:
+			spec.TurnTimeout = 5 * time.Minute
+		case NodeExecutor:
+			spec.TurnTimeout = 15 * time.Minute
 		}
 	}
 	// Select executor.
