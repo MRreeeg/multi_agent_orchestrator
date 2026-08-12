@@ -13,9 +13,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"reasonix/internal/proc"
@@ -56,14 +58,23 @@ func (e *Executor) opencodeBin() string {
 
 // DiscoverBin returns the native opencode binary path found on this machine,
 // or "" when nothing is installed. npm shims (.ps1/.cmd) are skipped because
-// they cannot be spawned directly by os/exec on Windows.
+// they cannot be spawned directly by os/exec on Windows, and npm placeholder
+// files (opencode-ai's postinstall stub) are skipped because they are shell
+// scripts, not native executables.
 func DiscoverBin() string {
 	candidates := []string{
 		filepath.Join(os.Getenv("APPDATA"), "npm", "node_modules", "opencode-ai", "bin", "opencode.exe"),
 		filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming", "npm", "node_modules", "opencode-ai", "bin", "opencode.exe"),
+		// When opencode-ai was installed with --ignore-scripts (or via pnpm),
+		// bin/opencode.exe is a shell placeholder and the real binary lives in
+		// the platform optional dependency package.
+		filepath.Join(os.Getenv("APPDATA"), "npm", "node_modules", "opencode-ai", "node_modules", "opencode-windows-x64", "bin", "opencode.exe"),
+		filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming", "npm", "node_modules", "opencode-ai", "node_modules", "opencode-windows-x64", "bin", "opencode.exe"),
+		filepath.Join(os.Getenv("APPDATA"), "npm", "node_modules", "opencode-ai", "node_modules", "opencode-windows-x64-baseline", "bin", "opencode.exe"),
+		filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming", "npm", "node_modules", "opencode-ai", "node_modules", "opencode-windows-x64-baseline", "bin", "opencode.exe"),
 	}
 	for _, candidate := range candidates {
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+		if candidate != "" && isExecutableCandidate(candidate) {
 			return candidate
 		}
 	}
@@ -71,6 +82,31 @@ func DiscoverBin() string {
 		return path
 	}
 	return ""
+}
+
+// isExecutableCandidate reports whether path exists and, on Windows, starts
+// with the PE magic "MZ". opencode-ai leaves a small shell placeholder at
+// bin/opencode.exe when its postinstall script was skipped; spawning that
+// placeholder yields a confusing ERROR_BAD_EXE_FORMAT ("This version of %1 is
+// not compatible with the version of Windows you're running").
+func isExecutableCandidate(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	if runtime.GOOS != "windows" {
+		return true
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	header := make([]byte, 2)
+	if _, err := io.ReadFull(f, header); err != nil {
+		return false
+	}
+	return header[0] == 'M' && header[1] == 'Z'
 }
 
 // Execute runs one `opencode run` call and parses the JSON event stream.
