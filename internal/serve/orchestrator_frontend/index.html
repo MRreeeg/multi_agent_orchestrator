@@ -1147,8 +1147,13 @@ const API_TIMEOUTS = {
   '/requirements/understand': 120000,
 };
 
+// Run-progress analysis drives a model subprocess server-side (same class of
+// slow call as /requirements/analyze) and the path embeds a dynamic run ID,
+// so exact keys cannot cover it — match by shape.
 function apiTimeoutMs(path) {
-  return API_TIMEOUTS[path] || 15000;
+  if (API_TIMEOUTS[path]) return API_TIMEOUTS[path];
+  if (/^\/runs\/[^/]+\/analysis$/.test(path)) return 260000;
+  return 15000;
 }
 
 async function api(method, path, body) {
@@ -3747,19 +3752,28 @@ function runtimeEventHtml(e) {
   const stamp = e.at ? new Date(e.at).toLocaleTimeString() : '--:--:--';
   const detail = e.text || e.payload || '';
   // Streaming deltas are already merged into one block per message by the
-  // backend; reasoning stays dim and collapsed-looking so the assistant
-  // answer is the visual focus.
+  // backend. Reasoning is folded by default so the assistant answer is the
+  // visual focus; expanded state survives polling refreshes (see
+  // renderRuntimeEvents).
   const reasoning = e.category === 'reasoning';
   const assistant = e.category === 'assistant';
-  const color = e.level === 'error' ? '#d1242f' : assistant ? '#0969da' : reasoning ? '#57606a' : '#57606a';
+  const color = e.level === 'error' ? '#d1242f' : assistant ? '#0969da' : '#57606a';
   const prefix = reasoning ? '🧠 推理 · ' : assistant ? '💬 回答 · ' : '';
   const label = (reasoning || assistant) ? prefix + (e.method || 'text') : (e.method || 'event');
-  if (reasoning || assistant) {
+  if (reasoning) {
+    return '<details class="rc-ev">' +
+      '<summary><span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
+      '<span style="color:#57606a;font-style:italic">' + escHtml(label) + '</span>' +
+      '<span style="margin-left:auto;color:#8c959f">' + (detail ? '展开推理' : '') + '</span></summary>' +
+      (detail ? '<pre style="white-space:pre-wrap;color:#57606a;font:inherit">' + escHtml(detail) + '</pre>' : '<pre style="color:#57606a">（无推理内容）</pre>') +
+      '</details>';
+  }
+  if (assistant) {
     // QA content stays expanded.
     return '<div style="padding:5px 4px;border-bottom:1px solid rgba(15,23,42,.07)">' +
       '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
-      '<span style="color:' + color + (reasoning ? ';font-style:italic' : '') + '">' + escHtml(label) + '</span>' +
-      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:' + (reasoning ? '#57606a' : '#24292f') + ';font:inherit">' + escHtml(detail) + '</pre>' : '') +
+      '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
+      (detail ? '<pre style="margin:4px 0 0;white-space:pre-wrap;color:#24292f;font:inherit">' + escHtml(detail) + '</pre>' : '') +
       '</div>';
   }
   // Non-QA (system/tool/usage) events are folded; click to expand the raw log.
