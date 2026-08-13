@@ -1545,10 +1545,16 @@ async function switchOrchestrationSession(sessionID, title) {
     state.loopConfigDirty = false;
     state.sessionID = sessionID;
     localStorage.setItem('orchestrator-session-id', sessionID);
-    await loadOrchestratorState(sessionID);
-    await loadRuns();
+    // Load the canvas/conversation and the runs list in parallel — loadRuns
+    // only needs the session ID, so sequencing them doubles the latency for
+    // no reason.
+    await Promise.all([loadOrchestratorState(sessionID), loadRuns()]);
     switchPanel('chat');
     toast('已切换到历史编排会话', 'success');
+    // The dock marks the current session from state.sessionID; refresh it so
+    // the badge and enter button move to the newly active session (otherwise
+    // the old session keeps showing 当前 with no way to return).
+    await refreshHistory();
   } catch (err) {
     toast('切换失败: ' + err.message, 'error');
   }
@@ -2855,24 +2861,29 @@ async function saveOrchestratorState(sessionID) {
     if (state.pipelineRevisionID || state.pipelineId) {
       payload.baseRevisionID = state.pipelineRevisionID || state.pipelineId;
     }
-    const revision = await apiPut('/orch-sessions/' + sessionID + '/pipelines/current', payload);
+    // All three writes target independent keys, so fire them in parallel
+    // instead of waiting 3 round-trips in a row (session switching spends
+    // most of its latency here).
+    const revisionPromise = apiPut('/orch-sessions/' + sessionID + '/pipelines/current', payload);
+    const conversationPromise = apiPut('/orch-sessions/' + sessionID + '/conversation', {
+      chatMessages: state.chatMessages || [],
+      requirementMessages: state.requirementMessages || [],
+      pipelineMessages: state.pipelineMessages || []
+    });
+    const titlePromise = state.rewrittenTask
+      ? apiPut('/orch-sessions/' + sessionID, {
+          task: state.rewrittenTask,
+          rewrittenTask: state.rewrittenTask
+        })
+      : Promise.resolve();
+    const revision = await revisionPromise;
     if (!revision || !revision.id) throw new Error('服务端未返回 pipeline revision ID');
     state.pipelineId = revision.id;
     state.pipelineRevisionID = revision.id;
     state.loadedLoopConfig = normalizeLoopConfigForSave(revision.loopConfig || loopConfig);
     state.loopConfigDirty = false;
-    await apiPut('/orch-sessions/' + sessionID + '/conversation', {
-      chatMessages: state.chatMessages || [],
-      requirementMessages: state.requirementMessages || [],
-      pipelineMessages: state.pipelineMessages || []
-    });
-    // Update session title if we have a rewritten task
-    if (state.rewrittenTask) {
-      await apiPut('/orch-sessions/' + sessionID, {
-        task: state.rewrittenTask,
-        rewrittenTask: state.rewrittenTask
-      });
-    }
+    await conversationPromise;
+    await titlePromise;
   } catch (err) {
     toast('保存失败: ' + err.message, 'error');
     throw err;
@@ -2896,9 +2907,13 @@ async function loadOrchestratorState(sessionID) {
   try {
     // Try new API first
     let data;
+    let convPromise = null;
     try {
       data = await apiGet('/orch-sessions/' + sessionID);
       console.log('[orch:init] loaded session id:', sessionID);
+      // Fire the conversation fetch in parallel with the (mostly synchronous)
+      // canvas application below; it only needs the session ID.
+      convPromise = loadOrchestrationConversation(sessionID);
     } catch (e) {
       // A legacy history session predates OrchestrationSession. Migrate its
       // saved canvas once, then continue with the new session ID.
@@ -2942,6 +2957,10 @@ async function loadOrchestratorState(sessionID) {
           pipelineMessages: data.pipelineMessages || []
         });
       }
+      // The legacy path never issued a parallel conversation fetch; load it
+      // here (outside the parallel fast path) so the new session still shows
+      // its messages.
+      convPromise = loadOrchestrationConversation(state.sessionID);
     }
     if (data) {
       // A session workspace is the authoritative UI value. The process-level
@@ -2979,7 +2998,8 @@ async function loadOrchestratorState(sessionID) {
       if (data.session && data.session.requirementMessages) {
         state.requirementMessages = data.session.requirementMessages;
       }
-      await loadOrchestrationConversation(state.sessionID);
+      if (convPromise) await convPromise;
+      else await loadOrchestrationConversation(state.sessionID);
       if (data.rewrittenTask || (data.session && data.session.rewrittenTask)) {
         state.rewrittenTask = data.rewrittenTask || (data.session && data.session.rewrittenTask) || '';
       }
