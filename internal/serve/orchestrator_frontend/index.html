@@ -1178,6 +1178,17 @@ fetchCwd();
 // follows the selected executor (modelsByExecutor). The analysis
 // responsibility contract stays server-side, so switching engines only swaps
 // the "brain" behind the analysis.
+// Fallback lists keep the pickers usable when /analysis/options fails or the
+// server returns an old shape (e.g. stale executable): without them the
+// select would collapse to a single "reasonix" with empty models.
+const ANALYSIS_DEFAULT_EXECUTORS = ['reasonix', 'opencode', 'codex', 'claude', 'mimo'];
+const ANALYSIS_DEFAULT_MODELS_BY_EXECUTOR = {
+  reasonix: ['deepseek-pro', 'deepseek-flash', 'deepseek'],
+  opencode: ['opencode/deepseek-v4-flash-free', 'deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro'],
+  codex: ['ccs', 'o3', 'codex-default', 'deepseek-v4-flash'],
+  claude: ['ccs', 'opus', 'sonnet', 'haiku', 'claude-fable-5', 'deepseek-v4-flash'],
+  mimo: ['mimo-v2.5-pro', 'mimo-v2.5', 'xiaomi/mimo-v2.5']
+};
 async function loadAnalysisOptions() {
   let data = null;
   try {
@@ -1185,8 +1196,9 @@ async function loadAnalysisOptions() {
   } catch (err) {
     console.error('[analysis/options]', err && err.message ? err.message : err);
   }
-  const executors = (data && Array.isArray(data.executors) && data.executors.length) ? data.executors : ['reasonix'];
-  const byExec = (data && typeof data.modelsByExecutor === 'object') ? data.modelsByExecutor : {};
+  const live = data && Array.isArray(data.executors) && data.executors.length && typeof data.modelsByExecutor === 'object';
+  const executors = live ? data.executors : ANALYSIS_DEFAULT_EXECUTORS;
+  const byExec = live ? data.modelsByExecutor : ANALYSIS_DEFAULT_MODELS_BY_EXECUTOR;
   const fillModels = (executor, modelSel) => {
     if (!modelSel) return;
     const models = (byExec[executor] || []).filter(Boolean);
