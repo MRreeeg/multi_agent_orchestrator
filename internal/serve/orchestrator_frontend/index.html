@@ -490,10 +490,10 @@ input,textarea,select{font:inherit;color:inherit}
           </div>
         </div>
         <div class="chat__opts" id="chat-opts">
+          <span class="chat__opt-label">分析执行器</span>
+          <select class="chat__opt" id="chat-executor" title="需求分析使用的执行器"></select>
           <span class="chat__opt-label">分析模型</span>
           <select class="chat__opt" id="chat-model" title="需求分析使用的模型"></select>
-          <span class="chat__opt-label">分析Agent</span>
-          <select class="chat__opt" id="chat-agent" title="需求分析使用的 Agent 人设（reasonix subagent，空=默认）"></select>
         </div>
         <div class="chat__input-bar" id="chat-input-bar">
           <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
@@ -601,8 +601,8 @@ input,textarea,select{font:inherit;color:inherit}
         <span class="run-dash__badge" id="rd-badge">● 执行中</span>
         <span class="run-dash__title">Loop 运行看板</span>
         <span class="run-dash__spacer"></span>
+        <select class="run-dash__sel" id="rd-executor" title="分析进展使用的执行器"></select>
         <select class="run-dash__sel" id="rd-model" title="分析进展使用的模型"></select>
-        <select class="run-dash__sel" id="rd-agent" title="分析进展使用的 Agent 人设（reasonix subagent，空=默认）"></select>
         <button class="run-dash__btn" id="rd-analyze" title="AI 分析当前执行进展">分析进展</button>
         <button class="run-dash__btn" id="rd-stop" title="停止当前 Loop">停止</button>
         <button class="run-dash__btn" id="rd-close" title="收起看板">收起</button>
@@ -1171,11 +1171,13 @@ async function fetchCwd() {
 }
 fetchCwd();
 
-// ── Analysis model / agent pickers ──
+// ── Analysis executor / model pickers ──
 // The requirement analysis and run-progress analysis entry points share one
-// picklist fetched from /analysis/options. Models come from the reasonix
-// executor catalog; agents are reasonix subagent profiles (persona only —
-// the analysis responsibility contract stays server-side).
+// picklist fetched from /analysis/options. The executor selects the provider
+// engine (reasonix / opencode / codex / claude / mimo); the model picklist
+// follows the selected executor (modelsByExecutor). The analysis
+// responsibility contract stays server-side, so switching engines only swaps
+// the "brain" behind the analysis.
 async function loadAnalysisOptions() {
   let data = null;
   try {
@@ -1183,22 +1185,26 @@ async function loadAnalysisOptions() {
   } catch (err) {
     console.error('[analysis/options]', err && err.message ? err.message : err);
   }
-  const models = (data && Array.isArray(data.models) && data.models.length) ? data.models : ['deepseek-flash'];
-  const agents = (data && Array.isArray(data.agents)) ? data.agents : [];
-  const defModel = models.includes('deepseek-flash') ? 'deepseek-flash' : models[0];
-  [['chat-model', $('#chat-model')], ['rd-model', $('#rd-model')]].forEach(([id, sel]) => {
-    if (!sel) return;
-    sel.innerHTML = models.map(m =>
+  const executors = (data && Array.isArray(data.executors) && data.executors.length) ? data.executors : ['reasonix'];
+  const byExec = (data && typeof data.modelsByExecutor === 'object') ? data.modelsByExecutor : {};
+  const fillModels = (executor, modelSel) => {
+    if (!modelSel) return;
+    const models = (byExec[executor] || []).filter(Boolean);
+    const defModel = models.includes('deepseek-flash') ? 'deepseek-flash' : models[0];
+    modelSel.innerHTML = models.map(m =>
       '<option value="' + escHtml(m) + '"' + (m === defModel ? ' selected' : '') + '>' + escHtml(m) + '</option>'
     ).join('');
-  });
-  const defAgent = '<option value="">默认（不指定）</option>';
-  [['chat-agent', $('#chat-agent')], ['rd-agent', $('#rd-agent')]].forEach(([id, sel]) => {
-    if (!sel) return;
-    sel.innerHTML = defAgent + agents.map(a =>
-      '<option value="' + escHtml(a.name) + '">' + escHtml(a.name) + '</option>'
+  };
+  const fillExecutor = (execSel, modelSel) => {
+    if (!execSel) return;
+    execSel.innerHTML = executors.map(e =>
+      '<option value="' + escHtml(e) + '">' + escHtml(e) + '</option>'
     ).join('');
-  });
+    execSel.addEventListener('change', () => fillModels(execSel.value, modelSel));
+    fillModels(execSel.value, modelSel);
+  };
+  fillExecutor($('#chat-executor'), $('#chat-model'));
+  fillExecutor($('#rd-executor'), $('#rd-model'));
 }
 loadAnalysisOptions();
 
@@ -2681,8 +2687,8 @@ async function sendChat() {
       text,
       history,
       pipelineInfo,
-      model: $('#chat-model').value || '',
-      agent: $('#chat-agent').value || ''
+      executor: $('#chat-executor').value || '',
+      model: $('#chat-model').value || ''
     });
     console.log('[sendChat] analysis result:', JSON.stringify(analysis).substring(0, 500));
     // Loop is a runtime repetition of one base DAG. If the model still
@@ -4553,8 +4559,8 @@ $('#rd-analyze').addEventListener('click', async () => {
   box.innerHTML = '<div class="rd-analysis__loading">⏳ 正在分析执行进展…</div>';
   try {
     const res = await apiPost('/runs/' + encodeURIComponent(runID) + '/analysis', {
-      model: $('#rd-model').value || '',
-      agent: $('#rd-agent').value || ''
+      executor: $('#rd-executor').value || '',
+      model: $('#rd-model').value || ''
     });
     const a = res || {};
     const blocking = (Array.isArray(a.blocking) && a.blocking.length)

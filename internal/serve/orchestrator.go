@@ -336,6 +336,46 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
+// runAnalysisExec dispatches one analysis prompt to the chosen executor.
+// reasonix (default) keeps the stdin subprocess path: it streams thinking
+// lines to onProgress and avoids the Windows 32K argv limit via stdin. The
+// other executors go through the unified orchestrator executor registry in
+// one-shot run mode; their final text is the analysis answer. The
+// responsibility contract (the JSON schema) is always built server-side and
+// passed as the prompt, so any executor/model combination stays compatible
+// with the downstream parsers.
+func runAnalysisExec(ctx context.Context, bin, workDir, prompt, executor, model, agent string, onProgress func(line string)) (string, string, error) {
+	exType := strings.ToLower(strings.TrimSpace(executor))
+	if exType == "" || exType == "reasonix" {
+		return spawnReasonixAnalysis(ctx, bin, workDir, prompt, model, agent, onProgress)
+	}
+	exec := orchestrator.GetExecutor(orchestrator.ExecutorType(exType))
+	if exec == nil {
+		return "", "", fmt.Errorf("unknown executor %q", exType)
+	}
+	spec := orchestrator.ExecSpec{
+		Workspace: workDir,
+		Prompt:    prompt,
+		ModelRef:  model,
+		Mode:      "run",
+		Executor:  exType,
+		NodeID:    "analysis",
+		MaxSteps:  25,
+	}
+	res, err := exec.Execute(ctx, spec, nil)
+	if err != nil && res == nil {
+		return "", "", err
+	}
+	if res == nil {
+		return "", "", fmt.Errorf("executor %q returned no result", exType)
+	}
+	out := strings.TrimSpace(res.FinalText)
+	if out == "" {
+		out = strings.TrimSpace(res.RawStdout)
+	}
+	return out, strings.TrimSpace(res.RawStderr), err
+}
+
 // spawnReasonixAnalysis runs a `reasonix run --model deepseek-flash` subprocess
 // (or `reasonix subagent run <agent> --model <model>` when an analysis agent
 // persona is selected) with the prompt on stdin. Every spawn hides the console
@@ -569,8 +609,9 @@ func (h *orchestratorHandler) analyzeRunProgress(w http.ResponseWriter, r *http.
 		return
 	}
 	var body struct {
-		Model string `json:"model"`
-		Agent string `json:"agent"`
+		Executor string `json:"executor"`
+		Model    string `json:"model"`
+		Agent    string `json:"agent"`
 	}
 	json.NewDecoder(r.Body).Decode(&body) // optional; empty body keeps defaults
 	attempts := h.store.ListAttempts(id)
@@ -643,7 +684,7 @@ Run ID: %s
 	slog.Info("analyzeRunProgress: starting", "run", id, "attempts", len(attempts), "prompt_len", len(prompt))
 	h.emitAnalyzeProgress("spawning", 0, 1, "")
 	start := time.Now()
-	stdout, errMsg, err := spawnReasonixAnalysis(ctx, bin, workDir, prompt, body.Model, body.Agent, func(line string) {
+	stdout, errMsg, err := runAnalysisExec(ctx, bin, workDir, prompt, body.Executor, body.Model, body.Agent, func(line string) {
 		h.emitAnalyzeProgress("thinking", int(time.Since(start).Seconds()), 1, line)
 	})
 	if err != nil {
@@ -682,28 +723,31 @@ func (h *orchestratorHandler) listAgents(w http.ResponseWriter, _ *http.Request)
 	writeJSON(w, agents)
 }
 
-// analysisOptions returns the model picklist and agent-persona picklist for
-// the requirement/progress analysis entry points. Models come from the shared
-// node-type catalog (reasonix executor). Agents are reasonix subagent
-// profiles (run-as=subagent skills); selecting one only swaps the persona
-// behind the analysis — the responsibility contract (the JSON schema) is
-// always built server-side and passed as the task, so it stays universal.
+// analysisOptions returns the executor picklist with per-executor model lists
+// for the requirement/progress analysis entry points, mirroring the node-type
+// catalog.  Selecting an executor only swaps the engine behind the analysis —
+// the responsibility contract (the JSON schema) is always built server-side
+// and passed as the prompt, so it stays universal.
 func (h *orchestratorHandler) analysisOptions(w http.ResponseWriter, _ *http.Request) {
-	models := []string{}
-	for _, nt := range orchestrator.NodeTypeCatalog() {
-		if nt.Type == orchestrator.NodeArchitect {
-			models = append([]string{}, nt.ModelsByExecutor[orchestrator.ExecutorReasonix]...)
-			break
+	catalog := orchestrator.NodeTypeCatalog()
+	executors := []string{}
+	modelsByExecutor := map[string][]string{}
+	if len(catalog) > 0 {
+		for _, ex := range catalog[0].Executors {
+			executors = append(executors, string(ex))
+		}
+		for k, v := range catalog[0].ModelsByExecutor {
+			modelsByExecutor[string(k)] = append([]string{}, v...)
 		}
 	}
-	if len(models) == 0 {
-		models = []string{"deepseek-pro", "deepseek-flash", "deepseek"}
+	if len(executors) == 0 {
+		executors = []string{string(orchestrator.ExecutorReasonix)}
 	}
 	agents := analysisAgentProfiles()
 	if agents == nil {
 		agents = []analysisAgent{}
 	}
-	writeJSON(w, map[string]any{"models": models, "agents": agents})
+	writeJSON(w, map[string]any{"executors": executors, "modelsByExecutor": modelsByExecutor, "agents": agents})
 }
 
 type analysisAgent struct {
@@ -1056,6 +1100,7 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 			Content string `json:"content"`
 		} `json:"history"`
 		PipelineInfo string `json:"pipelineInfo"`
+		Executor     string `json:"executor"`
 		Model        string `json:"model"`
 		Agent        string `json:"agent"`
 	}
@@ -1202,7 +1247,7 @@ Agent角色:
 	// Pass prompt via stdin to avoid Windows 32K command-line length limit.
 	runOnce := func(attempt int, p string) (string, error) {
 		start := time.Now()
-		stdout, errMsg, err := spawnReasonixAnalysis(ctx, bin, workDir, p, body.Model, body.Agent, func(line string) {
+		stdout, errMsg, err := runAnalysisExec(ctx, bin, workDir, p, body.Executor, body.Model, body.Agent, func(line string) {
 			h.emitAnalyzeProgress("thinking", int(time.Since(start).Seconds()), attempt, line)
 		})
 		if err != nil {
@@ -1297,9 +1342,10 @@ Agent角色:
 
 func (h *orchestratorHandler) expandRequirement(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Text  string `json:"text"`
-		Model string `json:"model"`
-		Agent string `json:"agent"`
+		Text     string `json:"text"`
+		Executor string `json:"executor"`
+		Model    string `json:"model"`
+		Agent    string `json:"agent"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Text == "" {
 		writeErr(w, "text is required", http.StatusBadRequest)
@@ -1339,7 +1385,7 @@ func (h *orchestratorHandler) expandRequirement(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	stdout, errMsg, err := spawnReasonixAnalysis(context.Background(), bin, workDir, prompt, body.Model, body.Agent, nil)
+	stdout, errMsg, err := runAnalysisExec(context.Background(), bin, workDir, prompt, body.Executor, body.Model, body.Agent, nil)
 	if err != nil {
 		slog.Error("expand requirement failed", "err", errMsg)
 		writeJSON(w, map[string]string{"expanded": body.Text}) // fallback to original
@@ -1355,9 +1401,10 @@ func (h *orchestratorHandler) expandRequirement(w http.ResponseWriter, r *http.R
 
 func (h *orchestratorHandler) understandRequirement(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Text  string `json:"text"`
-		Model string `json:"model"`
-		Agent string `json:"agent"`
+		Text     string `json:"text"`
+		Executor string `json:"executor"`
+		Model    string `json:"model"`
+		Agent    string `json:"agent"`
 		Nodes []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
@@ -1413,7 +1460,7 @@ func (h *orchestratorHandler) understandRequirement(w http.ResponseWriter, r *ht
 		}
 		workDir = filepath.Dir(exe)
 	}
-	stdout, errMsg, err := spawnReasonixAnalysis(context.Background(), bin, workDir, prompt, body.Model, body.Agent, nil)
+	stdout, errMsg, err := runAnalysisExec(context.Background(), bin, workDir, prompt, body.Executor, body.Model, body.Agent, nil)
 	if err != nil {
 		slog.Error("understand requirement failed", "err", errMsg)
 		// Fallback: return original text and roles

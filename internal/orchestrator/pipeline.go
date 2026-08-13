@@ -1413,8 +1413,14 @@ func getExecutor(key ExecutorType) PipelineExecutor {
 	return executors[key]
 }
 
-func GetExecutorForTest(key ExecutorType) PipelineExecutor {
+// GetExecutor returns the registered executor for a key, or nil when unknown.
+func GetExecutor(key ExecutorType) PipelineExecutor {
 	return getExecutor(key)
+}
+
+// GetExecutorForTest is kept for existing test callers.
+func GetExecutorForTest(key ExecutorType) PipelineExecutor {
+	return GetExecutor(key)
 }
 
 func SetExecutorForTest(key ExecutorType, exec PipelineExecutor) {
