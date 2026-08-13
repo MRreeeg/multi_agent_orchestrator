@@ -711,11 +711,25 @@ type analysisAgent struct {
 	Description string `json:"description"`
 }
 
+// analysisAgentCache caches the subagent profile enumeration: scanning skill
+// directories (maxDepth 3) can take seconds on cold start, and the frontend
+// would otherwise abort the options request and fall back to a single default.
+var analysisAgentCache struct {
+	mu      sync.Mutex
+	agents  []analysisAgent
+	fetched time.Time
+}
+
 // analysisAgentProfiles enumerates reasonix subagent profiles visible from the
 // executable's working directory, mirroring `reasonix subagent list`. Builtin
 // subagent skills are included, same as the CLI. Failures degrade to an empty
-// list so the analysis entry points stay usable.
+// list so the analysis entry points stay usable. Results are cached for 30s.
 func analysisAgentProfiles() []analysisAgent {
+	analysisAgentCache.mu.Lock()
+	defer analysisAgentCache.mu.Unlock()
+	if analysisAgentCache.agents != nil && time.Since(analysisAgentCache.fetched) < 30*time.Second {
+		return analysisAgentCache.agents
+	}
 	workDir := "."
 	if exe, err := os.Executable(); err == nil {
 		workDir = filepath.Dir(exe)
@@ -733,6 +747,8 @@ func analysisAgentProfiles() []analysisAgent {
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	analysisAgentCache.agents = out
+	analysisAgentCache.fetched = time.Now()
 	return out
 }
 

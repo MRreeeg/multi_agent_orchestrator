@@ -1180,7 +1180,9 @@ async function loadAnalysisOptions() {
   let data = null;
   try {
     data = await apiGet('/analysis/options');
-  } catch (_) {}
+  } catch (err) {
+    console.error('[analysis/options]', err && err.message ? err.message : err);
+  }
   const models = (data && Array.isArray(data.models) && data.models.length) ? data.models : ['deepseek-flash'];
   const agents = (data && Array.isArray(data.agents)) ? data.agents : [];
   const defModel = models.includes('deepseek-flash') ? 'deepseek-flash' : models[0];
@@ -1221,6 +1223,7 @@ const API_TIMEOUTS = {
 // server-side); the default 15s deadline would abort before the answer.
 function apiTimeoutMs(path) {
   if (API_TIMEOUTS[path]) return API_TIMEOUTS[path];
+  if (path === '/analysis/options') return 60000;
   if (/^\/runs\/[^/]+\/analysis$/.test(path)) return 260000;
   if (/^\/runtimes\/[^/]+\/message$/.test(path)) return 300000;
   return 15000;
