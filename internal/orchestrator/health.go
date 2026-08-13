@@ -90,12 +90,15 @@ func lookupBin(name string) string {
 }
 
 // probeVersion asks one binary for its version line with a short timeout.
+// 10s (not tighter) because freshly rebuilt Windows binaries can be held up
+// by antivirus first-scan or cold start while five probes run in parallel;
+// a 3s cap caused transient "unavailable" false positives in self-check.
 func probeVersion(ctx context.Context, bin string) (string, error) {
 	type result struct {
 		line string
 		err  error
 	}
-	probeCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(probeCtx, bin, "--version")
 	proc.HideWindow(cmd)
