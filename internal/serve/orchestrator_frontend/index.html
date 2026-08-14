@@ -1001,8 +1001,8 @@ const I18N = {
     'composer.placeholder': '输入需求，Enter 发送，Shift+Enter 换行…',
     'opt.executor': '分析执行器', 'opt.model': '分析模型', 'opt.agent': '分析人设',
     'run.title': 'Loop 运行看板', 'run.analyze': '分析进展', 'run.stop': '停止', 'run.collapse': '收缩', 'run.expand': '展开', 'run.close': '收起',
-    'history.title': '历史会话', 'history.empty': '暂无历史会话', 'hist.rename': '编辑名称', 'hist.renamed': '会话已重命名:', 'hist.renameFailed': '重命名失败:', 'hist.delete': '删除',
-    'runs.empty': '暂无执行记录',
+    'history.title': '历史会话', 'history.empty': '暂无历史会话', 'hist.rename': '编辑名称', 'hist.renamed': '会话已重命名:', 'hist.renameFailed': '重命名失败:', 'hist.delete': '删除', 'hist.loading': '加载中...',
+    'runs.empty': '暂无执行记录', 'runs.title': '执行记录', 'stats.title': '节点类型统计', 'run.records': '执行记录：',
     'sc.executors': '执行器可用性', 'sc.probe': '本机探测的 Agent 与模型（程序化）', 'sc.custom': '客制化 DSH Agent（本地自动导入）', 'sc.skills': 'Skill 库',
     'node.architect': '架构师', 'node.executor': '执行者', 'node.reviewer': '审查者',
     'sse.connected': '已连接', 'sse.disconnected': '未连接',
@@ -1014,7 +1014,7 @@ const I18N = {
     'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情', 'skill.none': '无',
     'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
     'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：',
-    'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…', 'rd.iter': '第 {cur} 轮 / 共 {max} 轮',
+    'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…', 'rd.iter': '第 {cur} 轮 / 共 {max} 轮', 'rd.noRun': '没有可分析的 Run', 'rd.analyzing': '⏳ 正在分析执行进展…', 'rd.blocking': '卡点：', 'rd.noBlocking': '暂无卡点', 'rd.suggest': '建议：', 'rd.analysisTitle': '📊 执行进展分析', 'rd.analysisFail': '分析失败: ', 'rd.failedParen': '（失败 {n}）', 'toast.noLoop': '没有正在运行的 Loop', 'toast.stopReq': '已请求停止当前 Loop', 'toast.stopFail': '停止 Loop 失败: ',
     'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
     'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'cfg.rolePh': '描述该节点的职责...（点击打开大窗口）', 'cfg.execTitle': '驱动本节点的 Agent 引擎', 'cfg.execTitleCodex': 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）', 'cfg.skillTitle': '默认执行器可使用 skill', 'cfg.skillTitleCodex': 'Codex 通过 Prompt 注入 Skill 内容', 'cfg.skillTitleMimo': 'mimo executor 当前不会使用 skill，但可保留配置', 'cfg.dshTitle': '本地客制化的 DSH agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 DSH 内置 persona（Prompt 式）。', 'cfg.dshDefault': '默认（内置 persona，Prompt 式）', 'cfg.dshNoPatch': ' · 无 headless 补丁，不可用于节点', 'loop.off': '关闭', 'loop.on': '开启', 'loop.modeReview': '审查者决定', 'loop.modeFixed': '固定次数', 'loop.pickReviewer': '选择审查节点...', 'loop.overlay': 'Loop 运行时回到执行者 · {mode} · {max} 轮', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ 自定义模型…', 'model.promptTitle': '输入模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消',
@@ -1031,8 +1031,8 @@ const I18N = {
     'composer.placeholder': 'Type a requirement. Enter to send, Shift+Enter for a new line…',
     'opt.executor': 'Executor', 'opt.model': 'Model', 'opt.agent': 'Persona',
     'run.title': 'Loop Dashboard', 'run.analyze': 'Analyze', 'run.stop': 'Stop', 'run.collapse': 'Collapse', 'run.expand': 'Expand', 'run.close': 'Close',
-    'history.title': 'History', 'history.empty': 'No sessions yet', 'hist.rename': 'Rename', 'hist.renamed': 'Session renamed:', 'hist.renameFailed': 'Rename failed:', 'hist.delete': 'Delete',
-    'runs.empty': 'No runs yet',
+    'history.title': 'History', 'history.empty': 'No sessions yet', 'hist.rename': 'Rename', 'hist.renamed': 'Session renamed:', 'hist.renameFailed': 'Rename failed:', 'hist.delete': 'Delete', 'hist.loading': 'Loading...',
+    'runs.empty': 'No runs yet', 'runs.title': 'Run History', 'stats.title': 'Node Type Stats', 'run.records': 'Run history: ',
     'sc.executors': 'Executors', 'sc.probe': 'Probed Agents & Models (programmatic)', 'sc.custom': 'Custom DSH Agents (auto-imported)', 'sc.skills': 'Skills',
     'node.architect': 'Architect', 'node.executor': 'Executor', 'node.reviewer': 'Reviewer',
     'sse.connected': 'Connected', 'sse.disconnected': 'Disconnected',
@@ -1044,7 +1044,7 @@ const I18N = {
     'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details', 'skill.none': 'None',
     'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
     'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ',
-    'rd.running': '● Running', 'rd.runningEllipsis': 'Running…', 'rd.iter': 'Round {cur} / {max}',
+    'rd.running': '● Running', 'rd.runningEllipsis': 'Running…', 'rd.iter': 'Round {cur} / {max}', 'rd.noRun': 'No run to analyze', 'rd.analyzing': '⏳ Analyzing run progress...', 'rd.blocking': 'Blockers: ', 'rd.noBlocking': 'No blockers', 'rd.suggest': 'Suggestions: ', 'rd.analysisTitle': '📊 Run Progress Analysis', 'rd.analysisFail': 'Analysis failed: ', 'rd.failedParen': ' (failed {n})', 'toast.noLoop': 'No Loop is running', 'toast.stopReq': 'Stop requested for current Loop', 'toast.stopFail': 'Failed to stop Loop: ',
     'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
     'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'cfg.rolePh': 'Describe this node role... (click to open large editor)', 'cfg.execTitle': 'Agent engine driving this node', 'cfg.execTitleCodex': 'Codex: run = one-shot exec; serve = retained Runtime (app-server)', 'cfg.skillTitle': 'Default executors can use skill', 'cfg.skillTitleCodex': 'Codex injects Skill via prompt', 'cfg.skillTitleMimo': 'mimo executor does not use skill; kept for compatibility', 'cfg.dshTitle': 'Locally customized DSH agent ($DSH_HOME/.agent-presets). Selected node runs with that agent persona and toolset (custom); empty uses DSH built-in persona (prompt-based).', 'cfg.dshDefault': 'Default (built-in persona, prompt-based)', 'cfg.dshNoPatch': ' · no headless patch, not usable for nodes', 'loop.off': 'Off', 'loop.on': 'On', 'loop.modeReview': 'Review decides', 'loop.modeFixed': 'Fixed rounds', 'loop.pickReviewer': 'Select review node...', 'loop.overlay': 'Loop returns to executor · {mode} · {max} rounds', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ Custom model…', 'model.promptTitle': 'Enter model name', 'model.promptPh': 'Model name (ccs/ccswitch routes via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel',
@@ -1111,6 +1111,13 @@ function applyLang() {
   setTitle('#chat-model', 'opt.model');
   setTitle('#chat-agent', 'opt.agent');
   setTitle('#rd-executor', 'run.analyze');
+  setTitle('#rd-analyze', 'run.analyze');
+  setTitle('#rd-stop', 'run.stop');
+  setTitle('#rd-collapse', 'run.collapse');
+  setTitle('#rd-close', 'run.close');
+  // 面板标题（执行记录 / 节点类型统计）
+  set('#panel-data .stats__section-title', 'runs.title');
+  set('#panel-stats .stats__section-title', 'stats.title');
   setTitle('#btn-save-preset', 'preset.saveTitle');
   set('#gcm-cancel', 'dlg.cancel');
   set('#gcm-ok', 'dlg.ok');
@@ -2275,7 +2282,7 @@ async function loadSessionMessages(name, title, path) {
 
   const loading = document.createElement('div');
   loading.style.cssText = 'text-align:center;color:var(--muted-2);padding:20px;font-size:12px';
-  loading.textContent = '加载中...';
+  loading.textContent = T('hist.loading');
   historyList.appendChild(loading);
 
   try {
@@ -4413,7 +4420,7 @@ async function openRunDetail(runId) {
       '<span>' + T('rd.status') + escHtml(run.status || '-') + '</span>' +
       '<span>' + T('rd.trigger') + escHtml(run.trigger || '-') + '</span>' +
       (started ? '<span>' + started + (finished ? ' → ' + finished : '') + '</span>' : '') +
-      '<span>' + T('rd.nodes') + okCount + '/' + values.length + (failCount > 0 ? '（失败 ' + failCount + '）' : '') + '</span>' +
+      '<span>' + T('rd.nodes') + okCount + '/' + values.length + (failCount > 0 ? T('rd.failedParen').replace('{n}', String(failCount)) : '') + '</span>' +
       (totalTokens ? '<span>Token: ' + formatNumber(totalTokens) + ' · ¥' + totalCost.toFixed(4) + '</span>' : '') +
       '</div></div>';
     // 2) Loop 卡
@@ -5498,7 +5505,7 @@ function updateRunDashboardNode(nodeID, status, output) {
     (status === 'running' ? ' rd-node__dot--running' : status === 'done' ? ' rd-node__dot--done' : status === 'failed' ? ' rd-node__dot--failed' : '');
   if (status === 'running') out.textContent = T('rd.runningEllipsis');
   else if (status === 'done') out.textContent = (output || '').replace(/\s+/g, ' ').substring(0, 120);
-  else if (status === 'failed') out.textContent = '失败: ' + (output || '').substring(0, 120);
+  else if (status === 'failed') out.textContent = T('run.failed') + (output || '').substring(0, 120);
   else out.textContent = '';
 }
 function tryParseReview(detail) {
@@ -5534,11 +5541,11 @@ function finishRunDashboard(ok) {
 }
 $('#rd-analyze').addEventListener('click', async () => {
   const runID = runDash.runID || state.runId;
-  if (!runID) { toast('没有可分析的 Run', 'error'); return; }
+  if (!runID) { toast(T('rd.noRun'), 'error'); return; }
   const box = $('#rd-analysis');
   box.className = 'rd-analysis';
   box.classList.remove('hidden');
-  box.innerHTML = '<div class="rd-analysis__loading">⏳ 正在分析执行进展…</div>';
+  box.innerHTML = '<div class="rd-analysis__loading">' + T('rd.analyzing') + '</div>';
   try {
     const res = await apiPost('/runs/' + encodeURIComponent(runID) + '/analysis', {
       executor: $('#rd-executor').value || '',
@@ -5547,21 +5554,21 @@ $('#rd-analyze').addEventListener('click', async () => {
     });
     const a = res || {};
     const blocking = (Array.isArray(a.blocking) && a.blocking.length)
-      ? '<div class="rd-analysis__blocking"><b>卡点：</b>' + a.blocking.map(escHtml).join('；') + '</div>'
-      : '<div class="rd-analysis__blocking" style="color:var(--success)">暂无卡点</div>';
+      ? '<div class="rd-analysis__blocking"><b>' + T('rd.blocking') + '</b>' + a.blocking.map(escHtml).join('；') + '</div>'
+      : '<div class="rd-analysis__blocking" style="color:var(--success)">' + T('rd.noBlocking') + '</div>';
     const sugg = (Array.isArray(a.suggestions) && a.suggestions.length)
-      ? '<div class="rd-analysis__sugg"><b>建议：</b>' + a.suggestions.map(escHtml).join('；') + '</div>' : '';
-    box.innerHTML = '<div class="rd-analysis__head">📊 执行进展分析</div>' +
+      ? '<div class="rd-analysis__sugg"><b>' + T('rd.suggest') + '</b>' + a.suggestions.map(escHtml).join('；') + '</div>' : '';
+    box.innerHTML = '<div class="rd-analysis__head">' + T('rd.analysisTitle') + '</div>' +
       '<div class="rd-analysis__summary">' + escHtml(a.summary || '') + '</div>' +
       (a.progress ? '<div class="rd-analysis__progress">' + escHtml(a.progress) + '</div>' : '') +
       blocking + sugg;
   } catch (err) {
-    box.innerHTML = '<div style="color:var(--danger)">分析失败: ' + escHtml(err.message || err) + '</div>';
+    box.innerHTML = '<div style="color:var(--danger)">' + T('rd.analysisFail') + escHtml(err.message || err) + '</div>';
   }
 });
 $('#rd-stop').addEventListener('click', () => {
   if (runDash.runID) { cancelOrchRun(runDash.runID); finishRunDashboard(false); }
-  else toast('没有正在运行的 Loop', 'error');
+  else toast(T('toast.noLoop'), 'error');
 });
 $('#rd-close').addEventListener('click', () => {
   $('#run-dash').classList.add('hidden');
@@ -5574,17 +5581,17 @@ $('#rd-close').addEventListener('click', () => {
 $('#rd-collapse').addEventListener('click', () => {
   const dash = $('#run-dash');
   const collapsed = dash.classList.toggle('run-dash--collapsed');
-  $('#rd-collapse').textContent = collapsed ? '展开' : '收缩';
+  $('#rd-collapse').textContent = collapsed ? T('run.expand') : T('run.collapse');
 });
 
 async function cancelOrchRun(runID) {
   if (!state.sessionID || !runID) return;
   try {
     await apiPost('/orch-sessions/' + encodeURIComponent(state.sessionID) + '/runs/' + encodeURIComponent(runID) + '/cancel', {});
-    toast('已请求停止当前 Loop', 'success');
+    toast(T('toast.stopReq'), 'success');
     await loadRuns();
   } catch (err) {
-    toast('停止 Loop 失败: ' + err.message, 'error');
+    toast(T('toast.stopFail') + err.message, 'error');
   }
 }
 
@@ -5661,7 +5668,7 @@ function showSessionDetail(session, runs) {
   const statusIcons = { running: '⏳', complete: '✅', failed: '❌', canceled: '🚫', blocked: '⛔', interrupted: '⏸️' };
   let html = `<div style="margin-bottom:12px"><b>需求：</b>${escHtml(session.task || '')}</div>`;
   if (runs.length) {
-    html += '<div style="font-size:12px;color:var(--muted-2);margin-bottom:8px">执行记录：</div>';
+    html += '<div style="font-size:12px;color:var(--muted-2);margin-bottom:8px">' + T('run.records') + '</div>';
     html += runs.map((r, idx) => {
       const tokens = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.totalTokens || 0), 0) : 0);
       const cost = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.costYuan || 0), 0) : 0);
