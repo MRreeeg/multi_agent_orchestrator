@@ -141,21 +141,29 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__inner th{background:var(--bg-2);font-weight:600}
 .chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
 .chat-bubble--user .chat-bubble__meta{text-align:right}
-.chat__input-bar{border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;background:var(--bg)}
+.chat__input-bar{border-top:1px solid var(--border);padding:14px 20px 18px;background:var(--bg)}
+/* 输入区居中卡片化：不贴两侧、不贴底部，宽度收窄到舒适区 */
+.chat__composer{display:flex;align-items:flex-end;gap:10px;width:min(860px,100%);margin:0 auto}
 /* 工作目录卡片：位于输入框上方，小按钮卡片式（不再是顶栏里的文本框） */
-.chat__ws{display:flex;align-items:center;gap:6px;padding:8px 16px 0;background:var(--bg)}
+/* 注意：input/按钮的显示/隐藏由 JS 用内联 style 控制（display 不写进类），
+   否则 style.display='' 会被类的 display:none 覆盖，路径一隐藏输入框却不出
+   现，界面看起来"工作区变空"。 */
+.chat__ws{display:flex;align-items:center;gap:6px;padding:0}
+.chat__ws--bar{padding:8px 16px 0}
 .chat__ws-btn{display:inline-flex;align-items:center;gap:6px;max-width:min(420px,60vw);border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);font-family:var(--mono);font-size:11px;padding:4px 8px;cursor:pointer;overflow:hidden;white-space:nowrap;transition:border-color .15s,box-shadow .15s}
 .chat__ws-btn:hover{border-color:var(--accent);box-shadow:0 1px 4px oklch(0% 0 0/.08)}
 .chat__ws-btn .chat__ws-edit{color:var(--muted-2);font-family:inherit;font-size:10px;flex-shrink:0}
 .chat__ws-btn:hover .chat__ws-edit{color:var(--accent)}
-.chat__ws-input{display:none;height:26px;width:min(420px,55vw);font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:8px;background:var(--card);color:var(--fg);padding:0 8px;outline:none}
-.chat__ws-confirm{display:none;height:26px;padding:0 10px;font-size:11px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);cursor:pointer}
+.chat__ws-input{height:28px;width:min(420px,55vw);font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:8px;background:var(--card);color:var(--fg);padding:0 8px;outline:none}
+.chat__ws-confirm,.chat__ws-pick{height:28px;padding:0 10px;font-size:11px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);cursor:pointer;transition:border-color .15s,color .15s}
 .chat__ws-confirm:hover{border-color:var(--accent);color:var(--accent)}
+.chat__ws-pick{border-color:var(--accent);color:var(--accent)}
+.chat__ws-pick:hover{background:var(--accent-soft)}
 .chat__opts{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:8px 16px 0;flex-wrap:wrap;background:var(--bg)}
 .chat__opt-label{font-size:10.5px;color:var(--muted-2);font-family:var(--mono)}
 .chat__opt{border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--fg-2);font-size:11px;padding:2px 6px;max-width:180px;outline:none;transition:border-color .15s}
 .chat__opt:hover{border-color:var(--border-strong)}
-.chat__input{flex:1;min-height:46px;max-height:160px;border:1px solid var(--border-strong);border-radius:10px;background:var(--card);padding:8px 12px;font-size:13px;line-height:1.5;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
+.chat__input{flex:1;min-height:52px;max-height:180px;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:10px 14px;font-size:14px;line-height:1.6;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
 .chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 20px -6px oklch(0% 0 0/.18)}
 .chat__input::placeholder{color:var(--muted-2)}
 .chat__send{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius);background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
@@ -163,10 +171,10 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__send:disabled{background:var(--panel-2);color:var(--muted);cursor:default;transform:none}
 .chat__send svg{width:16px;height:16px}
 .topbar__sub{font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:400}
-.hero__title{font-family:var(--heading);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--fg);text-align:center;line-height:1.3}
-.hero__sub{font-size:13px;color:var(--muted-2);text-align:center;width:min(640px,92%);line-height:1.65}
-.hero__box{position:relative;width:min(640px,92%);margin-top:8px}
-.hero__input{display:block;width:100%;min-height:56px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 58px 12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
+.hero__title{font-family:var(--heading);font-size:24px;font-weight:700;letter-spacing:-.02em;color:var(--fg);text-align:center;line-height:1.3}
+.hero__sub{font-size:13.5px;color:var(--muted-2);text-align:center;width:min(680px,92%);line-height:1.65}
+.hero__box{position:relative;width:min(680px,94%);margin-top:10px}
+.hero__input{display:block;width:100%;min-height:62px;resize:none;border:1px solid var(--border-strong);border-radius:16px;background:var(--card);padding:14px 62px 14px 16px;font:14px/1.65 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 8px oklch(0% 0 0/.06),0 1px 2px oklch(0% 0 0/.04)}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 8px 24px -8px oklch(0% 0 0/.2)}
 .hero__input::placeholder{color:var(--muted-2)}
 .hero__send{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;border-radius:10px;background:var(--accent-strong);color:oklch(99% 0 0);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
@@ -478,6 +486,16 @@ input,textarea,select{font:inherit;color:inherit}
           <div class="chat__welcome" id="chat-welcome">
             <div class="hero__title">把任务交给我，剩下的我来编排</div>
             <div class="hero__sub"><b>架构师 → 执行者 → 审查者</b> 协作完成你的任务</div>
+            <div class="chat__ws" id="chat-ws">
+              <button class="chat__ws-btn" id="chat-ws-btn" title="点击修改工作目录（悬停可见完整路径）" onclick="showCwdEditor()">
+                <span>📁</span>
+                <span id="cwd-display" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</span>
+                <span class="chat__ws-edit">✏️ 切换</span>
+              </button>
+              <input class="chat__ws-input" id="cwd-input" type="text" style="display:none" />
+              <button class="chat__ws-pick" id="cwd-pick" style="display:none" title="打开系统文件夹选择器">📂 浏览…</button>
+              <button class="chat__ws-confirm" id="cwd-confirm" style="display:none" onclick="confirmCwd()">确定</button>
+            </div>
             <div class="hero__box">
               <textarea class="hero__input" id="hero-input" rows="2" placeholder="描述你的任务，例如：实现端口范围解析函数并补测试"></textarea>
               <button class="hero__send" id="hero-send" title="生成编排"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></button>
@@ -489,15 +507,6 @@ input,textarea,select{font:inherit;color:inherit}
             </div>
           </div>
         </div>
-        <div class="chat__ws" id="chat-ws">
-          <button class="chat__ws-btn" id="chat-ws-btn" title="点击修改工作目录（悬停可见完整路径）" onclick="showCwdEditor()">
-            <span>📁</span>
-            <span id="cwd-display" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</span>
-            <span class="chat__ws-edit">✏️ 切换</span>
-          </button>
-          <input class="chat__ws-input" id="cwd-input" type="text" />
-          <button class="chat__ws-confirm" id="cwd-confirm" onclick="confirmCwd()">确定</button>
-        </div>
         <div class="chat__opts" id="chat-opts">
           <span class="chat__opt-label">分析执行器</span>
           <select class="chat__opt" id="chat-executor" title="需求分析使用的执行器"></select>
@@ -507,10 +516,12 @@ input,textarea,select{font:inherit;color:inherit}
           <select class="chat__opt" id="chat-agent" title="需求分析使用的 Agent 人设：dsh 执行器下为本机客制化 agent 预设（自检自动导入）"></select>
         </div>
         <div class="chat__input-bar" id="chat-input-bar">
-          <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
-          <button class="chat__send" id="chat-send" title="生成编排">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-          </button>
+          <div class="chat__composer">
+            <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
+            <button class="chat__send" id="chat-send" title="生成编排">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1154,11 +1165,25 @@ function resetChatToWelcome() {
 function showChatWelcome() {
   chatWelcome.style.display = '';
   chatInputBar.style.display = 'none';
+  // 工作目录卡片回到欢迎页：中央输入框正上方
+  const ws = $('#chat-ws');
+  if (ws && ws.parentElement !== chatWelcome) {
+    const heroBox = chatWelcome.querySelector('.hero__box') || chatWelcome;
+    chatWelcome.insertBefore(ws, heroBox);
+    ws.classList.remove('chat__ws--bar');
+  }
 }
 
 function hideChatWelcome() {
   chatWelcome.style.display = 'none';
   chatInputBar.style.display = 'flex';
+  // 工作目录卡片移到对话输入栏上方
+  const ws = $('#chat-ws');
+  if (ws && ws.parentElement !== chatWelcome.parentElement) {
+    const opts = $('#chat-opts');
+    opts.parentElement.insertBefore(ws, opts);
+    ws.classList.add('chat__ws--bar');
+  }
 }
 
   const canvas = $('#canvas');
@@ -1175,19 +1200,34 @@ const sseStatus = $('#sse-status');
 const cwdDisplay = $('#cwd-display');
 const cwdInput = $('#cwd-input');
 const cwdConfirm = $('#cwd-confirm');
+const cwdPick = $('#cwd-pick');
 
 // ── Working directory ──
+function cwdEditorOpen() { return cwdInput.style.display !== 'none'; }
+
+// 关闭编辑态：恢复路径显示。路径文本只可能被"确认成功的值"或"接口返回值"
+// 替换，关闭动作永远不写空——工作区不会因为点空白而变空。
+function closeCwdEditor() {
+  cwdInput.style.display = 'none';
+  cwdConfirm.style.display = 'none';
+  if (cwdPick) cwdPick.style.display = 'none';
+  cwdDisplay.style.display = '';
+}
+
 function showCwdEditor() {
   cwdDisplay.style.display = 'none';
-  cwdInput.style.display = '';
-  cwdConfirm.style.display = '';
-  cwdInput.value = cwdDisplay.textContent;
+  // 显式写 display 值：类的样式表里没有 display 规则（见 .chat__ws-input
+  // 注释），style='' 会退回类的默认 display，曾经把输入框藏死造成"变空"。
+  cwdInput.style.display = 'inline-block';
+  cwdConfirm.style.display = 'inline-flex';
+  if (cwdPick) cwdPick.style.display = 'inline-flex';
+  cwdInput.value = (cwdDisplay.textContent === '-' || cwdDisplay.textContent === '未设置工作目录') ? '' : cwdDisplay.textContent;
   cwdInput.focus();
   cwdInput.select();
 }
 async function confirmCwd() {
   const val = cwdInput.value.trim();
-  if (!val) return;
+  if (!val) { closeCwdEditor(); return; }
   try {
     const res = await fetch('/orchestrator/api/cwd', {
       method: 'POST',
@@ -1208,17 +1248,55 @@ async function confirmCwd() {
   } catch (err) {
     toast('切换失败: ' + err.message, 'error');
   }
-  cwdInput.style.display = 'none';
-  cwdConfirm.style.display = 'none';
-  cwdDisplay.style.display = '';
+  closeCwdEditor();
 }
-cwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmCwd(); if (e.key === 'Escape') { cwdInput.style.display = 'none'; cwdConfirm.style.display = 'none'; cwdDisplay.style.display = ''; } });
+cwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmCwd(); if (e.key === 'Escape') closeCwdEditor(); });
+
+// 点击卡片外空白处：关闭编辑态并恢复路径显示，绝不置空。
+document.addEventListener('mousedown', (e) => {
+  if (!cwdEditorOpen()) return;
+  const card = $('#chat-ws');
+  if (card && card.contains(e.target)) return;
+  closeCwdEditor();
+});
+
+// 系统文件夹选择器：服务端弹原生目录对话框（POST /cwd/pick），选完自动确认。
+if (cwdPick) {
+  cwdPick.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      const res = await apiPost('/cwd/pick', {
+        current: (cwdDisplay.textContent === '-' || cwdDisplay.textContent === '未设置工作目录') ? '' : cwdDisplay.textContent
+      });
+      if (res && res.path) {
+        cwdInput.value = res.path;
+        await confirmCwd();
+        return;
+      }
+      // 用户在系统对话框里取消：恢复显示
+      closeCwdEditor();
+    } catch (err) {
+      toast('打开目录选择失败: ' + (err.message || err), 'error');
+      closeCwdEditor();
+    }
+  });
+}
+
 async function fetchCwd() {
   try {
     const data = await apiGet('/cwd');
-    cwdDisplay.textContent = data.cwd || '-';
-    cwdDisplay.title = data.cwd || '';
+    const c = (data && data.cwd) ? String(data.cwd).trim() : '';
+    if (c) {
+      cwdDisplay.textContent = c;
+      cwdDisplay.title = c;
+      return;
+    }
   } catch (_) {}
+  // 兜底：任何情况下都不允许空着，至少给出可点击的占位提示。
+  if (!cwdDisplay.textContent || cwdDisplay.textContent === '-' || cwdDisplay.textContent === '未设置工作目录') {
+    cwdDisplay.textContent = '未设置工作目录';
+    cwdDisplay.title = '点击选择工作目录';
+  }
 }
 fetchCwd();
 
@@ -1243,6 +1321,18 @@ const ANALYSIS_DEFAULT_MODELS_BY_EXECUTOR = {
   mimo: ['mimo-v2.5-pro', 'mimo-v2.5', 'xiaomi/mimo-v2.5']
 };
 const ANALYSIS_DEFAULT_AGENT = 'frontend-analyst';
+// API timeout table must be declared BEFORE the first apiGet/apiPost call in
+// this script: apiTimeoutMs reads it from the module scope, and `const` is in
+// the temporal dead zone until its declaration line executes — loadAnalysisOptions
+// is invoked at script top level, so a declaration after it would throw
+// "Cannot access 'API_TIMEOUTS' before initialization" on every page load and
+// force the analysis pickers onto their fallback lists.
+const API_TIMEOUTS = {
+  '/requirements/analyze': 260000,
+  '/requirements/expand': 120000,
+  '/requirements/understand': 120000,
+  '/cwd/pick': 300000,
+};
 async function loadAnalysisOptions() {
   let data = null;
   let optionsFailed = false;
@@ -1312,17 +1402,6 @@ loadAnalysisOptions();
 // the browser to abort the request, which also cancelled the server-side
 // subprocess through r.Context(). SSE being "connected" does not change that;
 // SSE and ordinary fetch requests have independent lifecycles.
-const API_TIMEOUTS = {
-  '/requirements/analyze': 260000,
-  '/requirements/expand': 120000,
-  '/requirements/understand': 120000,
-};
-
-// Run-progress analysis drives a model subprocess server-side (same class of
-// slow call as /requirements/analyze) and the path embeds a dynamic run ID,
-// so exact keys cannot cover it — match by shape. Runtime console messages
-// run a full model turn on the retained opencode serve (up to 10 minutes
-// server-side); the default 15s deadline would abort before the answer.
 function apiTimeoutMs(path) {
   if (API_TIMEOUTS[path]) return API_TIMEOUTS[path];
   if (path === '/analysis/options') return 60000;
@@ -3169,10 +3248,12 @@ async function loadOrchestratorState(sessionID) {
     }
     if (data) {
       // A session workspace is the authoritative UI value. The process-level
-      // /cwd endpoint remains only a legacy compatibility mechanism.
-      if (data.session && data.session.workspace) {
-        cwdDisplay.textContent = data.session.workspace;
-        cwdDisplay.title = data.session.workspace;
+      // /cwd endpoint remains only a legacy compatibility mechanism. Never
+      // overwrite the card with an empty value (trim + truthy guard).
+      if (data.session && data.session.workspace && String(data.session.workspace).trim()) {
+        const ws = String(data.session.workspace).trim();
+        cwdDisplay.textContent = ws;
+        cwdDisplay.title = ws;
       }
       // Handle new API response format
       if (data.currentPipeline) {

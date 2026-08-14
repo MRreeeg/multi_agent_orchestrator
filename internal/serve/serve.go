@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -31,6 +32,7 @@ import (
 	"reasonix/internal/event"
 	"reasonix/internal/jobs"
 	"reasonix/internal/nilutil"
+	"reasonix/internal/proc"
 	"reasonix/internal/provider"
 	"reasonix/internal/store"
 )
@@ -183,6 +185,51 @@ func (s *Server) orchestratorCwd(w http.ResponseWriter, r *http.Request) {
 	s.ctl().SetWorkspaceRoot(body.Cwd)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"cwd": body.Cwd})
+}
+
+// orchestratorPickCwd opens a native folder-picker dialog on the server side
+// (Windows FolderBrowserDialog via a STA PowerShell process) and returns the
+// chosen directory. This is how the browser frontend gets a real directory
+// path instead of forcing the user to type it by hand. Cancellation returns
+// {"cancelled":true}; the dialog itself is capped by a timeout so a stale
+// dialog can never leak a server goroutine forever.
+func (s *Server) orchestratorPickCwd(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Current string `json:"current"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	current := strings.TrimSpace(body.Current)
+	if current == "" {
+		current, _ = os.Getwd()
+	}
+	// A path may contain single quotes; double them for the PowerShell literal.
+	esc := strings.ReplaceAll(current, "'", "''")
+	script := "Add-Type -AssemblyName System.Windows.Forms; " +
+		"$f = New-Object System.Windows.Forms.FolderBrowserDialog; " +
+		"$f.Description = '选择工作目录'; " +
+		"try { $f.SelectedPath = '" + esc + "' } catch {}; " +
+		"if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath } else { exit 2 }"
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-STA", "-Command", script)
+	proc.HideWindow(cmd)
+	out, err := cmd.Output()
+	w.Header().Set("Content-Type", "application/json")
+	if ctx.Err() != nil {
+		json.NewEncoder(w).Encode(map[string]any{"cancelled": true, "error": "dialog timeout"})
+		return
+	}
+	if err != nil {
+		// Non-zero exit (2) means the user cancelled the dialog.
+		json.NewEncoder(w).Encode(map[string]any{"cancelled": true})
+		return
+	}
+	picked := strings.TrimSpace(string(out))
+	if picked == "" {
+		json.NewEncoder(w).Encode(map[string]any{"cancelled": true, "error": "empty selection"})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]any{"path": picked})
 }
 
 // orchestratorSubmit translates the orchestrator frontend's {message: "..."}
@@ -497,6 +544,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /orchestrator/api/events", s.orchestratorEvents)
 	mux.HandleFunc("GET /orchestrator/api/cwd", s.orchestratorCwd)
 	mux.HandleFunc("POST /orchestrator/api/cwd", s.orchestratorCwd)
+	mux.HandleFunc("POST /orchestrator/api/cwd/pick", s.orchestratorPickCwd)
 	mux.HandleFunc("POST /orchestrator/api/requirements/expand", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/requirements/understand", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/requirements/analyze", s.orchestratorAPI)

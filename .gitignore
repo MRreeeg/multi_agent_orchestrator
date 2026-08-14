@@ -94,3 +94,7 @@ LeetCode C++ 笔记调研报告*.md
 # playwright CLI artifacts (local browser automation dumps)
 .playwright-cli/
 
+
+# playwright test runner artifacts
+test-results/
+
