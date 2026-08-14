@@ -969,7 +969,7 @@ const I18N = {
     'app.name': '多智能体管家', 'app.sub': '多Agent 编排控制台',
     'top.title': '多Agent 协作编排 · 架构 → 实现 → 审查',
     'nav.chat': '对话', 'nav.pipeline': '管道编辑器', 'nav.data': '执行记录', 'nav.new': '新建会话',
-    'top.selfcheck': '自检', 'top.save': '保存', 'top.execute': '执行', 'top.dark': '深色', 'top.light': '浅色', 'top.lang': 'EN',
+    'top.selfcheck': '自检', 'top.save': '保存', 'top.execute': '执行', 'top.dark': '深色', 'top.light': '浅色', 'top.lang': 'EN', 'top.theme': '切换深色 / 浅色主题', 'top.sideFab': '打开右侧面板（节点配置 / 运行看板）',
     'hero.title': '把任务交给我，剩下的我来编排',
     'hero.sub': '架构师 → 执行者 → 审查者 协作完成你的任务',
     'hero.placeholder': '描述你的任务，例如：实现端口范围解析函数并补测试',
@@ -980,12 +980,26 @@ const I18N = {
     'runs.empty': '暂无执行记录',
     'sc.executors': '执行器可用性', 'sc.probe': '本机探测的 Agent 与模型（程序化）', 'sc.custom': '客制化 DSH Agent（本地自动导入）', 'sc.skills': 'Skill 库',
     'node.architect': '架构师', 'node.executor': '执行者', 'node.reviewer': '审查者',
+    'sse.connected': '已连接', 'sse.disconnected': '未连接',
+    'sc.title': '一键自检', 'sc.refresh': '重新检查', 'sc.checking': '正在检查…',
+    'sc.col.executor': '执行器', 'sc.col.status': '状态', 'sc.col.bin': '二进制', 'sc.col.version': '版本',
+    'sc.available': '可用', 'sc.unavailable': '不可用', 'sc.models': '模型：', 'sc.agents': 'Agent：', 'sc.notInstalled': '未安装（不可用）', 'sc.cached': ' · 缓存', 'sc.initProbe': ' · 已按本机实际能力完成初始化探测', 'sc.probedAt': '探测于 ',
+    'sc.count': '共 ', 'sc.usable': '可用于节点', 'sc.noPatch': '无 headless 补丁', 'sc.emptyHint': '未发现本地客制化 agent。克隆/拉取仓库后一键安装：',
+    'sc.searchPh': '搜索 skill 名称 / 说明…', 'sc.expand': '展开全部', 'sc.collapse': '收起', 'sc.colName': '名称', 'sc.colDesc': '说明', 'sc.colPath': '路径', 'sc.searchRoots': 'Skill 搜索目录: ',
+    'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情',
+    'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
+    'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：',
+    'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…',
+    'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
+    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。',
+    'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消',
+    'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…',
   },
   en: {
     'app.name': 'Multi-Agent Butler', 'app.sub': 'Multi-Agent Orchestrator',
     'top.title': 'Orchestration · Architect → Implement → Review',
     'nav.chat': 'Chat', 'nav.pipeline': 'Pipeline', 'nav.data': 'Runs', 'nav.new': 'New Session',
-    'top.selfcheck': 'Self-check', 'top.save': 'Save', 'top.execute': 'Run', 'top.dark': 'Dark', 'top.light': 'Light', 'top.lang': '中',
+    'top.selfcheck': 'Self-check', 'top.save': 'Save', 'top.execute': 'Run', 'top.dark': 'Dark', 'top.light': 'Light', 'top.lang': '中', 'top.theme': 'Toggle dark / light theme', 'top.sideFab': 'Open right panel (node config / run dashboard)',
     'hero.title': 'Describe it once — we orchestrate the rest',
     'hero.sub': 'Architect → Executor → Reviewer work as a team',
     'hero.placeholder': 'Describe your task, e.g. implement a port-range parser with tests',
@@ -996,11 +1010,27 @@ const I18N = {
     'runs.empty': 'No runs yet',
     'sc.executors': 'Executors', 'sc.probe': 'Probed Agents & Models (programmatic)', 'sc.custom': 'Custom DSH Agents (auto-imported)', 'sc.skills': 'Skills',
     'node.architect': 'Architect', 'node.executor': 'Executor', 'node.reviewer': 'Reviewer',
+    'sse.connected': 'Connected', 'sse.disconnected': 'Disconnected',
+    'sc.title': 'Self-check', 'sc.refresh': 'Re-check', 'sc.checking': 'Checking…',
+    'sc.col.executor': 'Executor', 'sc.col.status': 'Status', 'sc.col.bin': 'Binary', 'sc.col.version': 'Version',
+    'sc.available': 'Available', 'sc.unavailable': 'Unavailable', 'sc.models': 'Models: ', 'sc.agents': 'Agents: ', 'sc.notInstalled': 'Not installed', 'sc.cached': ' · cached', 'sc.initProbe': ' · initial probe done for this machine', 'sc.probedAt': 'probed at ',
+    'sc.count': '', 'sc.usable': 'usable', 'sc.noPatch': 'no headless patch', 'sc.emptyHint': 'No custom DSH agents found. Clone/pull the repo and install:',
+    'sc.searchPh': 'Search skill name / description…', 'sc.expand': 'Expand all', 'sc.collapse': 'Collapse', 'sc.colName': 'Name', 'sc.colDesc': 'Description', 'sc.colPath': 'Path', 'sc.searchRoots': 'Skill search roots: ',
+    'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details',
+    'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
+    'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ',
+    'rd.running': '● Running', 'rd.runningEllipsis': 'Running…',
+    'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
+    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.',
+    'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel',
+    'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…',
   },
 };
 let currentLang = 'zh';
 try { currentLang = localStorage.getItem('orch-lang') || 'zh'; } catch (_) {}
-const T = (key) => (I18N[currentLang] && I18N[currentLang][key]) || I18N.zh[key] || key;
+// 注意：用 !== undefined 判断而非 ||——英文翻译里合法的空字符串值
+// （如 sc.count=''）不能被当成缺 key 回退到中文。
+const T = (key) => (I18N[currentLang] && I18N[currentLang][key] !== undefined) ? I18N[currentLang][key] : (I18N.zh[key] !== undefined ? I18N.zh[key] : key);
 
 // 应用语言：静态区域直接按选择器赋值；动态渲染处使用 T()。
 function applyLang() {
@@ -1043,6 +1073,38 @@ function applyLang() {
   set('#rd-stop', 'run.stop');
   set('#rd-collapse', 'run.collapse');
   set('#rd-close', 'run.close');
+  // —— 其余静态文本与 tooltip ——
+  const setTitle = (sel, key) => { const el = document.querySelector(sel); if (el) el.title = T(key); };
+  setTitle('#btn-selfcheck', 'top.selfcheck');
+  setTitle('#btn-save-pipeline', 'top.save');
+  setTitle('#btn-execute', 'top.execute');
+  setTitle('#btn-theme', 'top.theme');
+  setTitle('#btn-lang', 'top.lang');
+  setTitle('#btn-new-session', 'nav.new');
+  setTitle('#side-fab', 'top.sideFab');
+  setTitle('#chat-executor', 'opt.executor');
+  setTitle('#chat-model', 'opt.model');
+  setTitle('#chat-agent', 'opt.agent');
+  setTitle('#rd-executor', 'run.analyze');
+  set('#gcm-cancel', 'dlg.cancel');
+  set('#gcm-ok', 'dlg.ok');
+  set('#selfcheck-title', 'sc.title');
+  set('#selfcheck-refresh', 'sc.refresh');
+  const sse = document.querySelector('#sse-status');
+  if (sse && sse.textContent) {
+    sse.textContent = T(sse.textContent === '已连接' || sse.textContent === 'Connected' ? 'sse.connected' : 'sse.disconnected');
+  }
+  const rdBadge = document.querySelector('#rd-badge');
+  if (rdBadge) rdBadge.textContent = T('rd.running');
+  // 配置面板字段 label（顺序对应 HTML：0 名称…13 审查节点）
+  const cfgKeys = ['cfg.name', 'cfg.type', 'cfg.model', 'cfg.skill', 'cfg.agent', 'cfg.preset', 'cfg.mode', 'cfg.approval', 'cfg.reasoning', 'cfg.role', 'cfg.loop', 'cfg.loopMode', 'cfg.loopMax', 'cfg.loopReviewer'];
+  const cfgLabels = document.querySelectorAll('#config-fields .field__label');
+  cfgLabels.forEach((el, i) => { if (cfgKeys[i]) el.textContent = T(cfgKeys[i]); });
+  const wsEdit = document.querySelector('#chat-ws-btn .chat__ws-edit');
+  if (wsEdit) wsEdit.textContent = T('ws.switch');
+  const wsPick = document.querySelector('#cwd-pick');
+  if (wsPick) wsPick.textContent = T('ws.pick');
+  if (cwdDisplay && cwdDisplay.textContent === '未设置工作目录') cwdDisplay.textContent = T('ws.unset');
 }
 document.addEventListener('DOMContentLoaded', applyLang);
 document.querySelector('#btn-lang').addEventListener('click', () => {
@@ -1818,10 +1880,10 @@ function confirmDialog(opts) {
   return new Promise(resolve => {
     const m = $('#generic-confirm-modal');
     if (!m) { resolve(true); return; }
-    $('#gcm-title').textContent = opts.title || '确认';
+    $('#gcm-title').textContent = opts.title || T('dlg.confirm');
     $('#gcm-message').innerHTML = opts.message || '';
     const ok = $('#gcm-ok');
-    ok.textContent = opts.okText || '确定';
+    ok.textContent = opts.okText || T('dlg.ok');
     ok.className = 'btn ' + (opts.danger ? 'topbar__btn--danger' : 'btn--primary');
     const cleanup = () => {
       ok.removeEventListener('click', onOk);
@@ -2433,13 +2495,13 @@ function agentSourceLine(node) {
   if (node?.executor === 'dsh') {
     if (node.dshPreset) {
       const p = (state.dshPresets || []).find(x => x.id === node.dshPreset);
-      return '客制化 Agent：' + (p ? escHtml(p.name) + '（' + escHtml(p.id) + '）' : escHtml(node.dshPreset));
+      return T('src.custom') + (p ? escHtml(p.name) + '（' + escHtml(p.id) + '）' : escHtml(node.dshPreset));
     }
-    return 'Prompt 式：内置 persona';
+    return T('src.promptDefault');
   }
-  if (node?.executor === 'mimo' && node?.agent) return 'Agent 配置：' + escHtml(node.agent);
-  if (node?.skill) return 'Prompt 式：Skill 注入 ' + escHtml(node.skill);
-  return 'Prompt 式：角色描述';
+  if (node?.executor === 'mimo' && node?.agent) return T('src.agentCfg') + escHtml(node.agent);
+  if (node?.skill) return T('src.skillInject') + escHtml(node.skill);
+  return T('src.roleDesc');
 }
 
 function agentSourceClass(node) {
@@ -2468,11 +2530,11 @@ function renderNodes() {
         <span class="node__type-badge node__type-badge--${node.type}">${typeLabel}</span>
         <span class="node__name">${escHtml(node.name)}</span>
         <span class="node__status node__status--${node.status}"></span>
-        <span class="node__detail-btn" data-node-id="${node.id}" title="查看详情">ℹ</span>
+        <span class="node__detail-btn" data-node-id="${node.id}" title="' + T('node.detail') + '">ℹ</span>
       </div>
       <div class="node__body">
-        <div class="node__model">${escHtml(node.model || '未选择模型')}</div>
-        <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || '默认 Agent') : (node.skill || '无 Skill'))}</div>
+        <div class="node__model">${escHtml(node.model || T('node.noModel'))}</div>
+        <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || T('node.defaultAgent')) : (node.skill || T('node.noSkill')))}</div>
         <div class="${agentSourceClass(node)}">${agentSourceLine(node)}</div>
         ${node.runtime && node.runtime.output ? `<div class="node__output">${escHtml(node.runtime.output)}</div>` : ''}
       </div>
@@ -3712,7 +3774,7 @@ function connectSSE() {
   state.sseConnection = ev;
   ev.onopen = () => {
     sseDot.classList.add('topbar__dot--live');
-    sseStatus.textContent = '已连接';
+    sseStatus.textContent = T('sse.connected');
     state.sseNotified = false;
   };
   ev.onerror = () => {
@@ -4100,22 +4162,22 @@ function selfcheckBadge(ok, text) {
 async function openSelfCheck() {
   const body = $('#selfcheck-body');
   $('#selfcheck-modal').style.display = 'flex';
-  body.innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:24px;font-size:13px">正在检查…</div>';
+  body.innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:24px;font-size:13px">' + T('sc.checking') + '</div>';
   try {
     const d = await apiGet('/selfcheck');
     let html = '';
     const checked = new Date(d.checkedAt || Date.now()).toLocaleTimeString();
-    $('#selfcheck-meta').textContent = '检查时间 ' + checked;
+    $('#selfcheck-meta').textContent = T('sc.checkedAt') + checked;
 
     // 1. Health: executor binaries（badge 不换行；二进制列省略号，悬停看全路径）
     html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.executors') + '</div>';
     html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;table-layout:fixed">' +
       '<colgroup><col style="width:70px"><col style="width:64px"><col><col style="width:120px"></colgroup>' +
-      '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">执行器</th><th style="padding:4px 6px">状态</th><th style="padding:4px 6px">二进制</th><th style="padding:4px 6px">版本</th></tr>';
+      '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">' + T('sc.col.executor') + '</th><th style="padding:4px 6px">' + T('sc.col.status') + '</th><th style="padding:4px 6px">' + T('sc.col.bin') + '</th><th style="padding:4px 6px">' + T('sc.col.version') + '</th></tr>';
     (d.health || []).forEach(h => {
       html += '<tr style="border-top:1px solid var(--border);font-size:12.5px">' +
         '<td style="padding:6px;white-space:nowrap">' + escHtml(executorLabels[h.executor] || h.executor) + '</td>' +
-        '<td style="padding:6px;white-space:nowrap">' + selfcheckBadge(h.available, h.available ? '可用' : '不可用') + '</td>' +
+        '<td style="padding:6px;white-space:nowrap">' + selfcheckBadge(h.available, h.available ? T('sc.available') : T('sc.unavailable')) + '</td>' +
         '<td style="padding:6px;font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(h.bin || '') + '">' + escHtml(h.bin || '-') + '</td>' +
         '<td style="padding:6px;font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(h.version || (h.error ? h.error : '-')) + '">' + escHtml(h.version || (h.error ? h.error : '-')) + '</td></tr>';
     });
@@ -4125,8 +4187,8 @@ async function openSelfCheck() {
     const probes = (d.probes && d.probes.executors) ? d.probes.executors : [];
     const probedAt = d.probes && d.probes.probedAt ? new Date(d.probes.probedAt).toLocaleTimeString() : '';
     html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.probe') + ' ' +
-      '<span style="font-weight:400;color:var(--muted-2);font-size:11px">' + (probedAt ? '探测于 ' + probedAt : '') + '</span>' +
-      (d.probes && d.probes.fromCache ? '<span style="font-weight:400;color:var(--muted-2);font-size:11px"> · 缓存</span>' : '<span style="font-weight:400;color:var(--accent);font-size:11px"> · 已按本机实际能力完成初始化探测</span>') + '</div>';
+      '<span style="font-weight:400;color:var(--muted-2);font-size:11px">' + (probedAt ? T('sc.probedAt') + probedAt : '') + '</span>' +
+      (d.probes && d.probes.fromCache ? '<span style="font-weight:400;color:var(--muted-2);font-size:11px">' + T('sc.cached') + '</span>' : '<span style="font-weight:400;color:var(--accent);font-size:11px">' + T('sc.initProbe') + '</span>') + '</div>';
     if (probes.length) {
       html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;background:var(--card)">';
       probes.forEach(pe => {
@@ -4134,29 +4196,29 @@ async function openSelfCheck() {
         html += '<div style="margin:6px 0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">' +
           '<span style="font-family:var(--mono);font-size:11.5px;color:var(--accent);min-width:74px;font-weight:600">' + escHtml(label) + '</span>' +
           (pe.available
-            ? '<span style="font-size:12.5px;color:var(--fg-2)">模型：' + escHtml((pe.models || []).join(' · ') || '—') + '</span>' +
-              ((pe.agents && pe.agents.length) ? '<span style="font-size:12px;color:var(--muted-2)">Agent：' + pe.agents.map(escHtml).join(' · ') + '</span>' : '')
-            : '<span style="font-size:12px;color:var(--muted-2)">未安装（不可用）</span>') +
+            ? '<span style="font-size:12.5px;color:var(--fg-2)">' + T('sc.models') + escHtml((pe.models || []).join(' · ') || '—') + '</span>' +
+              ((pe.agents && pe.agents.length) ? '<span style="font-size:12px;color:var(--muted-2)">' + T('sc.agents') + pe.agents.map(escHtml).join(' · ') + '</span>' : '')
+            : '<span style="font-size:12px;color:var(--muted-2)">' + T('sc.notInstalled') + '</span>') +
           (pe.error ? '<span style="font-size:11px;color:var(--danger);font-family:var(--mono)">' + escHtml(pe.error) + '</span>' : '') +
           '</div>';
       });
       html += '</div>';
     }
-    html += '<div style="font-size:11.5px;color:var(--muted-2);margin-bottom:12px">节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。</div>';
+    html += '<div style="font-size:11.5px;color:var(--muted-2);margin-bottom:12px">' + T('sc.probeNote') + '</div>';
 
     // 3. 客制化 DSH Agent（本地自动导入 $DSH_HOME/.agent-presets）
     const dshPresets = d.dshPresets || [];
-    html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.custom') + ' <span style="font-weight:400;color:var(--muted-2);font-size:12px">共 ' + dshPresets.length + ' 个</span></div>';
+    html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.custom') + ' <span style="font-weight:400;color:var(--muted-2);font-size:12px">' + T('sc.count') + dshPresets.length + T('sc.countSuffix') + '</span></div>';
     dshPresets.forEach(p => {
       html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;background:var(--card)">' +
         '<div style="font-weight:600;font-size:13px">' + escHtml(p.name || p.id) +
         '<span style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-left:8px">' + escHtml(p.id) + '</span>' +
-        '<span style="margin-left:8px">' + selfcheckBadge(p.hasPatch, p.hasPatch ? '可用于节点' : '无 headless 补丁') + '</span></div>' +
+        '<span style="margin-left:8px">' + selfcheckBadge(p.hasPatch, p.hasPatch ? T('sc.usable') : T('sc.noPatch')) + '</span></div>' +
         (p.description ? '<div style="font-size:12.5px;color:var(--fg-2);margin-top:4px">' + escHtml(p.description) + '</div>' : '') +
         '<div style="font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:4px">' + escHtml(p.dir || '') + '</div></div>';
     });
     if (!dshPresets.length) {
-      html += '<div style="font-size:12.5px;color:var(--muted-2);padding:6px 0 12px">未发现本地客制化 agent。克隆/拉取仓库后一键安装：<br>' +
+      html += '<div style="font-size:12.5px;color:var(--muted-2);padding:6px 0 12px">' + T('sc.emptyHint') + '<br>' +
         '<span style="font-family:var(--mono);font-size:11.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 8px;display:inline-block;margin-top:4px">cd docs\\deepseek-harness\\dsh-agent-pack &amp;&amp; .\\install.ps1 -Mode user</span>' +
         '<br>也可手工放置：$DSH_HOME/.agent-presets/&lt;id&gt;/（agent.cordis.yml + preset.yml + headless.patch.yml）后重新自检。</div>';
     }
@@ -4166,10 +4228,10 @@ async function openSelfCheck() {
     const SKILL_PREVIEW = 12;
     html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.skills') + ' <span style="font-weight:400;color:var(--muted-2);font-size:12px">共 ' + skills.length + ' 个</span></div>';
     html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
-      '<input id="skill-search" type="text" placeholder="搜索 skill 名称 / 说明…" style="flex:1;max-width:320px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg);font-size:12px;padding:0 10px;outline:none">' +
-      '<button id="skill-toggle" class="chat__ws-confirm" style="display:inline-flex" title="展开/收起全部 Skill">展开全部</button></div>';
+      '<input id="skill-search" type="text" placeholder="' + T('sc.searchPh') + '" style="flex:1;max-width:320px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg);font-size:12px;padding:0 10px;outline:none">' +
+      '<button id="skill-toggle" class="chat__ws-confirm" style="display:inline-flex" title="展开/收起全部 Skill">' + T('sc.expand') + '</button></div>';
     html += '<table id="skill-table" style="width:100%;border-collapse:collapse;margin-bottom:14px">' +
-      '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">名称</th><th style="padding:4px 6px">说明</th><th style="padding:4px 6px">路径</th></tr>';
+      '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">' + T('sc.colName') + '</th><th style="padding:4px 6px">' + T('sc.colDesc') + '</th><th style="padding:4px 6px">' + T('sc.colPath') + '</th></tr>';
     skills.forEach((s, idx) => {
       const hidden = idx >= SKILL_PREVIEW;
       html += '<tr class="skill-row" data-name="' + escHtml((s.name || '').toLowerCase()) + '" data-desc="' + escHtml((s.description || '').toLowerCase()) + '"' + (hidden ? ' style="display:none"' : '') + '>' +
@@ -4177,11 +4239,11 @@ async function openSelfCheck() {
         '<td style="padding:5px 6px;color:var(--fg-2)">' + escHtml(s.description || '') + '</td>' +
         '<td style="padding:5px 6px;font-family:var(--mono);font-size:11px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px" title="' + escHtml(s.path || '') + '">' + escHtml(s.path || '') + '</td></tr>';
     });
-    if (!skills.length) html += '<tr><td style="padding:10px;color:var(--muted-2)">当前未发现可用 Skill</td></tr>';
+    if (!skills.length) html += '<tr><td style="padding:10px;color:var(--muted-2)">' + T('sc.noSkills') + '</td></tr>';
     html += '</table>';
 
     if (d.skillRoots && d.skillRoots.length) {
-      html += '<div style="font-size:12px;color:var(--muted-2);margin-bottom:10px">Skill 搜索目录: ' +
+      html += '<div style="font-size:12px;color:var(--muted-2);margin-bottom:10px">' + T('sc.searchRoots') + ' ' +
         d.skillRoots.map(x => '<span style="font-family:var(--mono);font-size:11px">' + escHtml(x) + '</span>').join(' &nbsp;·&nbsp; ') + '</div>';
     }
 
@@ -4208,7 +4270,7 @@ async function openSelfCheck() {
     if (skillToggle) {
       skillToggle.addEventListener('click', () => {
         skillExpanded = !skillExpanded;
-        skillToggle.textContent = skillExpanded ? '收起' : '展开全部';
+        skillToggle.textContent = skillExpanded ? T('sc.collapse') : T('sc.expand');
         document.querySelectorAll('#skill-table .skill-row').forEach((row, idx) => {
           const q = skillSearch ? skillSearch.value.trim().toLowerCase() : '';
           const hit = !q || row.dataset.name.includes(q) || row.dataset.desc.includes(q);
@@ -4246,18 +4308,18 @@ async function showNodeDetail(node) {
     } catch (_) {}
   }
   const statusIcon = output.status === 'done' ? '✅' : output.status === 'failed' ? '❌' : output.status === 'interrupted' ? '⏸️' : output.status === 'empty' ? '⚠️' : '⏳';
-  const statusText = output.status === 'done' ? '已完成' : output.status === 'failed' ? '失败' : output.status === 'interrupted' ? '已中断' : output.status === 'empty' ? '完成但无输出' : '待执行';
+  const statusText = output.status === 'done' ? T('nd.done') : output.status === 'failed' ? T('nd.failed') : output.status === 'interrupted' ? T('nd.interrupted') : output.status === 'empty' ? T('nd.empty') : T('nd.pending');
   
   // Build HTML with node config info
   let html = `
     <div style="margin-bottom:16px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-        <div><span style="color:var(--muted-2)">类型：</span>${escHtml(typeLabels[node.type] || node.type)}</div>
-        <div><span style="color:var(--muted-2)">模型：</span><span class="mono">${escHtml(node.model || '-')}</span></div>
-        <div><span style="color:var(--muted-2)">状态：</span>${statusIcon} ${statusText}</div>
+        <div><span style="color:var(--muted-2)">' + T('nd.type') + '</span>${escHtml(typeLabels[node.type] || node.type)}</div>
+        <div><span style="color:var(--muted-2)">' + T('nd.model') + '</span><span class="mono">${escHtml(node.model || '-')}</span></div>
+        <div><span style="color:var(--muted-2)">' + T('nd.status') + '</span>${statusIcon} ${statusText}</div>
         <div><span style="color:var(--muted-2)">${node.executor === 'mimo' ? 'Agent' : 'Skill'}：</span>${escHtml(node.executor === 'mimo' ? (node.agent || '默认') : (node.skill || '无'))}</div>
-        <div style="grid-column:span 2"><span style="color:var(--muted-2)">角色：</span>${escHtml(node.role || '未设置')}</div>
-        <div style="grid-column:span 2"><span style="color:var(--muted-2)">Agent 来源：</span>${agentSourceLine(node)}</div>
+        <div style="grid-column:span 2"><span style="color:var(--muted-2)">' + T('nd.role') + '</span>${escHtml(node.role || '未设置')}</div>
+        <div style="grid-column:span 2"><span style="color:var(--muted-2)">' + T('nd.source') + '</span>${agentSourceLine(node)}</div>
       </div>
     </div>
   `;
@@ -4275,7 +4337,7 @@ async function showNodeDetail(node) {
       <div style="margin-bottom:12px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
         <div style="font-size:12px;font-weight:600;margin-bottom:6px">Runtime</div>
         <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 8px">
-          <span style="color:var(--muted-2)">状态：</span><span>${rtStatus}</span>
+          <span style="color:var(--muted-2)">' + T('nd.status') + '</span><span>${rtStatus}</span>
           <span style="color:var(--muted-2)">端口：</span><span class="mono">${rt.port || '-'}</span>
           <span style="color:var(--muted-2)">端点：</span><span class="mono" style="font-size:10px">${rt.endpoint || '-'}</span>
           <span style="color:var(--muted-2)">策略：</span><span>retained（保留至手动停止）</span>
@@ -5163,7 +5225,7 @@ function showRunDashboard(runID) {
     initRunDashboard();
   const b = $('#rd-badge');
   b.className = 'run-dash__badge';
-  b.textContent = '● 执行中';
+  b.textContent = T('rd.running');
 }
 function updateRunDashboardNode(nodeID, status, output) {
   if (!runDash.active) return;
@@ -5175,7 +5237,7 @@ function updateRunDashboardNode(nodeID, status, output) {
   const out = row.querySelector('.rd-node__out');
   dot.className = 'rd-node__dot' +
     (status === 'running' ? ' rd-node__dot--running' : status === 'done' ? ' rd-node__dot--done' : status === 'failed' ? ' rd-node__dot--failed' : '');
-  if (status === 'running') out.textContent = '执行中…';
+  if (status === 'running') out.textContent = T('rd.runningEllipsis');
   else if (status === 'done') out.textContent = (output || '').replace(/\s+/g, ' ').substring(0, 120);
   else if (status === 'failed') out.textContent = '失败: ' + (output || '').substring(0, 120);
   else out.textContent = '';
@@ -5291,11 +5353,11 @@ function renderRuns() {
     const current = r.currentIteration || (iterations.length ? iterations[iterations.length - 1].number : 0);
     const finalDecision = r.finalReview?.decision || (iterations.length ? iterations[iterations.length - 1].decision : '');
     // 友好编号：第 N 次执行（run id 保留在副行与悬停提示）
-    const friendlyLabel = '第 ' + (idx + 1) + ' 次执行';
+    const friendlyLabel = T('run.execLabel').replace('{n}', String(idx + 1));
     const resumeButton = r.status === 'interrupted' && cfg.enabled
-      ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">继续 Loop</button>` : '';
+      ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">' + T('run.resume') + '</button>` : '';
     const cancelButton = r.status === 'running'
-      ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">停止</button>` : '';
+      ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">' + T('run.stop') + '</button>` : '';
     return `
     <div class="run-card" style="cursor:pointer;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px" title="${escHtml(r.id)}">
       <div style="display:flex;align-items:center;gap:8px">
@@ -5305,15 +5367,15 @@ function renderRuns() {
       </div>
       ${taskPreview ? `<div style="font-size:11px;color:var(--muted-2);margin-top:4px">${escHtml(taskPreview)}</div>` : ''}
       <div style="font-size:11px;color:var(--muted-2);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap">
-        <span>节点: ${successCount}/${nodeCount}</span>
-        ${failCount > 0 ? `<span style="color:var(--danger)">失败: ${failCount}</span>` : ''}
-        <span>触发: ${escHtml(trigger)}</span>
+        <span>' + T('run.nodes') + '${successCount}/${nodeCount}</span>
+        ${failCount > 0 ? `<span style="color:var(--danger)">' + T('run.failed') + '${failCount}</span>` : ''}
+        <span>' + T('run.trigger') + '${escHtml(trigger)}</span>
         ${started ? `<span>${started}${finished ? ' → ' + finished : ''}</span>` : ''}
       </div>
       ${cfg.enabled ? `<div style="font-size:11px;color:var(--muted-2);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap">
-        <span>Loop：第 ${current} / ${max} 轮</span><span>模式：${escHtml(mode)}</span>
-        ${r.terminationReason ? `<span>终止原因：${escHtml(r.terminationReason)}</span>` : ''}
-        ${finalDecision ? `<span>最终 Review：${escHtml(finalDecision)}</span>` : ''}
+        <span>' + T('run.loopInfo') + '${current} / ${max}</span><span>' + T('run.mode') + '${escHtml(mode)}</span>
+        ${r.terminationReason ? `<span>' + T('run.term') + '${escHtml(r.terminationReason)}</span>` : ''}
+        ${finalDecision ? `<span>' + T('run.review') + '${escHtml(finalDecision)}</span>` : ''}
       </div>` : ''}
       ${r.error ? `<div style="font-size:11px;color:var(--danger);margin-top:4px">${escHtml(r.error.substring(0, 100))}</div>` : ''}
       ${resumeButton}${cancelButton}
@@ -5342,7 +5404,7 @@ function showSessionDetail(session, runs) {
       const tokens = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.totalTokens || 0), 0) : 0);
       const cost = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.costYuan || 0), 0) : 0);
       return `<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:12px" title="${escHtml(r.id)}">
-        <div>${statusIcons[r.status] || '⏳'} 第 ${idx + 1} 次执行 <span style="color:var(--muted-2)">${r.status}</span> <span style="color:var(--muted-2);font-family:var(--mono);font-size:10px">${escHtml(r.id)}</span></div>
+        <div>${statusIcons[r.status] || '⏳'} ' + T('run.execLabel').replace('{n}', String(idx + 1)) + ' <span style="color:var(--muted-2)">${r.status}</span> <span style="color:var(--muted-2);font-family:var(--mono);font-size:10px">${escHtml(r.id)}</span></div>
         <div style="color:var(--muted-2);margin-top:4px">Token: ${formatNumber(tokens)} · ¥${cost.toFixed(4)}</div>
       </div>`;
     }).join('');
