@@ -2040,39 +2040,39 @@ func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) str
 		if run.Task != "" {
 			if hint := assistHint(node); hint != "" {
 				if node != nil && node.RoleDesc != "" {
-					return fmt.Sprintf("## 节点职责\n%s\n\n## 原始任务\n%s\n\n%s", node.RoleDesc, run.Task, hint)
+					return fmt.Sprintf("## 节点职责 / Node duty\n%s\n\n## 原始任务 / Original task\n%s\n\n%s", node.RoleDesc, run.Task, hint)
 				}
 				return fmt.Sprintf("%s\n\n%s", run.Task, hint)
 			}
 			if node != nil && node.RoleDesc != "" {
-				return fmt.Sprintf("## 节点职责\n%s\n\n## 原始任务\n%s", node.RoleDesc, run.Task)
+				return fmt.Sprintf("## 节点职责 / Node duty\n%s\n\n## 原始任务 / Original task\n%s", node.RoleDesc, run.Task)
 			}
 			return run.Task
 		}
 		if node != nil && node.RoleDesc != "" {
 			if hint := assistHint(node); hint != "" {
-				return fmt.Sprintf("你是一个%s。你的任务是：%s。请开始工作。\n\n%s", node.Label, node.RoleDesc, hint)
+				return fmt.Sprintf("你是一个%s / You are a(n) %s。你的任务是：%s。请开始工作 / Begin.\n\n%s", node.Label, node.Label, node.RoleDesc, hint)
 			}
-			return fmt.Sprintf("你是一个%s。你的任务是：%s。请开始工作。", node.Label, node.RoleDesc)
+			return fmt.Sprintf("你是一个%s / You are a(n) %s。你的任务是：%s。请开始工作 / Begin.", node.Label, node.Label, node.RoleDesc)
 		}
 		if hint := assistHint(node); hint != "" {
-			return fmt.Sprintf("请完成你的角色任务。角色：%s\n\n%s", node.Label, hint)
+			return fmt.Sprintf("请完成你的角色任务 / Complete your role task。角色 / Role：%s\n\n%s", node.Label, hint)
 		}
-		return fmt.Sprintf("请完成你的角色任务。角色：%s", node.Label)
+		return fmt.Sprintf("请完成你的角色任务 / Complete your role task。角色 / Role：%s", node.Label)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var parts []string
 	if node != nil && node.RoleDesc != "" {
-		parts = append(parts, "## 节点职责\n"+node.RoleDesc)
+		parts = append(parts, "## 节点职责 / Node duty\n"+node.RoleDesc)
 	}
 	if hint := assistHint(node); hint != "" {
 		parts = append(parts, hint)
 	}
 	if run.Task != "" {
-		parts = append(parts, "## 原始任务\n"+run.Task)
+		parts = append(parts, "## 原始任务 / Original task\n"+run.Task)
 	}
-	parts = append(parts, "## 上游节点输出")
+	parts = append(parts, "## 上游节点输出 / Upstream output")
 	for _, e := range upstream {
 		st, ok := run.NodeStates[e.FromID]
 		if ok && st.Output != "" {

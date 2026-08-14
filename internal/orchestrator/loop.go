@@ -1202,22 +1202,22 @@ func (s *Store) gatherInputForIteration(pipe *Pipeline, run *PipelineRun, iterat
 
 	var parts []string
 	if node != nil && node.RoleDesc != "" {
-		parts = append(parts, "## 节点职责\n"+node.RoleDesc)
+		parts = append(parts, "## 节点职责 / Node duty\n"+node.RoleDesc)
 	}
 	if hint := assistHint(node); hint != "" {
 		parts = append(parts, hint)
 	}
 	if run.Task != "" {
-		parts = append(parts, "## 当前轮任务\n"+run.Task)
+		parts = append(parts, "## 当前轮任务 / Current round task\n"+run.Task)
 	}
 	current, hasCurrent := s.iterations[iterationID]
 	if hasCurrent {
-		parts = append(parts, fmt.Sprintf("## Loop 轮次\n第 %d 轮", current.Number))
+		parts = append(parts, fmt.Sprintf("## Loop 轮次 / Loop round\n第 %d 轮 (Round %d)", current.Number, current.Number))
 	}
 
 	included := make(map[string]bool, len(upstream))
 	if len(upstream) > 0 {
-		parts = append(parts, "## 上游节点输出")
+		parts = append(parts, "## 上游节点输出 / Upstream output")
 	}
 	// Read current-iteration attempts first. If an architect was intentionally
 	// skipped after iteration 1, fall back to its latest successful output.

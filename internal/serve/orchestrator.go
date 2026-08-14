@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -292,6 +293,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.loadSessionState(w, r, id)
 	case path == "/runtimes" && r.Method == http.MethodGet:
 		h.listRuntimes(w, r)
+	case path == "/runtimes/cleanup" && r.Method == http.MethodPost:
+		h.cleanupRuntimes(w, r)
 	case strings.HasSuffix(path, "/console") && r.Method == http.MethodGet:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/console")
 		h.getRuntimeConsole(w, r, id)
@@ -966,6 +969,69 @@ func (h *orchestratorHandler) listRuntimes(w http.ResponseWriter, _ *http.Reques
 	writeJSON(w, all)
 }
 
+// cleanupRuntimes deletes stale per-runtime working directories under
+// bin/orchestrator-runtimes (each can hold a 50+ MB reasonix.exe copy), keeping
+// the `keep` most recent ones. Returns how many were removed and the freed size.
+func (h *orchestratorHandler) cleanupRuntimes(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Keep int `json:"keep"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if body.Keep < 1 {
+		body.Keep = 2
+	}
+
+	root := filepath.Join(filepath.Dir(os.Args[0]), "orchestrator-runtimes")
+	if exe, err := os.Executable(); err == nil {
+		root = filepath.Join(filepath.Dir(exe), "orchestrator-runtimes")
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		writeJSON(w, map[string]any{"deleted": 0, "freedMB": 0, "kept": []string{}, "error": err.Error()})
+		return
+	}
+	var dirs []string
+	for _, e := range entries {
+		if e.IsDir() && strings.HasPrefix(e.Name(), "runtime-") {
+			dirs = append(dirs, e.Name())
+		}
+	}
+	sort.Strings(dirs) // names embed timestamps: ascending = oldest first
+	var kept []string
+	deleted := 0
+	var freed int64
+	for i, name := range dirs {
+		if i >= len(dirs)-body.Keep {
+			kept = append(kept, name)
+			continue
+		}
+		target := filepath.Join(root, name)
+		dirSize, _ := dirSizeBytes(target)
+		if rmErr := os.RemoveAll(target); rmErr == nil {
+			deleted++
+			freed += dirSize
+		}
+	}
+	slog.Info("runtimes cleanup", "root", root, "deleted", deleted, "freed_mb", freed>>20, "kept", kept)
+	writeJSON(w, map[string]any{"deleted": deleted, "freedMB": int(freed >> 20), "kept": kept})
+}
+
+func dirSizeBytes(path string) (int64, error) {
+	var total int64
+	err := filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries; count what we can
+		}
+		if !d.IsDir() {
+			if info, e := d.Info(); e == nil {
+				total += info.Size()
+			}
+		}
+		return nil
+	})
+	return total, err
+}
+
 func (h *orchestratorHandler) getRuntime(w http.ResponseWriter, _ *http.Request, id string) {
 	if rt, ok := orchestrator.GetMimoRuntime(id); ok {
 		writeJSON(w, rt)
@@ -1195,8 +1261,9 @@ func enforceGeneratedRoleBoundary(agent, roleDesc string) string {
 // Returns structured requirement + suggested node roles.
 func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Text    string `json:"text"`
-		History []struct {
+		Text         string `json:"text"`
+		Lang         string `json:"lang"` // "zh" | "en"; UI language for replies
+		History      []struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`
 		} `json:"history"`
@@ -1225,101 +1292,11 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 	}
 
 	skillCatalog := orchestrator.SkillCatalogSummary()
-	prompt := `你是一个需求分析助手。你需要：
-1. 阅读完整对话历史，理解用户的需求和上下文
-2. 如果用户在后续消息中修改了需求，要结合之前的讨论来理解
-3. 改写需求为结构化文档（rewritten字段）
-4. 分解为可执行的步骤
-5. 设计步骤之间的依赖关系（串行/并行/汇聚）
-6. 为每个步骤分配合适的Agent角色
-7. 如果需求提到“循环、迭代、反复执行、审查后修改、直到通过”等 Loop 语义，必须把它设计成“运行时循环”，不能把每一轮展开成多组节点
-8. 每个 roleDesc 只描述该节点一次调用的职责，不得让 Agent 自己设定 Goal、自己循环三轮、自己执行完整流水线或执行完后才交接；这些都由 Orchestrator 负责
-9. Skill 只能从下面的真实目录中选择，不能编造名称；每个节点最多一个 Skill，没有合适的就留空。Reviewer 只能选择 review-agent/code-review 类审查 Skill，绝对不能选择 loop，因为 loop 是定时调度器而不是审查器。
-
-可用 Skill 目录：
-` + skillCatalog + `
-
-完整对话历史：
-` + historyText + `
-
-请严格输出以下JSON格式（不要加markdown代码块标记，直接输出JSON）：
-{
-  "analysis": "一句话总结用户的需求",
-  "rewritten": "改写后的结构化需求文档（包含背景、目标、约束、验收标准）",
-  "steps": [
-    {"id": "s1", "step": "步骤描述", "agent": "架构师/执行者/审查者", "model": "模型名", "executor": "reasonix或mimo", "mode": "serve或run", "skill": "可选skill名称，无则留空", "roleDesc": "这个Agent的具体职责，要详细，包括输入输出格式"}
-  ],
-  "edges": [
-    {"from": "s1", "to": "s2"},
-    {"from": "s1", "to": "s3"},
-    {"from": "s2", "to": "s4"},
-    {"from": "s3", "to": "s4"}
-  ],
-  "suggestion": "对用户的建议（可选）",
-  "loopConfig": {
-    "enabled": false,
-    "mode": "review_decides",
-    "maxIterations": 3,
-    "fixedIterations": 0,
-    "reviewNodeID": "",
-    "protocol": "loop-review-v1"
-  }
-}
-
-模型选择原则（按成本优先，能用便宜的就不用贵的）：
-- 架构师：deepseek-pro（需要强推理能力时才用）
-- 执行者：xiaomi/mimo-v2.5（性价比最高）或 deepseek-flash（轻量任务）
-- 审查者：deepseek-flash（最便宜，审查足够）
-- 只有真正需要强推理的任务才用 deepseek-pro，不要默认全用pro
-
-执行器选择原则：
-- deepseek 模型（deepseek-pro, deepseek-flash, deepseek）→ executor: "reasonix"
-- xiaomi 模型（xiaomi/mimo-v2.5, xiaomi/mimo-v2.5-pro）→ executor: "mimo"
-
-运行模式选择原则：
-- 默认优先使用 mode: "serve"
-- 只有一次性、无状态、明确不需要复用上下文时，才使用 mode: "run"
-- 当前多节点流水线、可恢复编排、需要查看运行地址时，都应该优先给出 mode: "serve"
-
-边的类型说明（省略type默认为serial）：
-- 无type或serial: A完成后B才开始
-- parallel: A和B独立执行，无依赖
-- converge: A和B都完成后C才开始
-
-设计原则：
-- 独立的任务应该并行（如同时调研两个方向）
-- 有依赖的任务必须串行（如先设计后实现）
-- 汇聚点用于合并多个并行任务的输出
-
-节点任务设计原则（非常重要的约束）：
-- 每个节点的任务必须有明确的、有价值的输出目标
-- 不要让节点重复已有信息（如已经读过的文件不需要再输出一遍完整内容）
-- 节点之间应该有清晰的数据流：上游输出 → 下游输入
-- 架构师节点只产出方案和实施清单，不写代码、不执行实现、不在内部循环；输出后立即交给执行者
-- 执行者节点应该产出新内容（代码、文档、分析），而不是重复读取
-- 执行者只处理当前轮，不得自己设置 Goal 或模拟下一轮
-- 审查者节点应该基于上游输出做判断，不需要重新读取原始文件
-- 如果一个节点的任务只是"读取文件"，那它应该同时做分析或处理，不能只读不产出
-- 审查者应该在所有实现完成后汇聚审查
-
-Loop 设计规则（必须遵守）：
-- Loop 是运行时对同一份 Pipeline DAG 重复执行，不是把多轮复制到 Canvas。
-- Canvas 只画一轮基础 DAG；不要添加从审查者回到执行者/架构师的回边，也不要画重复节点。
-- 第一轮允许架构师产出一次方案；第二轮及以后 Orchestrator 会复用该方案，不能再生成或执行新的架构师节点。
-- 只生成一组基础节点。例如“架构师 → 执行者 → 审查者，最多 3 轮”只能生成 3 个节点和 2 条边；绝对不能生成 9 个节点、3 组相同角色或把“第1轮/第2轮/第3轮”写进节点。
-- review_decides：审查者输出 pass/revise/blocked；revise 由 Orchestrator 重新调度同一组基础节点开始下一轮，pass 提前结束，blocked 终止。审查者不能自己调用下一轮。
-- fixed：同一组基础节点精确执行 N 轮；每轮仍然执行审查者，pass 也不能提前结束。
-- loopConfig.enabled=true 时，steps 中必须恰好有一个 type=reviewer 的审查节点，并在 loopConfig.reviewNodeID 中填写该节点的 step id；如果需求没有明确要求 Loop，loopConfig.enabled=false。
-- 不要为了表达 Loop 增加回边；Canvas 只表示一轮基础 DAG，循环由运行时状态机执行。
-- loopConfig 的轮数必须是 1 到 10 的整数；review_decides 填 maxIterations，fixed 填 fixedIterations。
-
-Agent角色:
-- 架构师(pro)：分析需求、设计方案、定义接口、评估质量
-- 执行者(mimo)：读写文件、执行命令、实现功能
-- 审查者(flash)：审查代码、发现问题、给出建议
-
-每个节点的id用s1, s2, s3...格式，edges引用这些id。
-再次强调：如果是 Loop，返回的 steps/edges 只能描述一轮，不能展开多轮。`
+	lang := body.Lang
+	if lang != "en" {
+		lang = "zh"
+	}
+	prompt := buildAnalysisPrompt(lang, skillCatalog, h.analysisCapabilitySummary(), historyText)
 
 	bin := "reasonix"
 	workDir := "."
@@ -1439,6 +1416,171 @@ Agent角色:
 	}
 
 	writeJSON(w, result)
+}
+
+// analysisCapabilitySummary lists what the orchestrator can actually orchestrate
+// with today: node types with their executors/models, presets, and skills. It is
+// injected into the analysis prompt so the conversational agent knows the system
+// inventory instead of guessing.
+func (h *orchestratorHandler) analysisCapabilitySummary() string {
+	var b strings.Builder
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	catalog := orchestrator.NodeTypeCatalogWithProbes(ctx)
+	b.WriteString("\n\n## 系统能力清单（只能使用以下节点类型/执行器/模型/预设）\n")
+	for _, t := range catalog {
+		execs := make([]string, 0, len(t.Executors))
+		for _, e := range t.Executors {
+			execs = append(execs, string(e))
+		}
+		b.WriteString(fmt.Sprintf("- 节点类型 %s（%s）：执行器 %s；", t.Type, t.Label, strings.Join(execs, "/")))
+		if len(t.Models) > 0 {
+			b.WriteString("模型 " + strings.Join(t.Models, ", "))
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("\n可用编排预设：\n")
+	for _, p := range orchestrator.Presets() {
+		b.WriteString(fmt.Sprintf("- %s（%s）：%s\n", p.ID, p.Name, p.Desc))
+	}
+	return b.String()
+}
+
+// buildAnalysisPrompt builds the requirement-analysis prompt for the requested
+// UI language. The model must reply in that language; casual/greeting messages
+// are handled conversationally (no fabricated requirements), like a concierge
+// would: ask follow-up questions step by step and keep it friendly.
+func buildAnalysisPrompt(lang, skillCatalog, capability, historyText string) string {
+	jsonSpec := `{
+  "analysis": "one-line summary of the user's request",
+  "rewritten": "structured requirement document (background, goals, constraints, acceptance criteria)",
+  "steps": [
+    {"id": "s1", "step": "step description", "agent": "architect/executor/reviewer", "model": "model name", "executor": "reasonix or mimo", "mode": "serve or run", "skill": "optional skill name, empty if none", "roleDesc": "detailed duty of this agent, including input/output format"}
+  ],
+  "edges": [
+    {"from": "s1", "to": "s2"},
+    {"from": "s1", "to": "s3"},
+    {"from": "s2", "to": "s4"},
+    {"from": "s3", "to": "s4"}
+  ],
+  "suggestion": "optional advice for the user",
+  "loopConfig": {
+    "enabled": false,
+    "mode": "review_decides",
+    "maxIterations": 3,
+    "fixedIterations": 0,
+    "reviewNodeID": "",
+    "protocol": "loop-review-v1"
+  }
+}`
+	// Shared rules expressed in the UI language; the JSON schema stays fixed.
+	if lang == "en" {
+		return `You are the orchestration console's conversational requirement analyst (a concierge, not a robot).
+Rules:
+1. Read the full conversation history; understand context and follow-ups.
+2. When the conversation is only greetings / small talk / casual messages, or there is no actionable request yet: DO NOT fabricate a requirement. Reply conversationally: analysis = a friendly one-liner, rewritten = a short "please describe your request" guide, steps = [], edges = [], suggestion = friendly guidance (you may chat and ask step by step: what is the goal? what should be delivered? any constraints?).
+3. Otherwise rewrite the request into a structured document (rewritten), break it into executable steps with dependencies (serial/parallel/converge), assign agent roles and models, and design Loop semantics (iteration/review-until-pass) as a RUNTIME loop — never expand rounds into duplicated nodes.
+4. Every roleDesc describes ONE invocation of that node only: the agent must not set its own Goal, loop three rounds by itself, run the whole pipeline, or hand off only after finishing; Orchestrator owns all of that.
+5. Skills must come from the real catalog below; never invent names; at most one skill per node; empty when none fits. Reviewers may only pick review-agent/code-review style skills, never "loop" (a scheduler, not a reviewer).
+
+Available Skill catalog:
+` + skillCatalog + capability + `
+
+Full conversation history:
+` + historyText + `
+
+Output strictly the JSON below (no markdown fences, raw JSON only):
+` + jsonSpec + `
+
+Model selection (cost-first):
+- architect: deepseek-pro (only when strong reasoning is required)
+- executor: xiaomi/mimo-v2.5 (best value) or deepseek-flash (light tasks)
+- reviewer: deepseek-flash (cheapest, enough for review)
+- Never default everything to pro.
+
+Executor mapping: deepseek models -> executor "reasonix"; xiaomi models -> executor "mimo".
+
+Mode: prefer "serve"; use "run" only for one-shot stateless tasks.
+
+Edge types: serial (default) = B starts after A; parallel = independent; converge = C starts after A and B.
+
+Node design constraints:
+- every node must have a clear, valuable output; no re-printing already-known info
+- architect produces design + implementation checklist only (no code, no execution, no internal loop), then hands off immediately
+- executor produces new content (code/docs/analysis), handles only the current round, never sets its own Goal or simulates the next round
+- reviewer judges based on upstream output, no need to re-read original files
+- reviewer converges at the end after all implementation
+
+Loop rules (mandatory):
+- Loop = runtime repetition of the SAME base DAG; never copy rounds onto the canvas.
+- Draw one base DAG only; no edges back from reviewer to executor/architect, no duplicate nodes.
+- One set of base nodes. "architect -> executor -> reviewer, max 3 rounds" = 3 nodes + 2 edges, NEVER 9 nodes / 3 role copies / "round 1/2/3" in nodes.
+- review_decides: reviewer outputs pass/revise/blocked; revise reschedules the same base DAG, pass ends early, blocked terminates; the reviewer never starts the next round itself.
+- fixed: run the same base DAG exactly N rounds; reviewer still runs each round; pass does not end early.
+- loopConfig.enabled=true requires exactly one reviewer step and its step id in loopConfig.reviewNodeID; false unless the request explicitly asks for a Loop.
+- Loop round counts must be integers 1..10 (review_decides uses maxIterations, fixed uses fixedIterations).
+- Node ids use s1, s2, s3...; edges reference them.
+
+Agent roles:
+- architect (pro): analyze requirements, design, define interfaces, evaluate quality
+- executor (mimo): read/write files, run commands, implement
+- reviewer (flash): review code, find problems, advise
+
+IMPORTANT LANGUAGE RULE: every piece of output text — analysis, rewritten, suggestion, steps[].step, steps[].roleDesc — MUST be written in English. The user interface is currently English.
+`
+	}
+	return `你是一个多Agent编排控制台的对话式需求分析管家（是金牌销售式的管家，不是冷冰冰的机器人）。
+规则：
+1. 阅读完整对话历史，理解用户需求和上下文；用户后续修改需求时结合之前的讨论理解。
+2. 如果对话只是问候/闲聊/寒暄，或还没有任何可执行的需求：绝对不要编造需求。此时 analysis 写一句友好的回应，rewritten 写"请描述你的需求"的简短引导，steps 返回空数组 []，edges 返回空数组 []，suggestion 用中文友好地引导用户——可以闲聊，并一步步追问：目标是什么？要交付什么？有什么约束或参考？
+3. 否则把需求改写为结构化文档（rewritten），分解为可执行步骤并设计依赖（串行/并行/汇聚），分配 Agent 角色与模型；提到"循环、迭代、反复执行、审查后修改、直到通过"等 Loop 语义时，设计成"运行时循环"，不能把每一轮展开成多组节点。
+4. 每个 roleDesc 只描述该节点一次调用的职责：Agent 不得自己设定 Goal、自己循环三轮、自己执行完整流水线或执行完才交接；这些都由 Orchestrator 负责。
+5. Skill 只能从下面的真实目录选择，不能编造；每节点最多一个 Skill，没有合适的留空；Reviewer 只能选 review-agent/code-review 类审查 Skill，绝对不能选 loop（那是定时调度器不是审查器）。
+
+可用 Skill 目录：
+` + skillCatalog + capability + `
+
+完整对话历史：
+` + historyText + `
+
+请严格输出以下JSON格式（不要加markdown代码块标记，直接输出JSON）：
+` + jsonSpec + `
+
+模型选择原则（成本优先）：
+- 架构师：deepseek-pro（需要强推理时才用）
+- 执行者：xiaomi/mimo-v2.5（性价比最高）或 deepseek-flash（轻量任务）
+- 审查者：deepseek-flash（最便宜，审查足够）
+- 不要默认全用 pro
+
+执行器映射：deepseek 模型 → executor "reasonix"；xiaomi 模型 → executor "mimo"。
+
+运行模式：默认优先 serve；只有一次性、无状态任务才用 run。
+
+边类型：serial（默认）= A 完成后 B 开始；parallel = 独立并行；converge = A 和 B 都完成后 C 开始。
+
+节点任务设计原则：
+- 每节点必须有明确、有价值的输出目标；不要重复已有信息
+- 架构师只产出方案和实施清单（不写代码、不执行、不内部循环），输出后立即交给执行者
+- 执行者产出新内容（代码/文档/分析），只处理当前轮，不得自设 Goal 或模拟下一轮
+- 审查者基于上游输出判断，不重新读原始文件；审查者在所有实现完成后汇聚
+
+Loop 设计规则（必须遵守）：
+- Loop 是运行时对同一份 Pipeline DAG 重复执行，不是把多轮复制到 Canvas。
+- Canvas 只画一轮基础 DAG；不要加审查者回到执行者/架构师的回边，不要画重复节点。
+- 只生成一组基础节点："架构师 → 执行者 → 审查者，最多 3 轮" = 3 节点 + 2 边；绝对不能生成 9 节点/3 组相同角色/把"第1轮/第2轮/第3轮"写进节点。
+- review_decides：审查者输出 pass/revise/blocked；revise 由 Orchestrator 重新调度同一组基础节点，pass 提前结束，blocked 终止；审查者不能自己调用下一轮。
+- fixed：同一组基础节点精确执行 N 轮；每轮仍执行审查者，pass 不能提前结束。
+- loopConfig.enabled=true 时 steps 必须恰好有一个 reviewer 节点并在 reviewNodeID 填其 step id；需求没明确要求 Loop 则 enabled=false。
+- 轮数必须是 1~10 的整数（review_decides 填 maxIterations，fixed 填 fixedIterations）。
+- 节点 id 用 s1, s2, s3...，edges 引用这些 id。
+
+Agent角色：
+- 架构师(pro)：分析需求、设计方案、定义接口、评估质量
+- 执行者(mimo)：读写文件、执行命令、实现功能
+- 审查者(flash)：审查代码、发现问题、给出建议
+
+重要语言规则：所有输出文本（analysis、rewritten、suggestion、steps[].step、steps[].roleDesc）必须使用中文。用户界面当前是中文。
+`
 }
 
 func (h *orchestratorHandler) expandRequirement(w http.ResponseWriter, r *http.Request) {
