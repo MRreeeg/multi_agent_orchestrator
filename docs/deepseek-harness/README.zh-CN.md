@@ -8,7 +8,7 @@
 | [`01-对比分析-定义式Agent-vs-Prompt式Harness.zh-CN.md`](01-对比分析-定义式Agent-vs-Prompt式Harness.zh-CN.md) | **（重点）** 三种 agent 定义方式对比、是否值得加入、如何加入 |
 | [`02-DSH执行器接入与配置.zh-CN.md`](02-DSH执行器接入与配置.zh-CN.md) | `executor=dsh` 使用手册：前置条件、模型/权限语义、已知限制、验收 |
 | [`03-自定义Agent打包与跨电脑复用.zh-CN.md`](03-自定义Agent打包与跨电脑复用.zh-CN.md) | 自定义 agent pack 打包/安装/跨电脑复用 |
-| [`04-客制化Agent导入与自检.zh-CN.md`](04-客制化Agent导入与自检.zh-CN.md) | **（新）** 客制化 agent 预设（前端分析师·管家/架构师/执行者/审查者）、自检自动导入、headless 补丁机制、前端「Prompt / 客制化」标注 |
+| [`04-客制化Agent导入与自检.zh-CN.md`](04-客制化Agent导入与自检.zh-CN.md) | **（新）** 客制化 agent 预设（管家/架构师/执行者/审查者）、自检自动导入、headless 补丁机制、前端「Prompt / 客制化」标注 |
 | [`dsh-agent-pack/`](dsh-agent-pack/) | 可直接分发的样例 pack（四角色 preset + skill + persona 覆盖层 + 安装器） |
 
 ## 本次接入内容（代码）

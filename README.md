@@ -24,7 +24,7 @@
 | 🔌 **6 种执行器** | reasonix · mimo · codex · claude · opencode · dsh，每节点独立模型路由，混用互不干扰 |
 | 💰 **成本优先** | 规划用强模型、执行用便宜/免费模型（`deepseek-v4-flash-free` 等）、审查用轻量模型 |
 | 💬 **人工介入** | Runtime Console 发消息/打断、工具权限批准卡片、停止/恢复，人工对话不污染 Loop 历史 |
-| 🤖 **客制化 Agent** | DSH 预设（前端分析师·管家 等）一键选用；卡片明确标注「客制化 Agent」vs「Prompt 式」 |
+| 🤖 **客制化 Agent** | DSH 预设（管家 等）一键选用；卡片明确标注「客制化 Agent」vs「Prompt 式」 |
 | 🔍 **程序化自检** | 纯程序化探测本机可用 Agent/模型（不烧 AI），换电脑即插即用 |
 | 📦 **桌面应用** | WebView2 原生窗口，也可浏览器使用 |
 | 🧩 **共用 Skill** | DSH 直接复用 codex/mimo 已装 skill，不重复下载 |

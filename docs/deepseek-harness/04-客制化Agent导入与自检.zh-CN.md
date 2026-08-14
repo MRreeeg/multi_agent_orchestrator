@@ -42,7 +42,7 @@
 ## 5. 前端「Prompt 还是客制化 Agent」标注
 
 - **节点卡片**（Canvas）新增「Agent 来源」行：
-  - dsh 节点选中预设 → `客制化 Agent：前端分析师 · 管家（frontend-analyst）`（强调色加粗）
+  - dsh 节点选中预设 → `客制化 Agent：管家（frontend-analyst）`（强调色加粗）
   - dsh 节点未选 → `Prompt 式：内置 persona`
   - 其他执行器 → `Prompt 式：Skill 注入 <skill>` 或 `Prompt 式：角色描述`
 - **节点详情弹窗**同样显示「Agent 来源」。
@@ -86,7 +86,7 @@ DSH 通过 `skill-filesystem.customSkillDirs` 直接指向其他 agent 已下载
 - [ ] 未选预设的 dsh 节点卡片显示「Prompt 式：内置 persona」；reasonix 节点显示「Prompt 式：Skill 注入 …」
 - [ ] 建一个 dsh 节点选中 `reviewer` 并执行：输出符合审查者 persona，且节点无 shell 工具（stderr/输出中无命令执行）
 - [ ] 把节点 `dshPreset` 改成不存在的 id 执行：节点失败且错误信息指向预设目录
-- [ ] 分析入口（对话/运行看板）执行器下拉默认 `dsh`、人设默认「前端分析师·管家」，模型默认 `deepseek-v4-flash`
+- [ ] 分析入口（对话/运行看板）执行器下拉默认 `dsh`、人设默认「管家」，模型默认 `deepseek-v4-flash`
 - [ ] 工作目录卡片位于输入框上方（不再在顶栏）
 - [ ] `dsh --profile headless "列出 12 个 skill 名称"` 能列出 codex/mimo 共用 skill
 - [ ] `go test ./internal/executor/dsh ./internal/orchestrator ./internal/serve`、`go vet`、`go build ./...` 全绿

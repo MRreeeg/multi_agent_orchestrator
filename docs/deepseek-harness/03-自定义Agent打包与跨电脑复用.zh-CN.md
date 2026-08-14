@@ -144,7 +144,7 @@ dsh --profile headless "你是什么角色？有哪些 skill？"
 
 1. `git clone`（或拉取）仓库 → 运行第 3 步的 `install.ps1 -Mode user`；
 2. 启动 Reasonix 控制台 → `/selfcheck` 的「客制化 DSH Agent」区**自动导入**并列出 4 个预设；
-3. dsh 节点的「客制化 Agent」下拉直接可选（前端分析师·管家 / 架构师 / 执行者 / 审查者）。
+3. dsh 节点的「客制化 Agent」下拉直接可选（管家 / 架构师 / 执行者 / 审查者）。
 
 自检只负责**导入展示**已安装的预设；安装动作由 install.ps1 完成（预设目录零依赖，复制即用）。
 

@@ -1,6 +1,6 @@
 # dsh-agent-pack — Reasonix 角色 × DSH 客制化 Agent 样例包
 
-一个可直接分发的 DeepSeek Harness（DSH）agent pack：把 Reasonix 编排控制台的四个角色（前端分析师 · 管家 / 架构师 / 执行者 / 审查者）沉淀为 DSH 的 **客制化 agent 预设 + skills + persona 覆盖层**，安装到任意电脑即可复用。
+一个可直接分发的 DeepSeek Harness（DSH）agent pack：把 Reasonix 编排控制台的四个角色（管家 / 架构师 / 执行者 / 审查者）沉淀为 DSH 的 **客制化 agent 预设 + skills + persona 覆盖层**，安装到任意电脑即可复用。
 
 ## 内容
 
@@ -11,12 +11,12 @@ dsh-agent-pack/
 ├── cordis.patch.yml          # persona 覆盖层（可选，装到 $DSH_HOME 生效）
 ├── settings.example.yaml     # agent-default-model 示例（不含 API Key）
 ├── presets/                  # ★ 客制化 agent 预设（装到 $DSH_HOME/.agent-presets/<id>/）
-│   ├── frontend-analyst/     # 前端分析师 · 管家：agent.cordis.yml + preset.yml + headless.patch.yml
+│   ├── frontend-analyst/     # 管家：agent.cordis.yml + preset.yml + headless.patch.yml
 │   ├── architect/            # 架构师：只读规划 + plan mode，无 goal
 │   ├── executor/             # 执行者：实现 + 验证 + 汇报证据
 │   └── reviewer/             # 审查者：只读审查，无 shell 工具
 └── skills/
-    ├── reasonix-frontend-analyst/SKILL.md  # 前端分析师：管家式前端分析/修改
+    ├── reasonix-frontend-analyst/SKILL.md  # 管家：管家式前端分析/修改
     ├── reasonix-architect/SKILL.md         # 架构师：只读分析 + 方案设计
     ├── reasonix-executor/SKILL.md          # 执行者：实现 + 测试
     └── reasonix-reviewer/SKILL.md          # 审查者：只读审查 + pass/revise/blocked
@@ -73,7 +73,7 @@ dsh-agent-pack/
 
 ```powershell
 dsh --profile headless "列出你已加载的 skill 并简述架构师 skill 的职责"
-.\install.ps1 -Mode temp -Task "用一句话自报身份" -Preset frontend-analyst   # 期望出现「前端分析师 · 管家」
+.\install.ps1 -Mode temp -Task "用一句话自报身份" -Preset frontend-analyst   # 期望出现「管家」
 ```
 
 或启动 Reasonix 控制台：`/selfcheck` → Skill 库出现 4 个 `reasonix-*` skill，且「客制化 DSH Agent」区出现 4 个本地预设；建一个 dsh 节点可在「客制化 Agent」下拉中选择。
