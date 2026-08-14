@@ -865,6 +865,18 @@ input,textarea,select{font:inherit;color:inherit}
   </div>
 </div>
 
+<!-- 执行详情 modal：点击执行记录卡片打开，总览 + 各 Agent 节点执行情况 -->
+<div class="modal-overlay" id="run-detail-modal" style="display:none">
+  <div class="modal modal--win" style="width:min(820px,94vw);max-height:88vh">
+    <div class="modal__head modal__head--drag">
+      <span id="run-detail-title">执行详情</span>
+      <span class="modal__close" id="run-detail-close">&times;</span>
+    </div>
+    <div class="modal__body" id="run-detail-body" style="max-height:72vh;overflow-y:auto">
+    </div>
+  </div>
+</div>
+
 <!-- Self-check modal -->
 <div class="modal-overlay" id="selfcheck-modal" style="display:none">
   <div class="modal modal--win" style="width:min(860px,94vw);max-height:88vh">
@@ -998,7 +1010,7 @@ const I18N = {
     'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
     'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消',
-    'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）',
+    'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）', 'rd.title': '执行详情', 'rd.loading': '加载中…', 'rd.status': '状态：', 'rd.trigger': '触发：', 'rd.nodes': '节点：', 'rd.loop': 'Loop 循环', 'rd.loopProgress': '进度：', 'rd.mode': '模式：', 'rd.termination': '终止：', 'rd.review': '审查：', 'rd.agents': '各 Agent 执行情况',
   },
   en: {
     'app.name': 'Multi-Agent Butler', 'app.sub': 'Multi-Agent Orchestrator',
@@ -1028,7 +1040,7 @@ const I18N = {
     'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
     'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel',
-    'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)',
+    'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)', 'rd.title': 'Run Details', 'rd.loading': 'Loading…', 'rd.status': 'Status: ', 'rd.trigger': 'Trigger: ', 'rd.nodes': 'Nodes: ', 'rd.loop': 'Loop', 'rd.loopProgress': 'Progress: ', 'rd.mode': 'Mode: ', 'rd.termination': 'Termination: ', 'rd.review': 'Review: ', 'rd.agents': 'Agent breakdown',
   },
 };
 let currentLang = 'zh';
@@ -4310,6 +4322,87 @@ async function openSelfCheck() {
   }
 }
 
+
+// ── 执行详情：点击执行记录卡片打开，总览 + 各 Agent 节点执行情况 ──
+async function openRunDetail(runId) {
+  $('#run-detail-title').textContent = T('rd.title');
+  $('#run-detail-modal').style.display = 'flex';
+  $('#run-detail-body').innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:24px;font-size:13px">' + T('rd.loading') + '</div>';
+  try {
+    const data = await apiGet('/runs/' + encodeURIComponent(runId) + '/detail');
+    const run = (data && data.run) || {};
+    const nodes = Array.isArray(data && data.nodes) ? data.nodes : [];
+    const statusIcons = { running: '⏳', complete: '✅', failed: '❌', canceled: '🚫', blocked: '⛔', interrupted: '⏸️' };
+    const ns = run.nodeStates || {};
+    const values = Object.values(ns);
+    const okCount = values.filter(v => v && v.status === 'complete').length;
+    const failCount = values.filter(v => v && v.status === 'failed').length;
+    const totalTokens = values.reduce((a, v) => a + ((v && v.tokenUsage && v.tokenUsage.totalTokens) || 0), 0);
+    const totalCost = values.reduce((a, v) => a + ((v && v.tokenUsage && v.tokenUsage.costYuan) || 0), 0);
+    const started = run.startedAt ? new Date(run.startedAt).toLocaleString() : '';
+    const finished = run.finishedAt ? new Date(run.finishedAt).toLocaleString() : '';
+    const cfg = run.loopConfig || {};
+    const iterCount = (run.iterationIDs || []).length || run.currentIteration || 0;
+    let html = '';
+    // 1) 总览卡
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      '<span style="font-size:18px">' + (statusIcons[run.status] || '⏳') + '</span>' +
+      '<span style="font-weight:700;font-size:14px">' + escHtml(run.status || '') + '</span>' +
+      '<span style="font-size:11px;color:var(--muted-2);font-family:var(--mono)">' + escHtml(runId) + '</span></div>' +
+      (run.task ? '<div style="font-size:12.5px;color:var(--fg-2);margin-top:6px">' + escHtml(run.task) + '</div>' : '') +
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted-2);margin-top:8px">' +
+      '<span>' + T('rd.status') + escHtml(run.status || '-') + '</span>' +
+      '<span>' + T('rd.trigger') + escHtml(run.trigger || '-') + '</span>' +
+      (started ? '<span>' + started + (finished ? ' → ' + finished : '') + '</span>' : '') +
+      '<span>' + T('rd.nodes') + okCount + '/' + values.length + (failCount > 0 ? '（失败 ' + failCount + '）' : '') + '</span>' +
+      (totalTokens ? '<span>Token: ' + formatNumber(totalTokens) + ' · ¥' + totalCost.toFixed(4) + '</span>' : '') +
+      '</div></div>';
+    // 2) Loop 卡
+    if (cfg.enabled) {
+      html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">' +
+        '<div style="font-weight:600;font-size:12.5px;margin-bottom:6px">' + T('rd.loop') + '</div>' +
+        '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--fg-2)">' +
+        '<span>' + T('rd.loopProgress') + iterCount + (cfg.fixedIterations ? ' / ' + cfg.fixedIterations : '') + '</span>' +
+        '<span>' + T('rd.mode') + escHtml(cfg.mode || '') + '</span>' +
+        (run.terminationReason ? '<span>' + T('rd.termination') + escHtml(run.terminationReason) + '</span>' : '') +
+        (run.finalReview ? '<span>' + T('rd.review') + escHtml(run.finalReview.decision || '') + (run.finalReview.summary ? ' · ' + escHtml(run.finalReview.summary) : '') + '</span>' : '') +
+        '</div></div>';
+    }
+    // 3) 各 Agent 节点执行情况
+    const typeLbl = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
+    const renderNode = (node, st) => {
+      st = st || {};
+      const stIcon = statusIcons[st.status] || '⏳';
+      const dur = (st.startedAt && st.doneAt) ? (new Date(st.doneAt) - new Date(st.startedAt)) : 0;
+      const output = String(st.output || '').trim();
+      const errText = String(st.error || '').trim();
+      return '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span style="font-size:15px">' + stIcon + '</span>' +
+        '<span class="node__type-badge node__type-badge--' + escHtml(node.type || '') + '">' + escHtml((node.type && typeLbl[node.type]) || node.type || '?') + '</span>' +
+        '<span style="font-weight:600;font-size:12.5px">' + escHtml(node.name || ('#' + node.id)) + '</span>' +
+        '<span style="font-size:11px;color:var(--muted-2);font-family:var(--mono)">' + escHtml(node.executor || '') + (node.model ? ' / ' + escHtml(node.model) : '') + '</span>' +
+        '<span style="margin-left:auto;font-size:11px;color:var(--muted-2)">' + escHtml(st.status || '-') + (dur ? ' · ' + formatDuration(dur) : '') + (st.tokenUsage && st.tokenUsage.totalTokens ? ' · ' + formatNumber(st.tokenUsage.totalTokens) + ' tok' : '') + '</span>' +
+        '</div>' +
+        (output ? '<div style="font-size:12px;color:var(--fg-2);margin-top:7px;white-space:pre-wrap;word-break:break-word;max-height:96px;overflow:auto;background:var(--bg-2);border-radius:6px;padding:8px" title="' + escHtml(output) + '">' + escHtml(output.length > 600 ? output.slice(0, 600) + '…' : output) + '</div>' : '') +
+        (errText ? '<div style="font-size:11.5px;color:var(--danger);margin-top:6px">' + escHtml(errText.length > 300 ? errText.slice(0, 300) + '…' : errText) + '</div>' : '') +
+        '</div>';
+    };
+    html += '<div style="font-weight:600;font-size:12.5px;margin:2px 0 6px">' + T('rd.agents') + '</div>';
+    if (nodes.length) {
+      nodes.forEach(node => { html += renderNode(node, ns[String(node.id)]); });
+    } else {
+      Object.keys(ns).forEach(id => { html += renderNode({ id: id, type: '', name: '#' + id }, ns[id]); });
+    }
+    $('#run-detail-body').innerHTML = html;
+  } catch (err) {
+    $('#run-detail-body').innerHTML = '<div style="color:var(--danger);padding:20px;text-align:center;font-size:13px">' + escHtml(err.message || err) + '</div>';
+  }
+}
+$('#run-detail-close').addEventListener('click', () => { $('#run-detail-modal').style.display = 'none'; });
+$('#run-detail-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) $('#run-detail-modal').style.display = 'none'; });
+
 async function showNodeDetail(node) {
   const typeLabels = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
   $('#node-detail-title').textContent = node.name + ' (' + (typeLabels[node.type] || node.type) + ')';
@@ -5386,7 +5479,7 @@ function renderRuns() {
     const cancelButton = r.status === 'running'
       ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">${T('run.stop')}</button>` : '';
     return `
-    <div class="run-card" style="cursor:pointer;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px" title="${escHtml(r.id)}">
+    <div class="run-card" data-run-id="${escHtml(r.id)}" style="cursor:pointer;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px" title="${escHtml(r.id)}">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:16px">${icon}</span>
         <span style="font-weight:600;font-size:12.5px;flex:1">${escHtml(friendlyLabel)}</span>
@@ -5408,6 +5501,9 @@ function renderRuns() {
       ${resumeButton}${cancelButton}
     </div>`;
   }).join('');
+  list.querySelectorAll('.run-card').forEach(card => {
+    card.addEventListener('click', () => { openRunDetail(card.getAttribute('data-run-id')); });
+  });
   list.querySelectorAll('[data-resume-run]').forEach(btn => {
     btn.addEventListener('click', event => {
       event.stopPropagation();

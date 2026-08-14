@@ -247,9 +247,10 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.executePipeline(w, r, id)
 	case path == "/runs" && r.Method == http.MethodGet:
 		h.listRuns(w, r)
+	case strings.HasSuffix(path, "/detail") && strings.Count(path, "/") == 3 && strings.HasPrefix(path, "/runs/") && r.Method == http.MethodGet:
+		h.getRunDetail(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/detail"))
 	case strings.Count(path, "/") == 2 && strings.HasPrefix(path, "/runs/") && r.Method == http.MethodGet:
-		id := strings.TrimPrefix(path, "/runs/")
-		h.getRun(w, r, id)
+		h.getRun(w, r, strings.TrimPrefix(path, "/runs/"))
 	case strings.HasSuffix(path, "/cancel") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/cancel")
 		h.cancelRun(w, r, id)
@@ -604,6 +605,25 @@ func (h *orchestratorHandler) getRun(w http.ResponseWriter, _ *http.Request, id 
 		return
 	}
 	writeJSON(w, run)
+}
+
+// getRunDetail returns one run plus the pipeline revision nodes it executed,
+// so the frontend can render a clean per-agent breakdown (type/executor/model/
+// label) alongside the run-level summary. The plain getRun endpoint keeps its
+// old shape for compatibility.
+func (h *orchestratorHandler) getRunDetail(w http.ResponseWriter, _ *http.Request, id string) {
+	run, ok := h.store.GetRun(id)
+	if !ok {
+		writeErr(w, fmt.Sprintf("run %q not found", id), http.StatusNotFound)
+		return
+	}
+	var nodes []orchestrator.AgentNode
+	if run.PipelineRevisionID != "" {
+		if rev, revOK := h.store.GetPipelineRevision(run.PipelineRevisionID); revOK {
+			nodes = rev.Nodes
+		}
+	}
+	writeJSON(w, map[string]any{"run": run, "nodes": nodes})
 }
 
 func (h *orchestratorHandler) cancelRun(w http.ResponseWriter, _ *http.Request, id string) {
