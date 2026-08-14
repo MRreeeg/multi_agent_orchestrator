@@ -51,6 +51,38 @@ func TestClientAbort(t *testing.T) {
 	}
 }
 
+func TestClientRespondPermission(t *testing.T) {
+	var gotBody, gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/session/ses_test/permissions/perm_1" && r.Method == http.MethodPost {
+			buf := make([]byte, 256)
+			n, _ := r.Body.Read(buf)
+			gotBody = string(buf[:n])
+			gotPath = r.URL.Path
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`true`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	ctx := context.Background()
+	if err := c.RespondPermission(ctx, "ses_test", "perm_1", "always"); err != nil {
+		t.Fatalf("RespondPermission: %v", err)
+	}
+	if gotPath != "/session/ses_test/permissions/perm_1" {
+		t.Fatalf("path = %q", gotPath)
+	}
+	if !strings.Contains(gotBody, `"response":"always"`) {
+		t.Fatalf("body = %q, want response always", gotBody)
+	}
+	if err := c.RespondPermission(ctx, "ses_test", "perm_1", "bogus"); err == nil {
+		t.Fatal("bogus response value must be rejected")
+	}
+}
+
 func TestClientHistory(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/session/ses_test/message" && r.Method == http.MethodGet {

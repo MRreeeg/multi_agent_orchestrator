@@ -139,6 +139,28 @@ func (c *Client) Abort(ctx context.Context, sessionID string) error {
 	return nil
 }
 
+// RespondPermission answers a parked permission request (surfaced by the
+// "permission.updated" event) with "once", "always" or "reject". "always"
+// remembers the decision for the rest of the session, mirroring the TUI's
+// approve-always option.
+func (c *Client) RespondPermission(ctx context.Context, sessionID, permissionID, response string) error {
+	switch response {
+	case "once", "always", "reject":
+	default:
+		return fmt.Errorf("opencode respond permission: invalid response %q", response)
+	}
+	payload, _ := json.Marshal(map[string]string{"response": response})
+	resp, err := c.post(ctx, "/session/"+sessionID+"/permissions/"+permissionID, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("opencode respond permission: %s", status(resp))
+	}
+	return nil
+}
+
 // HistoryMessage is one message from GET /session/{id}/message.
 type HistoryMessage struct {
 	ID   string `json:"id"`

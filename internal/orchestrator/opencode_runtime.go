@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -45,6 +46,11 @@ type opencodeRuntime struct {
 	sseCancel context.CancelFunc
 	partLast  map[string]int
 	partType  map[string]string
+
+	// pendingPerms holds "permission.updated" prompts parked in "ask" mode,
+	// keyed by the opencode permission id. The Runtime Console answers them
+	// through AnswerOpencodeRuntimePermission.
+	pendingPerms map[string]PermissionRequestInfo
 }
 
 // OpenCodeRuntimeManager starts `opencode serve` as a retained, loopback-only
@@ -236,6 +242,7 @@ func (m *OpenCodeRuntimeManager) stateFor(rt *opencodeRuntime, spec ExecSpec, po
 		ApprovalMode:  rt.ApprovalMode,
 		ThreadID:      rt.sessionID,
 		TurnID:        rt.turnID,
+		PermissionRequests: pendingPermissionList(rt.pendingPerms),
 	}
 }
 
@@ -271,6 +278,7 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 		status:       RuntimeStarting,
 		partLast:     make(map[string]int),
 		partType:     make(map[string]string),
+		pendingPerms: make(map[string]PermissionRequestInfo),
 	}
 	m.runtimes[key] = rt
 	m.mu.Unlock()
@@ -293,6 +301,17 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 	cmd := newRetainedRuntimeCommand(ctx, bin, args...)
 	if spec.Workspace != "" {
 		cmd.Dir = spec.Workspace
+	}
+	// opencode serve has no --auto flag (only `opencode run` and the TUI
+	// accept it), so automation is expressed through an injected inline
+	// config. The "question" tool is always denied: it exists to wait for a
+	// human answer the orchestrator can never provide, so the model must
+	// decide on its own instead of blocking the pipeline. In auto/yolo mode
+	// every other permission is allowed up front; in ask mode the user's
+	// permission rules stay active and requests surface in the Runtime
+	// Console as approval cards.
+	if content := opencodePermissionConfig(spec); content != "" {
+		cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_CONTENT="+content)
 	}
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
@@ -388,6 +407,91 @@ func (m *OpenCodeRuntimeManager) dropRuntime(key string, rt *opencodeRuntime) {
 	m.mu.Unlock()
 }
 
+// opencodePermissionConfig builds the OPENCODE_CONFIG_CONTENT inline config
+// for a node's approval mode (see the spawn comment in ensure).
+func opencodePermissionConfig(spec ExecSpec) string {
+	const questionDeny = `{"permission":{"question":"deny"}}`
+	if spec.ApprovalMode == "ask" {
+		return questionDeny
+	}
+	return `{"permission":{"*":"allow","question":"deny"}}`
+}
+
+// parkPermission stores one parked opencode permission prompt and wakes the
+// Runtime Console through the state sink.
+func (m *OpenCodeRuntimeManager) parkPermission(rt *opencodeRuntime, id, title, pattern string, askedAt time.Time) {
+	info := PermissionRequestInfo{
+		RequestID: id,
+		ToolName:  title,
+		ToolInput: pattern,
+		AskedAt:   askedAt,
+	}
+	rt.mu.Lock()
+	if rt.pendingPerms == nil {
+		rt.pendingPerms = make(map[string]PermissionRequestInfo)
+	}
+	rt.pendingPerms[id] = info
+	rt.mu.Unlock()
+	m.notify(rt)
+}
+
+// AnswerOpencodeRuntimePermission resolves a parked opencode permission
+// request with "once", "always" or "reject" (the opencode API's response
+// values; "always" remembers the decision for the session).
+func AnswerOpencodeRuntimePermission(runtimeID, permissionID, response string) error {
+	opencodeRuntimeMgr.mu.Lock()
+	var target *opencodeRuntime
+	for _, rt := range opencodeRuntimeMgr.runtimes {
+		if rt.ID == runtimeID {
+			target = rt
+			break
+		}
+	}
+	opencodeRuntimeMgr.mu.Unlock()
+	if target == nil {
+		return fmt.Errorf("opencode runtime %q not found", runtimeID)
+	}
+	target.mu.Lock()
+	_, ok := target.pendingPerms[permissionID]
+	if ok {
+		delete(target.pendingPerms, permissionID)
+	}
+	client := target.client
+	sessionID := target.sessionID
+	target.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("permission request %q not pending on runtime %q", permissionID, runtimeID)
+	}
+	if client == nil {
+		return fmt.Errorf("opencode runtime %q has no client", runtimeID)
+	}
+	if sessionID == "" {
+		return fmt.Errorf("opencode runtime %q has no session", runtimeID)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// The Runtime Console sends allow_once/allow_always/reject; opencode's
+	// API speaks once/always/reject.
+	if err := client.RespondPermission(ctx, sessionID, permissionID, opencodeResponseForAction(response)); err != nil {
+		return err
+	}
+	opencodeRuntimeMgr.notify(target)
+	return nil
+}
+
+// opencodeResponseForAction maps the Runtime Console's action vocabulary
+// (allow_once / allow_always / reject) to opencode's API responses
+// (once / always / reject).
+func opencodeResponseForAction(action string) string {
+	switch action {
+	case "allow_once":
+		return "once"
+	case "allow_always":
+		return "always"
+	}
+	return action
+}
+
 func (m *OpenCodeRuntimeManager) watchRuntime(key string, rt *opencodeRuntime) {
 	err := rt.Cmd.Wait()
 	rt.mu.Lock()
@@ -436,6 +540,20 @@ type opencodeSSEEvent struct {
 			Text  string `json:"text"`
 			State string `json:"state"`
 		} `json:"part"`
+		// Permission carries the fields of a "permission.updated" event
+		// (opencode Permission type): the approval prompt payload.
+		Permission struct {
+			ID        string `json:"id"`
+			Type      string `json:"type"`
+			Title     string `json:"title"`
+			Pattern   string `json:"pattern"`
+			SessionID string `json:"sessionID"`
+			Time      struct {
+				Created int64 `json:"created"`
+			} `json:"time"`
+		} `json:"permission"`
+		// PermissionID is the flat field of "permission.replied" events.
+		PermissionID string `json:"permissionID"`
 	} `json:"properties"`
 }
 
@@ -551,7 +669,58 @@ func (m *OpenCodeRuntimeManager) handleSSEEvent(rt *opencodeRuntime, ev opencode
 		rt.stream.flushNow()
 	case "session.idle", "message.updated", "session.status":
 		rt.stream.flushNow()
+	case "permission.updated":
+		m.handlePermissionUpdated(rt, ev)
+	case "permission.replied":
+		// The request was answered elsewhere (e.g. auto mode); keep the
+		// console informed and drop any stale parked card.
+		permID := ev.Properties.PermissionID
+		rt.mu.Lock()
+		if permID != "" {
+			delete(rt.pendingPerms, permID)
+		}
+		rt.mu.Unlock()
+		m.notify(rt)
 	}
+}
+
+// handlePermissionUpdated routes one opencode "permission.updated" event.
+// ask mode parks the request for a Runtime Console card; auto/yolo mode
+// answers it immediately (the injected config normally prevents requests
+// from reaching this point at all, this is the safety net).
+func (m *OpenCodeRuntimeManager) handlePermissionUpdated(rt *opencodeRuntime, ev opencodeSSEEvent) {
+	p := ev.Properties.Permission
+	if p.ID == "" {
+		return
+	}
+	askedAt := time.UnixMilli(p.Time.Created)
+	rt.mu.Lock()
+	approval := rt.ApprovalMode
+	rt.mu.Unlock()
+	if strings.EqualFold(approval, "ask") {
+		m.parkPermission(rt, p.ID, p.Title, p.Pattern, askedAt)
+		return
+	}
+	client := rt.client
+	sessionID := p.SessionID
+	if sessionID == "" {
+		rt.mu.Lock()
+		sessionID = rt.sessionID
+		rt.mu.Unlock()
+	}
+	if client == nil || sessionID == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// "always" mirrors mimo's allow_always: remember the decision for the
+	// session so the same tool does not re-prompt every call.
+	if err := client.RespondPermission(ctx, sessionID, p.ID, "always"); err != nil {
+		rt.mu.Lock()
+		rt.lastErr = "auto-approve failed: " + err.Error()
+		rt.mu.Unlock()
+	}
+	m.notify(rt)
 }
 
 // Execute runs one orchestration node turn against the retained opencode

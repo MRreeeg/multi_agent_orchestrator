@@ -1045,7 +1045,11 @@ func (h *orchestratorHandler) answerRuntimePermission(w http.ResponseWriter, r *
 		writeJSON(w, map[string]string{"ok": "true"})
 		return
 	}
-	if err := orchestrator.AnswerClaudeRuntimePermission(id, body.RequestID, body.Action); err != nil {
+	if err := orchestrator.AnswerClaudeRuntimePermission(id, body.RequestID, body.Action); err == nil {
+		writeJSON(w, map[string]string{"ok": "true"})
+		return
+	}
+	if err := orchestrator.AnswerOpencodeRuntimePermission(id, body.RequestID, body.Action); err != nil {
 		writeErr(w, err.Error(), http.StatusNotFound)
 		return
 	}
