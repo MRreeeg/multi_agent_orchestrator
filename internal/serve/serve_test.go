@@ -455,7 +455,7 @@ func TestOrchestratorSelfCheckReport(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&report); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"agents", "running", "runtimes", "skills", "skillRoots", "health", "checkedAt"} {
+	for _, key := range []string{"agents", "running", "runtimes", "skills", "skillRoots", "health", "checkedAt", "dshPresets"} {
 		if _, ok := report[key]; !ok {
 			t.Fatalf("selfcheck missing %q", key)
 		}

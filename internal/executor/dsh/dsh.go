@@ -52,6 +52,13 @@ type ExecOptions struct {
 	// DshHome overrides DSH_HOME for the child process. Useful for per-model /
 	// per-agent dedicated harness homes whose settings.yaml pins a model.
 	DshHome string
+	// AgentPreset names a locally authored DSH agent preset (a directory
+	// under $DSH_HOME/.agent-presets). When set, the node runs under that
+	// customized agent instead of the stock headless persona: the preset's
+	// headless.patch.yml is appended as a --patch overlay that carries the
+	// persona override and prunes tool rows the preset does not provide.
+	// An unknown preset or a preset without a headless patch fails the run.
+	AgentPreset string
 	// Bin overrides the discovered dsh entry (binary or "node <bin.js>" prefix).
 	Bin string
 }
@@ -98,6 +105,18 @@ func (e *DshExecutor) Exec(ctx context.Context, prompt string, opts ExecOptions)
 		}
 		defer patchCleanup()
 		args = append(args, "--patch", patchPath)
+	}
+
+	// Customized agent: append the preset's headless.patch.yml overlay, which
+	// carries the preset persona and prunes tool rows the preset omits. It is
+	// resolved under the same DSH_HOME the child will use; a missing preset or
+	// patch fails loudly rather than silently running the stock persona.
+	if strings.TrimSpace(opts.AgentPreset) != "" {
+		presetPatch, presetErr := ResolvePresetPatch(opts.AgentPreset, opts.DshHome)
+		if presetErr != nil {
+			return &ExecutorResult{ExitCode: -1, Stderr: presetErr.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, presetErr)
+		}
+		args = append(args, "--patch", presetPatch)
 	}
 
 	// The task is a positional argument of the headless app. DSH has no stdin

@@ -53,6 +53,7 @@ func (e *DshPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStar
 		Model:          spec.ModelRef,
 		Workspace:      spec.Workspace,
 		PermissionMode: dshPermissionMode(spec),
+		AgentPreset:    spec.DshPreset,
 	}
 	result, err := client.Exec(ctx, prompt, opts)
 	if result == nil {

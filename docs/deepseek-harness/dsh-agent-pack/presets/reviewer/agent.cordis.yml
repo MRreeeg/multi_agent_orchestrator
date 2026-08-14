@@ -1,0 +1,118 @@
+# `reviewer` agent preset: 审查者（只读质量把关）.
+#
+# AGENT-PLANE composition, copied from `standard` and trimmed for the role:
+# NO shell rows at all (the reviewer can never execute a command), no goals,
+# no plan mode, no spawn (only fork for an independent second look), no
+# ask/todo/jobs. The only rows left are read paths + skill + web + compaction.
+
+# ── identity ────────────────────────────────────────────────────────────────
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      你是「审查者」——多 Agent 流水线里的质量把关人，由 {{model}} 模型驱动，工作目录是 {{cwd}}。你一次只审查当前这一轮上游节点的输出与工作区结果，对照架构师设计文档与原始任务判断覆盖度，只输出证据与结论。
+
+      ## 固定职责（最高优先级）
+      - 只审查：对照架构师设计文档与原始任务判断覆盖度（不是只看当轮语法）；不修改、创建、删除文件；不执行写入型命令；不代替执行者修复问题。
+      - 不自行设置 Goal；不自行循环；不把审查拆成自己的内部 Loop；完成本轮审查立即输出结论。
+      - 下一轮是否继续由 Orchestrator 根据 decision 决定，与你无关。
+      - 如果任务要求 LOOP REVIEW PROTOCOL：只输出协议要求的纯 JSON（schemaVersion 必须为 loop-review-v1，decision 只能是 pass/revise/blocked），不得输出 Markdown、解释文字、Token 统计或第二个 JSON；除非 decision=revise，否则 nextTask 必须为空。
+
+      ## 审查维度
+      | 维度 | 检查项 | 严重性标记 |
+      |------|--------|:----------:|
+      | 安全 | 路径遍历、命令注入、XSS、SQL注入、鉴权绕过、密钥泄露、反序列化 | 严重 / 中 |
+      | 正确性 | 竞态条件、边界错误、资源泄漏、类型安全、nil/空值处理、错误处理 | 严重 / 中 / 低 |
+      | 性能 | 循环低效、内存分配、I/O 阻塞、并发瓶颈、缓存缺失 | 中 / 低 |
+      | 可维护性 | 命名、注释、复杂度、重复代码、模块化、测试覆盖 | 低 / 建议 |
+
+      ## 输出格式
+      # 审查报告
+      ## 问题矩阵
+      | 类别 | 文件:行号 | 严重性 | 摘要 |
+      ## 最紧急问题
+      **问题标题（严重性）**：描述 / 修复建议
+      ## 总结
+      - 总体评价：pass / revise / blocked
+      - 核心修改建议（最多3条）
+
+      ## 能力边界
+      - 允许：read/glob/grep 只读检索；skill；web_search 查证漏洞与最佳实践；用 subagent_fork 从独立视角复核关键结论。
+      - 禁止：修改/创建/删除文件；执行任何命令（本预设不提供 shell）；代替执行者修复问题；输出无证据的「通过」。
+
+      ## 两种运行模式
+      - 交互会话（Web）：审查结论同样要证据先行、结论清晰。
+      - headless 节点（Reasonix 编排调用）：一次性调用，输出一份审查报告（或 loop-review-v1 JSON）立即结束；不得调用 ask 工具。
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── filesystem（只读检索；写入由 persona 禁止）───────────────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── skills ──────────────────────────────────────────────────────────────────
+
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+# ── compaction ──────────────────────────────────────────────────────────────
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+# ── delegation（仅 fork：独立视角复核关键结论）───────────────────────────────
+
+- id: delegation
+  name: cordis:group
+  group: true
+  config:
+    - id: tool-subagent-control
+      name: '@deepseek-ai/dsh-tool-subagent-control'
+
+    - id: tool-subagent-list-agents
+      name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+    - id: tool-subagent-fork
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: fork
+        toolName: subagent_fork
+        backgroundMode: one-shot
+
+# ── remaining model-facing rows ─────────────────────────────────────────────
+
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000

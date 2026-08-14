@@ -1,21 +1,26 @@
 # dsh-agent-pack 安装器
 # 用法：
-#   .\install.ps1 -Mode user                # 用户级：装进 $DSH_HOME + ~/.config/reasonix/skills
+#   .\install.ps1 -Mode user                # 用户级：skills + persona + 客制化 agent 预设 → $DSH_HOME + Reasonix 技能根
 #   .\install.ps1 -Mode project -Workspace G:\work\my-project   # 项目级：装进 <workspace>/.agents/skills
 #   .\install.ps1 -Mode temp -Task "..."    # 临时：直接 --patch 跑一次 DSH，不落盘
+#   .\install.ps1 -Mode temp -Task "..." -Preset reviewer   # 临时用某个客制化 agent 的 headless 补丁跑一次
 #   .\install.ps1 -Mode user -SkipDsh       # 只装 Reasonix 技能根，不装 DSH
+#   .\install.ps1 -Mode user -SkipPresets   # 不装客制化 agent 预设
 param(
     [ValidateSet('user', 'project', 'temp')]
     [string]$Mode = 'user',
     [string]$Workspace = '',
     [string]$Task = '',
+    [string]$Preset = '',
     [switch]$SkipDsh,
-    [switch]$SkipReasonix
+    [switch]$SkipReasonix,
+    [switch]$SkipPresets
 )
 
 $ErrorActionPreference = 'Stop'
 $PackRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SkillRoot = Join-Path $PackRoot 'skills'
+$PresetRoot = Join-Path $PackRoot 'presets'
 
 function Copy-SkillsTo([string]$destRoot) {
     if (-not $destRoot) { return }
@@ -26,12 +31,29 @@ function Copy-SkillsTo([string]$destRoot) {
     }
 }
 
+# 把 pack 里的客制化 agent 预设装进 $DSH_HOME/.agent-presets/<id>/。
+# DSH Web 会话直接选用该目录；Reasonix dsh 节点通过 <id>/headless.patch.yml 使用。
+function Copy-PresetsTo([string]$dshHome) {
+    if (-not (Test-Path $PresetRoot)) { return }
+    $dest = Join-Path $dshHome '.agent-presets'
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    Get-ChildItem -Directory $PresetRoot | ForEach-Object {
+        $target = Join-Path $dest $_.Name
+        Copy-Item -Recurse -Force $_.FullName $target
+        Write-Host "[+] 客制化 agent 预设: $($_.Name) -> $target"
+    }
+    Write-Host "[+] Reasonix 自检 /selfcheck 会自动导入上述预设；dsh 节点配置面板可选。"
+}
+
 switch ($Mode) {
     'user' {
         $dshHome = $env:DSH_HOME
         if (-not $dshHome) { $dshHome = Join-Path $HOME '.dsh' }
         if (-not $SkipDsh) {
             Copy-SkillsTo (Join-Path $dshHome 'skills')
+            if (-not $SkipPresets) {
+                Copy-PresetsTo $dshHome
+            }
             # persona 覆盖层（合并追加，不覆盖已有 home 层）
             $homePatch = Join-Path $dshHome 'cordis.patch.yml'
             $packPatch = Join-Path $PackRoot 'cordis.patch.yml'
@@ -53,22 +75,29 @@ switch ($Mode) {
             Write-Host "[+] Reasonix skill root: $reasonixSkills"
             Write-Host "    提示：可用 `$env:REASONIX_SKILL_DIR 指向其他位置"
         }
-        Write-Host "`n完成。验证： dsh --profile headless \"列出已加载的 skill\""
+        Write-Host "`n完成。验证： dsh --profile headless ""列出已加载的 skill"""
     }
     'project' {
         if (-not $Workspace) { throw '-Mode project 需要 -Workspace <目录>' }
         $agentsSkills = Join-Path $Workspace '.agents\skills'
         Copy-SkillsTo $agentsSkills
         Write-Host "[+] 项目级技能根: $agentsSkills（该工作区内的 DSH 会话自动发现）"
+        Write-Host "提示：客制化 agent 预设是用户级（`$DSH_HOME/.agent-presets），项目级不复制；用 -Mode user 安装。"
         if (-not $SkipReasonix) {
             Write-Host "提示：Reasonix 技能根是全局的，项目级默认只装 DSH 侧。用 -Mode user -SkipDsh 装 Reasonix 侧。"
         }
     }
     'temp' {
         if (-not $Task) { throw '-Mode temp 需要 -Task "<任务>"' }
-        $patch = Join-Path $PackRoot 'cordis.patch.yml'
         $cmd = 'dsh --profile headless'
-        if (Test-Path $patch) { $cmd += " --patch `"$patch`"" }
+        if ($Preset) {
+            $presetPatch = Join-Path $PresetRoot "$Preset\headless.patch.yml"
+            if (-not (Test-Path $presetPatch)) { throw "客制化 agent 预设不存在或无 headless 补丁: $Preset" }
+            $cmd += " --patch `"$presetPatch`""
+        } else {
+            $patch = Join-Path $PackRoot 'cordis.patch.yml'
+            if (Test-Path $patch) { $cmd += " --patch `"$patch`"" }
+        }
         $cmd += " `"$Task`""
         Write-Host "[run] $cmd"
         Invoke-Expression $cmd

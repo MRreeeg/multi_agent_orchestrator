@@ -90,3 +90,7 @@ LeetCode C++ 笔记调研报告*.md
 
 # Orchestrator run state
 /.reasonix-orchestrator/
+
+# playwright CLI artifacts (local browser automation dumps)
+.playwright-cli/
+

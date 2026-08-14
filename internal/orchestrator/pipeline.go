@@ -3105,6 +3105,7 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		NodeLabel:         node.Label,
 		ContextPolicy:     contextPolicy,
 		ExternalSessionID: externalSessionID,
+		DshPreset:         strings.TrimSpace(node.DshPreset),
 	}
 	if loopReview {
 		// Keep reviewer cost bounded even if the provider ignores the prompt

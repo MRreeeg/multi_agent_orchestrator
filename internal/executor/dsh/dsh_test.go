@@ -130,6 +130,34 @@ func TestExecTimeout(t *testing.T) {
 	}
 }
 
+func TestExecPassesAgentPresetPatch(t *testing.T) {
+	dir := t.TempDir()
+	presetDir := filepath.Join(dir, ".agent-presets", "architect")
+	if err := os.MkdirAll(presetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(presetDir, "headless.patch.yml"), []byte("- id: system-prompt\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	bin := writeFakeDSHCmd(t, dir, "@echo off\r\necho ARGS:%*\r\n")
+	executor := &DshExecutor{DshBin: bin}
+	result, err := executor.Exec(context.Background(), "task", ExecOptions{AgentPreset: "architect", DshHome: dir})
+	if err != nil {
+		t.Fatalf("Exec() error = %v", err)
+	}
+	if !strings.Contains(result.RawStdout, "--patch") || !strings.Contains(result.RawStdout, "headless.patch.yml") {
+		t.Errorf("RawStdout = %q, want preset --patch path", result.RawStdout)
+	}
+
+	// An unknown preset fails loudly instead of silently running the stock persona.
+	if _, err := executor.Exec(context.Background(), "task", ExecOptions{AgentPreset: "nope", DshHome: dir}); err == nil {
+		t.Fatal("unknown preset should fail the run")
+	} else if !errors.Is(err, ErrExecutorStart) {
+		t.Errorf("unknown preset error = %v, want ErrExecutorStart", err)
+	}
+}
+
 func TestBuildEnvPermissionMapping(t *testing.T) {
 	joined := func(opts ExecOptions) string { return strings.Join(buildEnv(opts), "\n") }
 

@@ -276,6 +276,8 @@ input,textarea,select{font:inherit;color:inherit}
 .node__body{padding:6px 10px 8px;font-size:11px;color:var(--muted)}
 .node__model{font-family:var(--mono);font-size:10.5px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .node__skill{font-size:10.5px;color:var(--muted-2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node__agent-src{font-size:10.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted-2)}
+.node__agent-src--custom{color:var(--accent);font-weight:600}
 
 /* port circles for edge dragging */
 .node__port{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--panel-2);border:2px solid var(--border-strong);z-index:3;cursor:crosshair;transition:all .15s ease}
@@ -650,6 +652,12 @@ input,textarea,select{font:inherit;color:inherit}
           <select class="field__select" id="cfg-executor">
           </select>
         </div>
+        <div class="field" id="dsh-preset-field" style="display:none">
+          <label class="field__label">客制化 Agent（DSH 预设）</label>
+          <select class="field__select" id="cfg-dsh-preset" title="本地客制化的 DSH agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 DSH 内置 persona（Prompt 式）。">
+            <option value="">默认（内置 persona，Prompt 式）</option>
+          </select>
+        </div>
         <div class="field">
           <label class="field__label">运行模式</label>
           <select class="field__select" id="cfg-mode">
@@ -871,6 +879,7 @@ const state = {
   models: [],
   skills: [],
   skillCatalog: [],
+  dshPresets: [], // 本地客制化 DSH agent（/dsh-presets，自检时自动导入）
   presets: [],
   stats: null,
   runs: [],
@@ -1064,6 +1073,19 @@ function syncConfigFieldState(node) {
   syncExecutorOptionsForNode(node);
   populateModelSelect(node);
   populateSkillSelect(node);
+
+  // 客制化 Agent（仅 dsh 节点显示；其他执行器走 Prompt 式职责 + Skill 注入）
+  const dshPresetField = $('#dsh-preset-field');
+  const dshPresetSel = $('#cfg-dsh-preset');
+  if (dshPresetField) {
+    const isDshNode = node?.executor === 'dsh';
+    dshPresetField.style.display = isDshNode ? '' : 'none';
+    if (dshPresetSel) {
+      populateDshPresetSelect(node);
+      dshPresetSel.value = node?.dshPreset || '';
+      dshPresetSel.disabled = !isDshNode;
+    }
+  }
 
   // Show/hide ReasoningEffort for Codex
   const reasoningField = $('#reasoning-effort-field');
@@ -1898,7 +1920,7 @@ if (NARROW_CONFIG_Q.addEventListener) NARROW_CONFIG_Q.addEventListener('change',
 $('#config-close').addEventListener('click', hideConfig);
 
 // Config field change handlers
-['cfg-name', 'cfg-type', 'cfg-model', 'cfg-agent', 'cfg-skill', 'cfg-executor', 'cfg-mode', 'cfg-approval', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
+['cfg-name', 'cfg-type', 'cfg-model', 'cfg-agent', 'cfg-skill', 'cfg-executor', 'cfg-dsh-preset', 'cfg-mode', 'cfg-approval', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
   const el = $('#' + id);
   el.addEventListener('change', () => {
     if (!state.selectedNode) return;
@@ -1957,6 +1979,11 @@ $('#config-close').addEventListener('click', hideConfig);
     if (id === 'cfg-mode') node.mode = el.value;
     if (id === 'cfg-role') node.role = el.value;
     if (id === 'cfg-reasoning-effort') node.reasoningEffort = el.value;
+    if (id === 'cfg-dsh-preset') {
+      node.dshPreset = el.value || '';
+      renderNodes();
+      return;
+    }
     enforceNodeConstraints(node);
     syncConfigFieldState(node);
     showConfig(node.id);
@@ -2018,6 +2045,25 @@ $('#btn-clear-pipeline').addEventListener('click', () => {
 });
 
 // ── Render nodes on canvas ──
+// 节点卡片上的「Agent 来源」标注：客制化 Agent（DSH 预设）还是 Prompt 式
+// （角色描述 / Skill 注入）。用户要求卡片上明确区分两种实现方式。
+function agentSourceLine(node) {
+  if (node?.executor === 'dsh') {
+    if (node.dshPreset) {
+      const p = (state.dshPresets || []).find(x => x.id === node.dshPreset);
+      return '客制化 Agent：' + (p ? escHtml(p.name) + '（' + escHtml(p.id) + '）' : escHtml(node.dshPreset));
+    }
+    return 'Prompt 式：内置 persona';
+  }
+  if (node?.executor === 'mimo' && node?.agent) return 'Agent 配置：' + escHtml(node.agent);
+  if (node?.skill) return 'Prompt 式：Skill 注入 ' + escHtml(node.skill);
+  return 'Prompt 式：角色描述';
+}
+
+function agentSourceClass(node) {
+  return node?.executor === 'dsh' && node?.dshPreset ? 'node__agent-src node__agent-src--custom' : 'node__agent-src';
+}
+
 function renderNodes() {
   console.log('[nodes] rendering', state.nodes.length, 'nodes, canvas visible:', canvas.offsetParent !== null, 'canvas dims:', canvas.offsetWidth, 'x', canvas.offsetHeight);
   canvas.querySelectorAll('.node').forEach(n => n.remove());
@@ -2045,6 +2091,7 @@ function renderNodes() {
       <div class="node__body">
         <div class="node__model">${escHtml(node.model || '未选择模型')}</div>
         <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || '默认 Agent') : (node.skill || '无 Skill'))}</div>
+        <div class="${agentSourceClass(node)}">${agentSourceLine(node)}</div>
         ${node.runtime && node.runtime.output ? `<div class="node__output">${escHtml(node.runtime.output)}</div>` : ''}
       </div>
     `;
@@ -3710,6 +3757,21 @@ async function openSelfCheck() {
         d.skillRoots.map(x => '<span style="font-family:var(--mono);font-size:11px">' + escHtml(x) + '</span>').join(' &nbsp;·&nbsp; ') + '</div>';
     }
 
+    // 4. 客制化 DSH Agent（本地自动导入 $DSH_HOME/.agent-presets）
+    const dshPresets = d.dshPresets || [];
+    html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">客制化 DSH Agent（本地自动导入） <span style="font-weight:400;color:var(--muted-2);font-size:12px">共 ' + dshPresets.length + ' 个</span></div>';
+    dshPresets.forEach(p => {
+      html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;background:var(--card)">' +
+        '<div style="font-weight:600;font-size:13px">' + escHtml(p.name || p.id) +
+        '<span style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-left:8px">' + escHtml(p.id) + '</span>' +
+        '<span style="margin-left:8px">' + selfcheckBadge(p.hasPatch, p.hasPatch ? '可用于节点' : '无 headless 补丁') + '</span></div>' +
+        (p.description ? '<div style="font-size:12.5px;color:var(--fg-2);margin-top:4px">' + escHtml(p.description) + '</div>' : '') +
+        '<div style="font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:4px">' + escHtml(p.dir || '') + '</div></div>';
+    });
+    if (!dshPresets.length) {
+      html += '<div style="font-size:12.5px;color:var(--muted-2);padding:6px 0 12px">未发现本地客制化 agent。在 $DSH_HOME/.agent-presets/&lt;id&gt;/ 下放置 agent.cordis.yml + preset.yml（可选 headless.patch.yml）后重新自检即可自动导入。</div>';
+    }
+
     body.innerHTML = html;
   } catch (err) {
     body.innerHTML = '<div style="color:var(--red);padding:20px;text-align:center;font-size:13px">自检失败: ' + escHtml(err.message || err) + '</div>';
@@ -3752,6 +3814,7 @@ async function showNodeDetail(node) {
         <div><span style="color:var(--muted-2)">状态：</span>${statusIcon} ${statusText}</div>
         <div><span style="color:var(--muted-2)">${node.executor === 'mimo' ? 'Agent' : 'Skill'}：</span>${escHtml(node.executor === 'mimo' ? (node.agent || '默认') : (node.skill || '无'))}</div>
         <div style="grid-column:span 2"><span style="color:var(--muted-2)">角色：</span>${escHtml(node.role || '未设置')}</div>
+        <div style="grid-column:span 2"><span style="color:var(--muted-2)">Agent 来源：</span>${agentSourceLine(node)}</div>
       </div>
     </div>
   `;
@@ -4425,7 +4488,14 @@ async function loadNodeTypes() {
     } catch (_) {
       state.skillCatalog = [];
     }
-    console.log('[orch:config] nodeTypes loaded:', types?.map(t => t.type).join(', '), 'skills:', state.skills.length);
+    // 本地客制化 DSH agent（自检时同样会导入；这里让节点配置面板立即可选）
+    try {
+      const dshPresets = await apiGet('/dsh-presets');
+      state.dshPresets = Array.isArray(dshPresets) ? dshPresets : [];
+    } catch (_) {
+      state.dshPresets = [];
+    }
+    console.log('[orch:config] nodeTypes loaded:', types?.map(t => t.type).join(', '), 'skills:', state.skills.length, 'dshPresets:', state.dshPresets.map(p => p.id).join(', '));
     // Dynamically rebuild executor dropdown from backend capabilities
     const allExecutors = [...new Set(types?.flatMap(t => (t.executors || []).map(String)) || [])];
     console.log('[orch:config] executors:', allExecutors);
@@ -4485,6 +4555,22 @@ function populateSkillSelect(node) {
     activeNode.skill = canonicalSkillForNode(activeNode.skill, activeNode.type, state.rewrittenTask || '', activeNode.role || '');
     sel.value = activeNode.skill || '';
   }
+}
+
+// 客制化 DSH agent 下拉：来自 /dsh-presets（自检时自动导入 $DSH_HOME/.agent-presets）。
+// 只有带 headless.patch.yml 的预设可选；无补丁的仅展示在自检面板。
+function populateDshPresetSelect(node) {
+  const sel = $('#cfg-dsh-preset');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">默认（内置 persona，Prompt 式）</option>';
+  (state.dshPresets || []).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.hasPatch ? (p.name + '（' + p.id + '）') : (p.name + '（' + p.id + ' · 无 headless 补丁，不可用于节点）');
+    opt.disabled = !p.hasPatch;
+    sel.appendChild(opt);
+  });
+  sel.value = node?.dshPreset || '';
 }
 
 // ── Load stats ──

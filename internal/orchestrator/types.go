@@ -82,6 +82,9 @@ type ExecSpec struct {
 	// TurnTimeout is the hard per-turn budget for the opencode serve turn.
 	// Zero uses the runtime default (5 minutes).
 	TurnTimeout time.Duration
+	// DshPreset names a locally authored DSH agent preset for dsh executor
+	// nodes (mirrors AgentNode.DshPreset).
+	DshPreset string
 }
 
 // ExecResult is the unified execution result from any executor.
@@ -138,10 +141,16 @@ type AgentNode struct {
 	Executor        ExecutorType `json:"executor"`      // reasonix | mimo | codex
 	ExecutionMode   string       `json:"executionMode"` // task | goal (default: task)
 	ApprovalMode    string       `json:"approvalMode"`  // ask | auto (default: ask)
-	InputMap        string       `json:"inputMap"`      // how to map upstream output to this node's input
-	OutputMap       string       `json:"outputMap"`     // how to map this node's output for downstream
-	X               float64      `json:"x"`             // editor canvas X
-	Y               float64      `json:"y"`             // editor canvas Y
+	// DshPreset names a locally authored DSH agent preset
+	// ($DSH_HOME/.agent-presets/<id>) for dsh executor nodes. When set, the
+	// node runs under that customized agent (persona + pruned tool catalog)
+	// via its headless.patch.yml; when empty, the node uses DSH's stock
+	// headless persona plus prompt/skill injection.
+	DshPreset string  `json:"dshPreset,omitempty"`
+	InputMap  string  `json:"inputMap"`  // how to map upstream output to this node's input
+	OutputMap string  `json:"outputMap"` // how to map this node's output for downstream
+	X         float64 `json:"x"`         // editor canvas X
+	Y         float64 `json:"y"`         // editor canvas Y
 }
 
 // Edge defines data flow between two nodes.

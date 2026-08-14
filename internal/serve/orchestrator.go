@@ -22,6 +22,7 @@ import (
 
 	"reasonix/internal/config"
 	"reasonix/internal/event"
+	dshclient "reasonix/internal/executor/dsh"
 	"reasonix/internal/orchestrator"
 	"reasonix/internal/proc"
 	"reasonix/internal/skill"
@@ -263,6 +264,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.skills(w, r)
 	case path == "/nodes/types" && r.Method == http.MethodGet:
 		h.nodeTypes(w, r)
+	case path == "/dsh-presets" && r.Method == http.MethodGet:
+		h.dshPresets(w, r)
 	case path == "/selfcheck" && r.Method == http.MethodGet:
 		h.selfcheck(w, r)
 	case path == "/presets" && r.Method == http.MethodGet:
@@ -803,8 +806,19 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) 
 	writeJSON(w, orchestrator.NodeTypeCatalog())
 }
 
+// dshPresets returns the locally authored DSH agent presets
+// ($DSH_HOME/.agent-presets) so the config panel can offer them on dsh nodes.
+func (h *orchestratorHandler) dshPresets(w http.ResponseWriter, _ *http.Request) {
+	presets := dshclient.ListAgentPresets()
+	if presets == nil {
+		presets = []dshclient.AgentPresetInfo{}
+	}
+	writeJSON(w, presets)
+}
+
 // selfcheck returns the one-click self-check report: agent catalog, live
-// runtime states, skill catalog, and per-executor binary availability.
+// runtime states, skill catalog, per-executor binary availability, and the
+// locally imported DSH agent presets.
 func (h *orchestratorHandler) selfcheck(w http.ResponseWriter, r *http.Request) {
 	report := orchestrator.SelfCheckSnapshot(r.Context())
 	running := h.store.ListAgents()
@@ -812,13 +826,14 @@ func (h *orchestratorHandler) selfcheck(w http.ResponseWriter, r *http.Request) 
 		running = []orchestrator.AgentInstance{}
 	}
 	writeJSON(w, map[string]interface{}{
-		"checkedAt": report.CheckedAt,
-		"agents":    report.Agents,
-		"running":   running,
-		"runtimes":  report.Runtimes,
-		"skills":    report.Skills,
+		"checkedAt":  report.CheckedAt,
+		"agents":     report.Agents,
+		"running":    running,
+		"runtimes":   report.Runtimes,
+		"skills":     report.Skills,
 		"skillRoots": report.SkillRoots,
-		"health":    report.Health,
+		"health":     report.Health,
+		"dshPresets": report.DshPresets,
 	})
 }
 
@@ -1023,6 +1038,7 @@ func (h *orchestratorHandler) getRuntimeConsole(w http.ResponseWriter, _ *http.R
 	}
 	writeJSON(w, snapshot)
 }
+
 // answerRuntimePermission resolves one parked tool-approval prompt on a
 // runtime (mimo ACP or claude SDK) with the action chosen in the Runtime
 // Console: allow_once | allow_always | reject.
@@ -1440,7 +1456,7 @@ func (h *orchestratorHandler) understandRequirement(w http.ResponseWriter, r *ht
 		Executor string `json:"executor"`
 		Model    string `json:"model"`
 		Agent    string `json:"agent"`
-		Nodes []struct {
+		Nodes    []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
 			Type string `json:"type"`

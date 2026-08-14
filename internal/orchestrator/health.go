@@ -24,14 +24,16 @@ type ExecutorHealth struct {
 }
 
 // SelfCheck is the one-click self-check report: agent catalog, live runtime
-// states, skill catalog with search roots, and executor binary probes.
+// states, skill catalog with search roots, executor binary probes, and the
+// locally authored DSH agent presets imported from $DSH_HOME/.agent-presets.
 type SelfCheck struct {
-	Agents     []NodeTypeInfo   `json:"agents"`
-	Runtimes   []RuntimeState   `json:"runtimes"`
-	Skills     []SkillInfo      `json:"skills"`
-	SkillRoots []string         `json:"skillRoots"`
-	Health     []ExecutorHealth `json:"health"`
-	CheckedAt  time.Time        `json:"checkedAt"`
+	Agents     []NodeTypeInfo              `json:"agents"`
+	Runtimes   []RuntimeState              `json:"runtimes"`
+	Skills     []SkillInfo                 `json:"skills"`
+	SkillRoots []string                    `json:"skillRoots"`
+	Health     []ExecutorHealth            `json:"health"`
+	DshPresets []dshclient.AgentPresetInfo `json:"dshPresets"`
+	CheckedAt  time.Time                   `json:"checkedAt"`
 }
 
 // CheckExecutors probes each supported executor binary in this build:
@@ -136,7 +138,7 @@ func probeVersion(ctx context.Context, bin string, prefix []string) (string, err
 
 // SelfCheckSnapshot assembles a one-click self-check report from already
 // computed state (node types, live runtimes, skill catalog with roots) plus a
-// fresh executor binary probe.
+// fresh executor binary probe and the locally authored DSH agent presets.
 func SelfCheckSnapshot(ctx context.Context) SelfCheck {
 	return SelfCheck{
 		Agents:     NodeTypeCatalog(),
@@ -144,6 +146,7 @@ func SelfCheckSnapshot(ctx context.Context) SelfCheck {
 		Skills:     ListAvailableSkills(),
 		SkillRoots: skillSearchRoots(),
 		Health:     CheckExecutors(ctx),
+		DshPresets: dshclient.ListAgentPresets(),
 		CheckedAt:  time.Now(),
 	}
 }
