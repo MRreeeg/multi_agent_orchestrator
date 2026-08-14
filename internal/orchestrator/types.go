@@ -321,6 +321,21 @@ type RuntimeState struct {
 	// orchestrator Runtime Console. They are provider identifiers, never tokens.
 	ThreadID string `json:"threadID,omitempty"`
 	TurnID   string `json:"turnID,omitempty"`
+	// PermissionRequests lists tool-approval prompts parked because the node's
+	// approval mode is "ask" and no human has decided yet. The Runtime Console
+	// renders one card per entry; answering calls
+	// AnswerMimoRuntimePermission / AnswerClaudeRuntimePermission.
+	PermissionRequests []PermissionRequestInfo `json:"permissionRequests,omitempty"`
+}
+
+// PermissionRequestInfo is the public projection of one parked tool-approval
+// prompt (mimo ACP request_permission or claude SDK can_use_tool).
+type PermissionRequestInfo struct {
+	RequestID string    `json:"requestId"`
+	ToolName  string    `json:"toolName"`
+	ToolInput string    `json:"toolInput,omitempty"` // trimmed JSON of the tool call
+	SessionID string    `json:"sessionID,omitempty"`
+	AskedAt   time.Time `json:"askedAt"`
 }
 
 // SessionState captures the full orchestrator state for a session (for persistence).

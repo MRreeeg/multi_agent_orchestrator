@@ -51,7 +51,24 @@ type TurnResult struct {
 
 // PermissionPolicy decides how the client answers a CLI permission request
 // (subtype "permission" / "can_use_tool"). A nil policy denies every request.
+// Returning ErrPermissionPending parks the request until a human answers it
+// through AnswerPermission; the control_response is delayed, the CLI keeps
+// waiting.
 type PermissionPolicy func(sessionID, toolName string, toolInput json.RawMessage) (bool, error)
+
+// ErrPermissionPending marks a permission request that the policy cannot
+// answer automatically. The client parks the request (no control_response
+// yet) and hands it to the onPermission hook so a human can decide later.
+var ErrPermissionPending = errors.New("permission pending human decision")
+
+// PermissionRequest is one CLI permission prompt parked for a human decision.
+type PermissionRequest struct {
+	RequestID string
+	SessionID string
+	ToolName  string
+	ToolInput json.RawMessage
+	AskedAt   time.Time
+}
 
 type activeTurn struct {
 	text        strings.Builder
@@ -81,6 +98,10 @@ type SdkClient struct {
 	w       io.Writer
 	onEvent func(Event)
 	permit  PermissionPolicy
+	// onPermission receives parked permission requests (ErrPermissionPending).
+	// The hook must eventually call AnswerPermission with the request's
+	// RequestID; until then the CLI waits and no control_response is written.
+	onPermission func(PermissionRequest)
 
 	mu          sync.Mutex
 	active      *activeTurn
@@ -108,6 +129,40 @@ func (c *SdkClient) SetPermissionPolicy(policy PermissionPolicy) {
 	c.mu.Lock()
 	c.permit = policy
 	c.mu.Unlock()
+}
+
+// SetPermissionHook registers the receiver for parked permission requests
+// (policy returned ErrPermissionPending). At most one hook is kept.
+func (c *SdkClient) SetPermissionHook(hook func(PermissionRequest)) {
+	c.mu.Lock()
+	c.onPermission = hook
+	c.mu.Unlock()
+}
+
+// AnswerPermission replies to a parked permission request with an allow/deny
+// control_response. Safe to call from any goroutine; the request must still
+// be pending (no reply written yet).
+func (c *SdkClient) AnswerPermission(requestID string, allow bool) error {
+	if strings.TrimSpace(requestID) == "" {
+		return fmt.Errorf("claude sdk: empty permission request id")
+	}
+	resp := map[string]any{
+		"type": "control_response",
+		"response": map[string]any{
+			"subtype":    "success",
+			"request_id": requestID,
+			"response": map[string]any{
+				"behavior": "deny",
+				"message":  "denied by orchestrator",
+			},
+		},
+	}
+	if allow {
+		if inner, ok := resp["response"].(map[string]any); ok {
+			inner["response"] = map[string]any{"behavior": "allow"}
+		}
+	}
+	return c.write(resp)
 }
 
 func (c *SdkClient) write(msg any) error {
@@ -651,6 +706,7 @@ func (c *SdkClient) handleControlRequest(event Event, request json.RawMessage) {
 	case "permission", "can_use_tool":
 		c.mu.Lock()
 		policy := c.permit
+		hook := c.onPermission
 		sessionID := c.sessionID
 		c.mu.Unlock()
 		allow := false
@@ -661,7 +717,23 @@ func (c *SdkClient) handleControlRequest(event Event, request json.RawMessage) {
 			}
 			var err error
 			allow, err = policy(sessionID, body.ToolName, input)
-			if err != nil {
+			if errors.Is(err, ErrPermissionPending) {
+				// Park the request: no control_response yet. The hook (usually
+				// the orchestrator runtime) stores it and answers via
+				// AnswerPermission once a human decides.
+				if hook != nil {
+					hook(PermissionRequest{
+						RequestID: requestID,
+						SessionID: sessionID,
+						ToolName:  body.ToolName,
+						ToolInput: input,
+						AskedAt:   time.Now(),
+					})
+					return
+				}
+				// No hook to answer later: stay conservative and deny.
+				allow = false
+			} else if err != nil {
 				allow = false
 			}
 		}

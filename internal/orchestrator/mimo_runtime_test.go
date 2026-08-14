@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -109,8 +110,8 @@ func TestMimoRuntimeFinishInterruptedTurnRemainsIdle(t *testing.T) {
 func TestMimoPermissionPolicyMatchesApprovalMode(t *testing.T) {
 	ask := &mimoRuntime{ApprovalMode: "ask"}
 	option, err := mimoPermissionPolicy(ask)("ses-1", json.RawMessage(`{}`))
-	if err != nil || option != "reject" {
-		t.Fatalf("ask policy = %q, %v", option, err)
+	if !errors.Is(err, mimoclient.ErrPermissionPending) || option != "" {
+		t.Fatalf("ask policy = %q, %v (want ErrPermissionPending)", option, err)
 	}
 	auto := &mimoRuntime{ApprovalMode: "auto"}
 	option, err = mimoPermissionPolicy(auto)("ses-1", json.RawMessage(`{}`))

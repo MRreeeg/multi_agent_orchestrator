@@ -294,6 +294,9 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	case strings.HasSuffix(path, "/message") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/message")
 		h.sendRuntimeMessage(w, r, id)
+	case strings.HasSuffix(path, "/permission") && r.Method == http.MethodPost:
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/permission")
+		h.answerRuntimePermission(w, r, id)
 	case strings.HasSuffix(path, "/interrupt") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runtimes/"), "/interrupt")
 		h.interruptRuntime(w, r, id)
@@ -1019,6 +1022,34 @@ func (h *orchestratorHandler) getRuntimeConsole(w http.ResponseWriter, _ *http.R
 		return
 	}
 	writeJSON(w, snapshot)
+}
+// answerRuntimePermission resolves one parked tool-approval prompt on a
+// runtime (mimo ACP or claude SDK) with the action chosen in the Runtime
+// Console: allow_once | allow_always | reject.
+func (h *orchestratorHandler) answerRuntimePermission(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		RequestID string `json:"requestId"`
+		Action    string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RequestID == "" {
+		writeErr(w, "requestId is required", http.StatusBadRequest)
+		return
+	}
+	switch body.Action {
+	case "allow_once", "allow_always", "reject":
+	default:
+		writeErr(w, "action must be allow_once | allow_always | reject", http.StatusBadRequest)
+		return
+	}
+	if err := orchestrator.AnswerMimoRuntimePermission(id, body.RequestID, body.Action); err == nil {
+		writeJSON(w, map[string]string{"ok": "true"})
+		return
+	}
+	if err := orchestrator.AnswerClaudeRuntimePermission(id, body.RequestID, body.Action); err != nil {
+		writeErr(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, map[string]string{"ok": "true"})
 }
 
 func (h *orchestratorHandler) sendRuntimeMessage(w http.ResponseWriter, r *http.Request, id string) {

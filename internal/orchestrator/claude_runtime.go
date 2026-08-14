@@ -48,6 +48,11 @@ type claudeRuntime struct {
 	lastErr   string
 	events    []RuntimeConsoleEvent
 	stream    *consoleStreamCoalescer
+
+	// pendingPerms holds tool-approval prompts parked in "ask" mode, keyed by
+	// the CLI request id. The Runtime Console answers them through
+	// AnswerClaudeRuntimePermission.
+	pendingPerms map[string]PermissionRequestInfo
 }
 
 // ClaudeRuntimeManager starts `claude -p` as a retained, loopback-only runtime
@@ -237,6 +242,7 @@ func (m *ClaudeRuntimeManager) stateFor(rt *claudeRuntime, spec ExecSpec, policy
 		CreatedAt: rt.StartedAt, LastActiveAt: rt.LastUsedAt, CleanupPolicy: policy,
 		AccessMode: "runtime_console", ApprovalMode: rt.ApprovalMode,
 		ThreadID: rt.sessionID, TurnID: rt.turnID,
+		PermissionRequests: pendingPermissionList(rt.pendingPerms),
 	}
 }
 
@@ -350,8 +356,12 @@ func (m *ClaudeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStar
 
 	client := claudeclient.NewSdkClient(stdoutR, stdinW, func(e claudeclient.Event) { m.recordEvent(rt, e) })
 	client.SetPermissionPolicy(claudePermissionPolicy(rt))
+	client.SetPermissionHook(func(req claudeclient.PermissionRequest) { m.parkPermission(rt, req) })
 	rt.mu.Lock()
 	rt.client = client
+	if rt.pendingPerms == nil {
+		rt.pendingPerms = make(map[string]PermissionRequestInfo)
+	}
 	rt.mu.Unlock()
 
 	// The Claude CLI (2.1.x) only emits the stream-json init event after it
@@ -735,18 +745,73 @@ func (m *ClaudeRuntimeManager) Interrupt(ctx context.Context, runtimeID string) 
 }
 
 // claudePermissionPolicy answers Agent SDK permission requests the way the
-// node's approval mode expects: ask denies in the non-interactive
-// orchestrator, auto allows the tool call.
+// node's approval mode expects: ask parks the request for a human decision in
+// the Runtime Console (ErrPermissionPending), auto allows the tool call.
 func claudePermissionPolicy(rt *claudeRuntime) claudeclient.PermissionPolicy {
 	return func(_ string, _ string, _ json.RawMessage) (bool, error) {
 		rt.mu.Lock()
 		approval := rt.ApprovalMode
 		rt.mu.Unlock()
 		if strings.EqualFold(approval, "ask") {
-			return false, nil
+			return false, claudeclient.ErrPermissionPending
 		}
 		return true, nil
 	}
+}
+
+// parkPermission stores one parked claude SDK permission request and wakes
+// the Runtime Console through the state sink.
+func (m *ClaudeRuntimeManager) parkPermission(rt *claudeRuntime, req claudeclient.PermissionRequest) {
+	info := PermissionRequestInfo{
+		RequestID: req.RequestID,
+		ToolName:  req.ToolName,
+		ToolInput: trimPermissionInput(req.ToolInput),
+		SessionID: req.SessionID,
+		AskedAt:   req.AskedAt,
+	}
+	rt.mu.Lock()
+	if rt.pendingPerms == nil {
+		rt.pendingPerms = make(map[string]PermissionRequestInfo)
+	}
+	rt.pendingPerms[req.RequestID] = info
+	rt.mu.Unlock()
+	m.notify(rt)
+}
+
+// AnswerClaudeRuntimePermission resolves a parked claude SDK permission
+// request: action "allow_once" / "allow" allows, "reject" denies.
+func AnswerClaudeRuntimePermission(runtimeID, requestID, action string) error {
+	claudeRuntimeMgr.mu.Lock()
+	var target *claudeRuntime
+	for _, rt := range claudeRuntimeMgr.runtimes {
+		if rt.ID == runtimeID {
+			target = rt
+			break
+		}
+	}
+	claudeRuntimeMgr.mu.Unlock()
+	if target == nil {
+		return fmt.Errorf("claude runtime %q not found", runtimeID)
+	}
+	target.mu.Lock()
+	_, ok := target.pendingPerms[requestID]
+	if ok {
+		delete(target.pendingPerms, requestID)
+	}
+	client := target.client
+	target.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("permission request %q not pending on runtime %q", requestID, runtimeID)
+	}
+	if client == nil {
+		return fmt.Errorf("claude runtime %q has no client", runtimeID)
+	}
+	allow := strings.EqualFold(action, "allow") || strings.EqualFold(action, "allow_once") || strings.EqualFold(action, "allow_always")
+	if err := client.AnswerPermission(requestID, allow); err != nil {
+		return err
+	}
+	claudeRuntimeMgr.notify(target)
+	return nil
 }
 
 // claudeConfigDir picks the CLAUDE_CONFIG_DIR overlay for a node.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,6 +46,11 @@ type mimoRuntime struct {
 	lastErr   string
 	events    []RuntimeConsoleEvent
 	stream    *consoleStreamCoalescer
+
+	// pendingPerms holds tool-approval prompts parked in "ask" mode, keyed by
+	// the JSON-RPC env id (as string). The Runtime Console answers them
+	// through AnswerMimoRuntimePermission.
+	pendingPerms map[string]PermissionRequestInfo
 }
 
 // MimoRuntimeManager starts `mimo acp` as a retained, loopback-only runtime
@@ -242,7 +248,22 @@ func (m *MimoRuntimeManager) stateFor(rt *mimoRuntime, spec ExecSpec, policy Cle
 		ApprovalMode:  rt.ApprovalMode,
 		ThreadID:      rt.sessionID,
 		TurnID:        rt.turnID,
+		PermissionRequests: pendingPermissionList(rt.pendingPerms),
 	}
+}
+
+// pendingPermissionList flattens the runtime's parked permission map into a
+// stable, newest-first slice for the public RuntimeState. Callers hold rt.mu.
+func pendingPermissionList(m map[string]PermissionRequestInfo) []PermissionRequestInfo {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]PermissionRequestInfo, 0, len(m))
+	for _, info := range m {
+		out = append(out, info)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].AskedAt.After(out[j].AskedAt) })
+	return out
 }
 
 func (m *MimoRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*mimoRuntime, error) {
@@ -340,8 +361,12 @@ func (m *MimoRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart 
 
 	client := mimoclient.NewAcpClient(stdoutR, stdinW, func(e mimoclient.AcpEvent) { m.recordEvent(rt, e) })
 	client.SetPermissionPolicy(mimoPermissionPolicy(rt))
+	client.SetPermissionHook(func(req mimoclient.PermissionRequest) { m.parkPermission(rt, req) })
 	rt.mu.Lock()
 	rt.client = client
+	if rt.pendingPerms == nil {
+		rt.pendingPerms = make(map[string]PermissionRequestInfo)
+	}
 	rt.mu.Unlock()
 
 	// The ACP server needs a few seconds to warm up (plugins, memory reconcile).
@@ -738,18 +763,84 @@ func (m *MimoRuntimeManager) Interrupt(ctx context.Context, runtimeID string) er
 }
 
 // mimoPermissionPolicy answers ACP permission requests the way the node's
-// approval mode expects: ask rejects in the non-interactive orchestrator,
-// auto/yolo allows the tool call for the whole session.
+// approval mode expects: ask parks the request for a human decision in the
+// Runtime Console (ErrPermissionPending), auto/yolo allows the tool call for
+// the whole session.
 func mimoPermissionPolicy(rt *mimoRuntime) mimoclient.PermissionPolicy {
 	return func(_ string, _ json.RawMessage) (string, error) {
 		rt.mu.Lock()
 		approval := rt.ApprovalMode
 		rt.mu.Unlock()
 		if strings.EqualFold(approval, "ask") {
-			return "reject", nil
+			return "", mimoclient.ErrPermissionPending
 		}
 		return "allow_always", nil
 	}
+}
+
+// parkPermission stores one parked ACP permission request and wakes the
+// Runtime Console through the state sink.
+func (m *MimoRuntimeManager) parkPermission(rt *mimoRuntime, req mimoclient.PermissionRequest) {
+	key := string(req.EnvID)
+	info := PermissionRequestInfo{
+		RequestID: key,
+		ToolName:  req.ToolName,
+		ToolInput: trimPermissionInput(req.ToolInput),
+		SessionID: req.SessionID,
+		AskedAt:   req.AskedAt,
+	}
+	rt.mu.Lock()
+	if rt.pendingPerms == nil {
+		rt.pendingPerms = make(map[string]PermissionRequestInfo)
+	}
+	rt.pendingPerms[key] = info
+	rt.mu.Unlock()
+	m.notify(rt)
+}
+
+// AnswerMimoRuntimePermission resolves a parked ACP permission request with
+// the chosen action: "allow_once", "allow_always" or "reject".
+func AnswerMimoRuntimePermission(runtimeID, requestID, action string) error {
+	mimoRuntimeMgr.mu.Lock()
+	var target *mimoRuntime
+	for _, rt := range mimoRuntimeMgr.runtimes {
+		if rt.ID == runtimeID {
+			target = rt
+			break
+		}
+	}
+	mimoRuntimeMgr.mu.Unlock()
+	if target == nil {
+		return fmt.Errorf("mimo runtime %q not found", runtimeID)
+	}
+	target.mu.Lock()
+	_, ok := target.pendingPerms[requestID]
+	if ok {
+		delete(target.pendingPerms, requestID)
+	}
+	client := target.client
+	target.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("permission request %q not pending on runtime %q", requestID, runtimeID)
+	}
+	if client == nil {
+		return fmt.Errorf("mimo runtime %q has no client", runtimeID)
+	}
+	if err := client.AnswerPermission(json.RawMessage(requestID), action); err != nil {
+		return err
+	}
+	mimoRuntimeMgr.notify(target)
+	return nil
+}
+
+// trimPermissionInput keeps the console card compact: the raw ACP toolCall
+// can embed large tool arguments.
+func trimPermissionInput(raw json.RawMessage) string {
+	s := strings.TrimSpace(string(raw))
+	if len(s) > 300 {
+		s = s[:300] + "…"
+	}
+	return s
 }
 
 var mimoRuntimeMgr = newMimoRuntimeManager()

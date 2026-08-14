@@ -815,6 +815,13 @@ func executeOpencodeRun(ctx context.Context, spec ExecSpec) (*ExecResult, error)
 		Model:     spec.ModelRef,
 		Workspace: spec.Workspace,
 		MaxSteps:  spec.MaxSteps,
+		// opencode run has no programmatic permission-reply channel (unlike
+		// mimo ACP / claude SDK), so an ask would hang the one-shot process
+		// forever. Always auto-approve non-denied requests and hard-deny the
+		// "question" tool: a model that wants to ask the user gets a tool
+		// rejection and must decide on its own instead of blocking a pipeline.
+		AutoApprove: true,
+		PermissionConfig: `{"permission":{"question":"deny"}}`,
 	}
 	if spec.ContextPolicy != "fresh" && spec.ContextPolicy != "fresh_per_run" {
 		opts.ResumeSessionID = strings.TrimSpace(spec.ExternalSessionID)

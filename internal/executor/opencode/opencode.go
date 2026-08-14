@@ -43,6 +43,18 @@ type ExecOptions struct {
 	// default; provisioned in the orchestrator for free/streaming models so a
 	// "let me explore" loop cannot run forever.
 	MaxSteps int
+	// AutoApprove adds --auto: opencode approves every permission request
+	// that is not explicitly denied. The orchestrator runs nodes
+	// non-interactively (there is no TTY and no programmatic reply channel
+	// for opencode permission prompts), so this is the only way to keep a
+	// run from hanging on an ask.
+	AutoApprove bool
+	// PermissionConfig is injected as OPENCODE_CONFIG_CONTENT (inline config,
+	// highest non-managed precedence) so the run can hard-deny the tools that
+	// would otherwise block an unattended pipeline — most importantly the
+	// "question" tool, whose whole purpose is to wait for a human answer that
+	// a one-shot subprocess can never receive.
+	PermissionConfig string
 }
 
 // Executor executes tasks via the opencode CLI (`opencode run`).
@@ -125,6 +137,9 @@ func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string)
 	if opts.MaxSteps > 0 {
 		args = append(args, "--max-steps", fmt.Sprint(opts.MaxSteps))
 	}
+	if opts.AutoApprove {
+		args = append(args, "--auto")
+	}
 	args = append(args, "--format", "json", prompt)
 
 	bin := e.opencodeBin()
@@ -133,6 +148,9 @@ func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string)
 	proc.HideWindow(cmd)
 	if opts.Workspace != "" {
 		cmd.Dir = opts.Workspace
+	}
+	if opts.PermissionConfig != "" {
+		cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_CONTENT="+opts.PermissionConfig)
 	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

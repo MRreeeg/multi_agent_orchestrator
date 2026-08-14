@@ -63,8 +63,26 @@ type PromptResult struct {
 
 // PermissionPolicy decides how the client answers an agent requestPermission
 // call. It returns the ACP option id to select: "allow_always", "allow_once"
-// or "reject". A nil policy rejects every permission request.
+// or "reject". A nil policy rejects every permission request. Returning
+// ErrPermissionPending parks the request until a human answers it through
+// AnswerPermission; the reply is delayed, the agent keeps waiting.
 type PermissionPolicy func(sessionID string, toolCall json.RawMessage) (string, error)
+
+// ErrPermissionPending marks a permission request that the policy cannot
+// answer automatically. The client parks the request (no JSON-RPC reply yet)
+// and hands it to the onPermission hook so a human can decide later.
+var ErrPermissionPending = errors.New("permission pending human decision")
+
+// PermissionRequest is one agent-initiated permission prompt that has been
+// parked for a human decision. EnvID is the JSON-RPC request id the reply
+// must carry.
+type PermissionRequest struct {
+	EnvID     json.RawMessage
+	SessionID string
+	ToolName  string
+	ToolInput json.RawMessage
+	AskedAt   time.Time
+}
 
 type rpcError struct {
 	Code    int             `json:"code"`
@@ -103,6 +121,10 @@ type AcpClient struct {
 	w       io.Writer
 	onEvent func(AcpEvent)
 	permit  PermissionPolicy
+	// onPermission receives parked permission requests (ErrPermissionPending).
+	// The hook must eventually call AnswerPermission with the request's
+	// EnvID; until then the agent waits and no other reply is written.
+	onPermission func(PermissionRequest)
 
 	writeMu     sync.Mutex
 	mu          sync.Mutex
@@ -134,6 +156,28 @@ func (c *AcpClient) SetPermissionPolicy(policy PermissionPolicy) {
 	c.mu.Lock()
 	c.permit = policy
 	c.mu.Unlock()
+}
+
+// SetPermissionHook registers the receiver for parked permission requests
+// (policy returned ErrPermissionPending). At most one hook is kept.
+func (c *AcpClient) SetPermissionHook(hook func(PermissionRequest)) {
+	c.mu.Lock()
+	c.onPermission = hook
+	c.mu.Unlock()
+}
+
+// AnswerPermission replies to a parked permission request with the chosen ACP
+// option id ("allow_always", "allow_once" or "reject"). Safe to call from any
+// goroutine; the request must still be pending (no reply written yet).
+func (c *AcpClient) AnswerPermission(envID json.RawMessage, optionID string) error {
+	switch optionID {
+	case "allow_always", "allow_once", "reject":
+	default:
+		return fmt.Errorf("mimo acp: invalid permission option %q", optionID)
+	}
+	return c.write(map[string]any{"id": envID, "result": map[string]any{
+		"outcome": map[string]any{"outcome": "selected", "optionId": optionID},
+	}})
 }
 
 func (c *AcpClient) write(msg any) error {
@@ -524,9 +568,30 @@ func (c *AcpClient) handleServerRequest(env envelope) {
 		var replyErr *rpcError
 		c.mu.Lock()
 		policy := c.permit
+		hook := c.onPermission
 		c.mu.Unlock()
 		if policy != nil {
 			chosen, err := policy(params.SessionID, params.ToolCall)
+			if errors.Is(err, ErrPermissionPending) {
+				// Park the request: no reply yet. The hook (usually the
+				// orchestrator runtime) stores it and answers via
+				// AnswerPermission once a human decides.
+				if hook != nil {
+					hook(PermissionRequest{
+						EnvID:     env.ID,
+						SessionID: params.SessionID,
+						ToolName:  permissionToolName(params.ToolCall),
+						ToolInput: params.ToolCall,
+						AskedAt:   time.Now(),
+					})
+					return
+				}
+				// No hook to answer later: stay conservative and reject.
+				_ = c.write(map[string]any{"id": env.ID, "result": map[string]any{
+					"outcome": map[string]any{"outcome": "selected", "optionId": "reject"},
+				}})
+				return
+			}
 			if err != nil {
 				replyErr = &rpcError{Code: -32603, Message: err.Error()}
 			} else if chosen != "" {
@@ -545,6 +610,28 @@ func (c *AcpClient) handleServerRequest(env envelope) {
 		// does not wait indefinitely for a reply.
 		_ = c.write(map[string]any{"id": env.ID, "error": &rpcError{Code: -32601, Message: "method not found: " + env.Method}})
 	}
+}
+
+// permissionToolName extracts a display name from an ACP toolCall payload.
+// The ACP toolCall object carries a "title" (e.g. "bash"); fall back to a
+// "name"/"tool" field or a generic label when it is missing.
+func permissionToolName(toolCall json.RawMessage) string {
+	var obj struct {
+		Title string `json:"title"`
+		Name  string `json:"name"`
+		Tool  string `json:"tool"`
+	}
+	_ = json.Unmarshal(toolCall, &obj)
+	if obj.Title != "" {
+		return obj.Title
+	}
+	if obj.Name != "" {
+		return obj.Name
+	}
+	if obj.Tool != "" {
+		return obj.Tool
+	}
+	return "unknown-tool"
 }
 
 // Done exposes the connection-closed channel for tests and lifecycle joins.

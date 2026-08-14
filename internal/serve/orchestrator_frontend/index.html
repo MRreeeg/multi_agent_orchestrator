@@ -657,6 +657,14 @@ input,textarea,select{font:inherit;color:inherit}
             <option value="run">run</option>
           </select>
         </div>
+        <div class="field">
+          <label class="field__label">权限模式</label>
+          <select class="field__select" id="cfg-approval" title="工具调用批准策略：auto 全自动放行；ask 时工具请求会挂起并在 Runtime Console 弹出待批准卡片（仅 mimo/claude serve 生效）">
+            <option value="auto">auto（全自动放行）</option>
+            <option value="ask">ask（人工批准）</option>
+            <option value="yolo">yolo（全自动放行）</option>
+          </select>
+        </div>
         <div class="field" id="reasoning-effort-field" style="display:none">
           <label class="field__label">思考强度</label>
           <select class="field__select" id="cfg-reasoning-effort">
@@ -805,6 +813,7 @@ input,textarea,select{font:inherit;color:inherit}
       <div class="modal__body" style="display:grid;grid-template-columns:minmax(250px,.75fr) minmax(0,1.65fr);gap:14px;overflow:hidden;flex:1;min-height:0">
         <section style="min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px;overflow:hidden">
           <div class="rc-meta" style="padding:11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);font:13px/1.55 var(--mono)"></div>
+          <div class="rc-permissions" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
           <label style="font-size:12.5px;color:var(--muted-2);font-weight:600">人工介入（保留会话上的新 Turn；仅调试，不推进 Loop 或改写 Run/Iteration 历史）</label>
           <textarea class="rc-input" rows="7" placeholder="输入补充要求、纠正指令或后续任务…" style="width:100%;box-sizing:border-box;resize:vertical;background:var(--bg-2);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius);padding:10px;font:13px/1.5 var(--mono)"></textarea>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1845,6 +1854,7 @@ function showConfig(nodeId) {
   $('#cfg-skill').value = node.skill || '';
   $('#cfg-executor').value = node.executor || 'reasonix';
   $('#cfg-mode').value = node.mode || 'serve';
+  $('#cfg-approval').value = node.approvalMode || 'auto';
   $('#cfg-role').value = node.role || '';
   syncConfigFieldState(node);
   // highlight node
@@ -1878,7 +1888,7 @@ if (NARROW_CONFIG_Q.addEventListener) NARROW_CONFIG_Q.addEventListener('change',
 $('#config-close').addEventListener('click', hideConfig);
 
 // Config field change handlers
-['cfg-name', 'cfg-type', 'cfg-model', 'cfg-agent', 'cfg-skill', 'cfg-executor', 'cfg-mode', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
+['cfg-name', 'cfg-type', 'cfg-model', 'cfg-agent', 'cfg-skill', 'cfg-executor', 'cfg-mode', 'cfg-approval', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
   const el = $('#' + id);
   el.addEventListener('change', () => {
     if (!state.selectedNode) return;
@@ -1886,6 +1896,7 @@ $('#config-close').addEventListener('click', hideConfig);
     if (!node) return;
     if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = '节点: ' + el.value; }
     if (id === 'cfg-type') node.type = el.value;
+    if (id === 'cfg-approval') node.approvalMode = el.value;
     if (id === 'cfg-model') {
       if (el.value === '__custom__') {
         const custom = (window.prompt('输入模型名：ccs/ccswitch 走 ccswitch 路由；其他（如 deepseek-xxx、claude 全名）将透传给 CLI 自行解析。', node.model || '') || '').trim();
@@ -1965,6 +1976,7 @@ function createNode(type, x, y) {
     skill: '',
     executor: type === 'executor' ? 'mimo' : 'reasonix',
     mode: 'serve',
+    approvalMode: 'auto',
     role: '',
     x: x,
     y: y,
@@ -3957,6 +3969,29 @@ function renderRuntimeConsole(runtimeID, data) {
   interrupt.disabled = !data.canInterrupt;
   interrupt.title = data.canInterrupt ? '中断当前 Turn（保留 Runtime 与会话）' : '当前无活动 Turn 可中断';
   modal.querySelector('.rc-output').textContent = data.output || data.error || '等待该 Runtime 的输出…';
+  // Parked tool-approval prompts ("ask" approval mode): one card per request
+  // with allow-once / allow-always / reject actions.
+  const perms = (rt.permissionRequests || []).filter(Boolean);
+  const permBox = modal.querySelector('.rc-permissions');
+  if (!permBox) return;
+  if (!perms.length) {
+    permBox.innerHTML = '';
+  } else {
+    permBox.innerHTML = '<div style="font-size:11px;font-weight:600;color:var(--warning);margin-bottom:2px">待批准的工具请求（ask 模式）</div>' + perms.map(p =>
+      '<div style="border:1px solid var(--warning);border-radius:var(--radius);background:var(--card);padding:8px 10px">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--fg)">⏸ ' + escHtml(p.toolName || 'unknown-tool') + '</div>' +
+        (p.toolInput ? '<div style="font-size:11px;color:var(--muted);margin:4px 0;white-space:pre-wrap;word-break:break-all;max-height:64px;overflow:auto">' + escHtml(p.toolInput) + '</div>' : '') +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' +
+          '<button class="run-dash__btn" data-act="allow_once" data-rid="' + escHtml(p.requestId) + '" style="border-color:var(--success);color:var(--success)">允许一次</button>' +
+          '<button class="run-dash__btn" data-act="allow_always" data-rid="' + escHtml(p.requestId) + '" style="border-color:var(--accent);color:var(--accent)">始终允许</button>' +
+          '<button class="run-dash__btn" data-act="reject" data-rid="' + escHtml(p.requestId) + '" style="border-color:var(--danger);color:var(--danger)">拒绝</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+    permBox.querySelectorAll('button[data-act]').forEach(btn => {
+      btn.addEventListener('click', () => answerRuntimePermission(runtimeID, btn.dataset.rid, btn.dataset.act));
+    });
+  }
   const events = Array.isArray(data.events) ? data.events : [];
   const container = modal.querySelector('.rc-events');
   renderRuntimeEvents(container, events, modal);
@@ -4101,6 +4136,19 @@ async function sendRuntimeConsoleMessage(runtimeID) {
   }
 }
 
+// answerRuntimePermission resolves a parked tool-approval prompt on a runtime
+// console ("ask" approval mode): allow_once | allow_always | reject.
+async function answerRuntimePermission(runtimeID, requestId, action) {
+  if (!runtimeID || !requestId) return;
+  try {
+    await apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/permission', { requestId, action });
+    toast(action === 'reject' ? '已拒绝该工具请求' : '已批准该工具请求', 'success');
+    await refreshRuntimeConsole(runtimeID);
+  } catch (err) {
+    toast('批准失败: ' + err.message, 'error');
+  }
+}
+
 async function interruptRuntime(runtimeID) {
   if (!runtimeID) return;
   try {
@@ -4124,6 +4172,7 @@ function buildPipelinePayload() {
       reasoningEffort: n.reasoningEffort || '',
       mode: n.mode || 'serve',
       executor: n.executor || 'reasonix',
+      approvalMode: n.approvalMode || 'auto',
       role: n.role,
       x: n.x,
       y: n.y,
