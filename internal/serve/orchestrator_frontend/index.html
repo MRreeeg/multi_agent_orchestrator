@@ -63,6 +63,13 @@ input,textarea,select{font:inherit;color:inherit}
 .topbar__btn--accent:hover{background:oklch(68% .16 38/.25)}
 .topbar__btn--danger{background:var(--danger-soft);color:var(--danger);border-color:transparent}
 .topbar__btn--danger:hover{background:oklch(66% .18 25/.25)}
+/* 启动加载画面：init 完成前遮挡，避免欢迎页与输入框同时闪现 */
+.boot-loading{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--bg);color:var(--fg-2)}
+.boot-loading__title{font-family:var(--heading);font-size:20px;font-weight:700;color:var(--fg)}
+.boot-loading__sub{font-size:12.5px;color:var(--muted-2)}
+.boot-loading__bar{width:180px;height:4px;border-radius:999px;background:var(--border);overflow:hidden;margin-top:8px}
+.boot-loading__bar-fill{display:block;width:40%;height:100%;border-radius:999px;background:var(--accent);animation:boot-slide 1.1s ease-in-out infinite}
+@keyframes boot-slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
 .topbar__btn--success{background:var(--success-soft);color:var(--success);border-color:transparent}
 @keyframes exec-pulse{0%,100%{box-shadow:0 0 0 0 var(--accent-soft)}50%{box-shadow:0 0 0 6px transparent}}
 #btn-execute.exec-pulse{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);animation:exec-pulse 1.4s ease-in-out infinite}
@@ -169,10 +176,10 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__input{flex:1;min-height:52px;max-height:180px;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:10px 14px;font-size:14px;line-height:1.6;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
 .chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 20px -6px oklch(0% 0 0/.18)}
 .chat__input::placeholder{color:var(--muted-2)}
-.chat__send{display:flex;align-items:center;justify-content:center;width:44px;height:auto;min-height:52px;flex-shrink:0;border-radius:14px;background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
+.chat__send{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex-shrink:0;align-self:flex-end;border-radius:12px;background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
 .chat__send:hover{transform:scale(1.05)}
 .chat__send:disabled{background:var(--panel-2);color:var(--muted);cursor:default;transform:none}
-.chat__send svg{width:16px;height:16px}
+.chat__send svg{width:20px;height:20px}
 .topbar__sub{font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:400}
 .hero__title{font-family:var(--heading);font-size:24px;font-weight:700;letter-spacing:-.02em;color:var(--fg);text-align:center;line-height:1.3}
 .hero__sub{font-size:13.5px;color:var(--muted-2);text-align:center;width:min(680px,92%);line-height:1.65}
@@ -180,8 +187,9 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__input{display:block;width:100%;min-height:62px;resize:none;border:1px solid var(--border-strong);border-radius:16px;background:var(--card);padding:14px 62px 14px 16px;font:14px/1.65 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 8px oklch(0% 0 0/.06),0 1px 2px oklch(0% 0 0/.04)}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 8px 24px -8px oklch(0% 0 0/.2)}
 .hero__input::placeholder{color:var(--muted-2)}
-.hero__send{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;border-radius:10px;background:var(--accent-strong);color:oklch(99% 0 0);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
-.hero__send svg{width:16px;height:16px;opacity:1}
+.hero__send{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:none;border-radius:12px;background:var(--accent-strong);color:oklch(99% 0 0);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
+.hero__send:hover{transform:translateY(-50%) scale(1.05)}
+.hero__send svg{width:20px;height:20px;opacity:1}
 .hero__send:hover{background:var(--accent);box-shadow:0 8px 20px -8px var(--accent-soft)}
 .hero__send:active{transform:translateY(-50%) scale(.97)}
 .hero__send:disabled{opacity:.55;cursor:default;transform:none;box-shadow:none}
@@ -413,6 +421,21 @@ input,textarea,select{font:inherit;color:inherit}
 <body>
 
 <div class="app" id="app">
+  <!-- 启动加载画面：init() 完成前遮住整个界面，避免欢迎页与输入框同时闪现 -->
+  <div class="boot-loading" id="boot-loading">
+    <div class="boot-loading__logo">
+      <svg viewBox="0 0 24 24" width="44" height="44" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="5.5" fill="var(--accent-strong)"/>
+        <path d="M7.5 10.6 12 13.2 M12 13.2 16.5 11.7" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>
+        <circle cx="7.5" cy="8" r="2.6" fill="#fff"/>
+        <circle cx="12" cy="15.5" r="2.6" fill="#fff"/>
+        <circle cx="16.5" cy="9" r="2.6" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="boot-loading__title">多智能体管家</div>
+    <div class="boot-loading__sub">正在加载编排控制台…</div>
+    <div class="boot-loading__bar"><span class="boot-loading__bar-fill"></span></div>
+  </div>
   <!-- Top bar -->
   <header class="topbar">
     <div class="topbar__brand">
@@ -764,6 +787,21 @@ input,textarea,select{font:inherit;color:inherit}
     <div class="modal__foot">
       <button class="btn btn--ghost" id="confirm-cancel">取消</button>
       <button class="btn btn--primary" id="confirm-ok">确认执行</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用确认弹窗（替代原生 window.confirm） -->
+<div class="modal-overlay" id="generic-confirm-modal" style="display:none">
+  <div class="modal" style="width:min(460px,90vw)">
+    <div class="modal__head">
+      <span id="gcm-title">确认</span>
+      <span class="modal__close" id="gcm-close">&times;</span>
+    </div>
+    <div class="modal__body" id="gcm-message" style="font-size:13.5px;color:var(--fg-2);line-height:1.7"></div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" id="gcm-cancel">取消</button>
+      <button class="btn btn--primary" id="gcm-ok">确定</button>
     </div>
   </div>
 </div>
@@ -1614,6 +1652,34 @@ async function refreshHistory() {
   }
 }
 
+// ── 通用确认弹窗（替代原生 window.confirm，风格与全站一致）──
+function confirmDialog(opts) {
+  return new Promise(resolve => {
+    const m = $('#generic-confirm-modal');
+    if (!m) { resolve(true); return; }
+    $('#gcm-title').textContent = opts.title || '确认';
+    $('#gcm-message').innerHTML = opts.message || '';
+    const ok = $('#gcm-ok');
+    ok.textContent = opts.okText || '确定';
+    ok.className = 'btn ' + (opts.danger ? 'topbar__btn--danger' : 'btn--primary');
+    const cleanup = () => {
+      ok.removeEventListener('click', onOk);
+      $('#gcm-cancel').removeEventListener('click', onCancel);
+      $('#gcm-close').removeEventListener('click', onCancel);
+      m.removeEventListener('click', onOverlay);
+    };
+    const onOk = () => { m.style.display = 'none'; cleanup(); resolve(true); };
+    const onCancel = () => { m.style.display = 'none'; cleanup(); resolve(false); };
+    const onOverlay = (e) => { if (e.target === m) onCancel(); };
+    ok.addEventListener('click', onOk);
+    $('#gcm-cancel').addEventListener('click', onCancel);
+    $('#gcm-close').addEventListener('click', onCancel);
+    m.addEventListener('click', onOverlay);
+    m.style.display = 'flex';
+    ok.focus();
+  });
+}
+
 async function deleteOrchestrationSession(sessionID, title, nativeName, nativePath) {
   if (!sessionID) return;
   if (state.sessionID && state.sessionID === sessionID) {
@@ -1621,7 +1687,13 @@ async function deleteOrchestrationSession(sessionID, title, nativeName, nativePa
     return;
   }
   const label = title || sessionID;
-  if (!confirm('确定删除会话“' + label + '”吗？\n\n会话将从历史列表中隐藏，相关数据会保留在归档状态。')) return;
+  const ok = await confirmDialog({
+    title: '删除会话',
+    message: '确定删除会话「' + escHtml(label) + '」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。',
+    okText: '删除',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await apiDelete('/orch-sessions/' + encodeURIComponent(sessionID));
     // A migrated orchestration session may also have a native .jsonl entry.
@@ -1643,7 +1715,13 @@ async function deleteOrchestrationSession(sessionID, title, nativeName, nativePa
 async function deleteNativeSession(name, title) {
   if (!name) return;
   const label = title || name;
-  if (!confirm('确定删除会话“' + label + '”吗？\n\n这会永久删除本地会话记录。')) return;
+  const ok = await confirmDialog({
+    title: '删除会话',
+    message: '确定删除会话「' + escHtml(label) + '」吗？<br>这会永久删除本地会话记录。',
+    okText: '删除',
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await mainApi('POST', '/delete-session', { name });
     toast('会话已删除', 'success');
@@ -2164,8 +2242,9 @@ $('#add-node-pro').addEventListener('click', () => createNode('architect', 60 + 
 $('#add-node-flash').addEventListener('click', () => createNode('reviewer', 60 + Math.random() * 200, 60 + Math.random() * 200));
 $('#add-node-mimo').addEventListener('click', () => createNode('executor', 60 + Math.random() * 200, 60 + Math.random() * 200));
 $('#btn-delete-node').addEventListener('click', () => { if (state.selectedNode) deleteNode(state.selectedNode); });
-$('#btn-clear-pipeline').addEventListener('click', () => {
-  if (!confirm('确定清空管道？')) return;
+$('#btn-clear-pipeline').addEventListener('click', async () => {
+  const ok = await confirmDialog({ title: '清空管道', message: '确定清空当前管道？所有节点与连线将被移除。', okText: '清空', danger: true });
+  if (!ok) return;
   state.nodes = []; state.edges = []; state.nextNodeId = 1;
   hideConfig(); syncLoopConfigUI(); renderNodes(); renderEdges();
 });
@@ -2403,9 +2482,10 @@ function renderEdges() {
     path.setAttribute('marker-end', 'url(#arrowhead)');
     path.style.pointerEvents = 'stroke';
     path.style.cursor = 'pointer';
-    path.addEventListener('click', e => {
+    path.addEventListener('click', async e => {
       e.stopPropagation();
-      if (confirm('删除此连线？')) {
+      const ok = await confirmDialog({ title: '删除连线', message: '删除此连线？', okText: '删除', danger: true });
+      if (ok) {
         state.edges.splice(i, 1);
         renderEdges();
       }
@@ -4568,9 +4648,12 @@ presetSelect.addEventListener('change', async () => {
   const preset = state.presets.find(p => p.id === id);
   console.log('[preset-change] found preset:', preset?.name, 'pipeline nodes:', preset?.pipeline?.nodes?.length);
   if (!preset) return;
-  if (state.nodes.length > 0 && !confirm('加载预设将替换当前管道，继续？')) {
-    presetSelect.value = '';
-    return;
+  if (state.nodes.length > 0) {
+    const ok = await confirmDialog({ title: '加载预设', message: '加载预设将替换当前管道，继续？', okText: '加载' });
+    if (!ok) {
+      presetSelect.value = '';
+      return;
+    }
   }
   state.nodes = [];
   state.edges = [];
@@ -5073,35 +5156,42 @@ async function loadChatHistory() {
 // ── Init ──
 async function init() {
   console.log('[init] starting...');
-  connectSSE();
-  console.log('[init] connectSSE called');
-  try { await loadPresets(); } catch (e) { console.error('[init] loadPresets failed:', e); }
-  try { await loadNodeTypes(); } catch (e) { console.error('[init] loadNodeTypes failed:', e); }
-  // Try to load orchestration session from URL or localStorage
-  const urlParams = new URLSearchParams(window.location.search);
-  state.sessionID = urlParams.get('session') || localStorage.getItem('orchestrator-session-id') || null;
   try {
-    // Resolve URL/localStorage through the session index first. A stale ID is
-    // reported instead of silently switching to another historical session.
-    await loadPreferredOrchestrationSession(state.sessionID || '');
-  } catch (e) {
-    console.warn('[init] no orchestration sessions found:', e);
+    connectSSE();
+    console.log('[init] connectSSE called');
+    try { await loadPresets(); } catch (e) { console.error('[init] loadPresets failed:', e); }
+    try { await loadNodeTypes(); } catch (e) { console.error('[init] loadNodeTypes failed:', e); }
+    // Try to load orchestration session from URL or localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    state.sessionID = urlParams.get('session') || localStorage.getItem('orchestrator-session-id') || null;
+    try {
+      // Resolve URL/localStorage through the session index first. A stale ID is
+      // reported instead of silently switching to another historical session.
+      await loadPreferredOrchestrationSession(state.sessionID || '');
+    } catch (e) {
+      console.warn('[init] no orchestration sessions found:', e);
+    }
+    try {
+      // The orchestration transcript is authoritative for this UI. Only use the
+      // native controller history when no orchestration conversation exists.
+      const hasOrchestrationConversation = state.sessionID &&
+        Array.isArray(state.chatMessages) && state.chatMessages.length > 0;
+      if (!hasOrchestrationConversation) await loadChatHistory();
+    } catch (e) { console.warn('[init] loadChatHistory:', e); }
+    try { loadStats(); } catch (e) { console.error('[init] loadStats failed:', e); }
+    try { loadAgents(); } catch (e) { console.error('[init] loadAgents failed:', e); }
+    try { loadRuns(); } catch (e) { console.error('[init] loadRuns failed:', e); }
+    try { await refreshHistory(); } catch (e) { console.warn('[init] refreshHistory:', e); }
+    if (configPanel.classList.contains('config--hidden')) {
+      $('#app').classList.add('app--no-config');
+    }
+    console.log('[init] done');
+  } finally {
+    // 加载完成才揭掉遮罩：欢迎页/输入栏/历史会话的显示状态此时已就位，
+    // 不会再出现"输入框与欢迎页同时出现"的闪屏。
+    const boot = $('#boot-loading');
+    if (boot) boot.style.display = 'none';
   }
-  try {
-    // The orchestration transcript is authoritative for this UI. Only use the
-    // native controller history when no orchestration conversation exists.
-    const hasOrchestrationConversation = state.sessionID &&
-      Array.isArray(state.chatMessages) && state.chatMessages.length > 0;
-    if (!hasOrchestrationConversation) await loadChatHistory();
-  } catch (e) { console.warn('[init] loadChatHistory:', e); }
-  try { loadStats(); } catch (e) { console.error('[init] loadStats failed:', e); }
-  try { loadAgents(); } catch (e) { console.error('[init] loadAgents failed:', e); }
-  try { loadRuns(); } catch (e) { console.error('[init] loadRuns failed:', e); }
-  try { await refreshHistory(); } catch (e) { console.warn('[init] refreshHistory:', e); }
-  if (configPanel.classList.contains('config--hidden')) {
-    $('#app').classList.add('app--no-config');
-  }
-  console.log('[init] done');
 }
 
 document.addEventListener('DOMContentLoaded', init);
