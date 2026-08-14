@@ -4,9 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>多智能体管家 · 多Agent 编排控制台</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/katex/katex.min.css" />
 <script src="/katex/katex.min.js" defer></script>
 <style>
@@ -31,8 +28,8 @@
   --shadow-lg:0 24px 60px -16px oklch(0% 0 0/.18);
   --radius:8px;--radius-lg:12px;
   --sans:'Segoe UI Variable Text','Segoe UI','Microsoft YaHei UI','PingFang SC',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
-  --heading:'Space Grotesk','Segoe UI Variable Display','Segoe UI','Microsoft YaHei UI',sans-serif;
-  --mono:'Cascadia Code','JetBrains Mono',ui-monospace,SFMono-Regular,Consolas,monospace;
+  --heading:'Segoe UI Variable Display','Segoe UI','Microsoft YaHei UI',sans-serif;
+  --mono:'Cascadia Code',ui-monospace,SFMono-Regular,Consolas,monospace;
   color-scheme:light;
 }
 html,body{height:100%;overflow:hidden}
@@ -45,7 +42,7 @@ button{cursor:pointer;font:inherit;border:none;background:none;color:inherit}
 input,textarea,select{font:inherit;color:inherit}
 
 /* ── Layout ── */
-.app{display:grid;grid-template-columns:190px 1fr 300px;grid-template-rows:48px 1fr;height:100vh}
+.app{display:grid;grid-template-columns:190px 1fr 300px;grid-template-rows:48px 1fr;height:100vh;min-width:940px;overflow-x:auto}
 .app--no-config{grid-template-columns:190px 1fr 0px}
 .topbar{grid-column:1/-1;background:var(--bg-2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;z-index:10}
 .topbar__brand{font-family:var(--heading);font-weight:700;font-size:15px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
@@ -118,16 +115,14 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__welcome>svg{width:40px;height:40px;opacity:.3}
 .chat__welcome-title{font-family:var(--heading);font-size:16px;font-weight:600;color:var(--fg-2)}
 .chat__welcome-desc{font-size:13px;text-align:center;max-width:320px}
-.chat-bubble{width:90%;max-width:1080px;animation:msg-in .25s ease}
+.chat-bubble{max-width:1080px;animation:msg-in .25s ease}
 @keyframes msg-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
-.chat-bubble--user{align-self:flex-end}
-.chat-bubble--user{width:78%;max-width:1080px}
-.chat-bubble--user{margin-left:auto}
-.chat-bubble--ai{margin-right:auto}
+.chat-bubble--user{width:max-content;max-width:78%;margin-left:auto;align-self:flex-end}
+.chat-bubble--ai{width:100%}
 .chat-bubble__inner{padding:10px 14px;border-radius:var(--radius-lg);font-size:13.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
 .chat-bubble__inner{font-size:14.5px;line-height:1.75}
 .chat-bubble--user .chat-bubble__inner{background:var(--accent-soft);color:var(--fg);border:1px solid oklch(68% .16 38/.2)}
-.chat-bubble--ai .chat-bubble__inner{background:var(--card);color:var(--fg-2);border:1px solid var(--border)}
+.chat-bubble--ai .chat-bubble__inner{background:transparent;border:none;color:var(--fg);padding:6px 2px}
 .chat-bubble__inner h2,.chat-bubble__inner h3,.chat-bubble__inner h4{margin:8px 0 4px;font-weight:700;line-height:1.35}
 .chat-bubble__inner h2{font-size:15px}.chat-bubble__inner h3{font-size:14px}.chat-bubble__inner h4{font-size:13.5px}
 .chat-bubble__inner p{margin:4px 0}
@@ -151,8 +146,8 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__opt-label{font-size:10.5px;color:var(--muted-2);font-family:var(--mono)}
 .chat__opt{border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--fg-2);font-size:11px;padding:2px 6px;max-width:180px;outline:none;transition:border-color .15s}
 .chat__opt:hover{border-color:var(--border-strong)}
-.chat__input{flex:1;min-height:46px;max-height:160px;border:1px solid var(--border-strong);border-radius:10px;background:var(--card);padding:8px 12px;font-size:13px;line-height:1.5;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease}
-.chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.chat__input{flex:1;min-height:46px;max-height:160px;border:1px solid var(--border-strong);border-radius:10px;background:var(--card);padding:8px 12px;font-size:13px;line-height:1.5;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
+.chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 20px -6px oklch(0% 0 0/.18)}
 .chat__input::placeholder{color:var(--muted-2)}
 .chat__send{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius);background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
 .chat__send:hover{transform:scale(1.05)}
@@ -162,8 +157,8 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__title{font-family:var(--heading);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--fg);text-align:center;line-height:1.3}
 .hero__sub{font-size:13px;color:var(--muted-2);text-align:center;width:min(640px,92%);line-height:1.65}
 .hero__box{position:relative;width:min(640px,92%);margin-top:8px}
-.hero__input{display:block;width:100%;min-height:56px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 58px 12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s}
-.hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.hero__input{display:block;width:100%;min-height:56px;resize:none;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:12px 58px 12px 14px;font:13px/1.6 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
+.hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 8px 24px -8px oklch(0% 0 0/.2)}
 .hero__input::placeholder{color:var(--muted-2)}
 .hero__send{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;border-radius:10px;background:var(--accent-strong);color:oklch(99% 0 0);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
 .hero__send svg{width:16px;height:16px;opacity:1}
@@ -348,8 +343,8 @@ input,textarea,select{font:inherit;color:inherit}
 .session-card__btn:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .session-card__btn--danger:hover{background:var(--danger-soft);color:var(--danger);border-color:var(--danger)}
 .history-msg{padding:8px 12px;border-radius:var(--radius-lg);font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;animation:msg-in .2s ease}
-.history-msg--user{background:var(--accent-soft);color:var(--fg);border:1px solid oklch(68% .16 38/.2);align-self:flex-end;max-width:80%}
-.history-msg--assistant{background:var(--card);color:var(--fg-2);border:1px solid var(--border);align-self:flex-start;max-width:85%}
+.history-msg--user{background:var(--accent-soft);color:var(--fg);border:1px solid oklch(68% .16 38/.2);align-self:flex-end;width:max-content;max-width:80%}
+.history-msg--assistant{background:transparent;color:var(--fg);border:none;align-self:stretch;width:100%;max-width:none;padding:6px 2px}
 .history-msg--tool{background:var(--bg-2);color:var(--muted);border:1px solid var(--border);font-family:var(--mono);font-size:11px;align-self:flex-start;max-width:90%;padding:6px 10px}
 .history-msg__role{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px;font-weight:600}
 .history-msg--user .history-msg__role{color:var(--accent)}
@@ -1191,10 +1186,15 @@ const ANALYSIS_DEFAULT_MODELS_BY_EXECUTOR = {
 };
 async function loadAnalysisOptions() {
   let data = null;
+  let optionsFailed = false;
   try {
     data = await apiGet('/analysis/options');
   } catch (err) {
+    optionsFailed = true;
     console.error('[analysis/options]', err && err.message ? err.message : err);
+  }
+  if (optionsFailed) {
+    toast('分析选项加载失败，已使用内置执行器/模型列表', 'error');
   }
   const live = data && Array.isArray(data.executors) && data.executors.length && typeof data.modelsByExecutor === 'object';
   const executors = live ? data.executors : ANALYSIS_DEFAULT_EXECUTORS;
@@ -1828,6 +1828,10 @@ $$('.nav-btn').forEach(btn => {
 function showConfig(nodeId) {
   const node = state.nodes.find(n => n.id === nodeId);
   if (!node) return;
+  if (NARROW_CONFIG_Q.matches) {
+    toast('窗口较窄，配置面板已收起；请拉宽窗口后再编辑节点', 'error');
+    return;
+  }
   state.selectedNode = nodeId;
   configPanel.classList.remove('config--hidden');
   $('#app').classList.remove('app--no-config');
@@ -1855,6 +1859,21 @@ function hideConfig() {
   $('#app').classList.add('app--no-config');
   $$('.node').forEach(n => n.classList.remove('node--selected'));
 }
+
+// ── Narrow-window config panel auto-hide ──
+// The right config panel reserves a fixed 300px grid column. On narrow
+// windows (<= 1160px) it squeezes the chat/pipeline surface, so it auto-
+// collapses and the window is reminded to widen it back. The app grid has a
+// min-width so nothing ever collapses into unusable slivers.
+const NARROW_CONFIG_Q = window.matchMedia('(max-width:1160px)');
+function narrowAutoHideConfig() {
+  if (NARROW_CONFIG_Q.matches && !configPanel.classList.contains('config--hidden')) {
+    configPanel.classList.add('config--hidden');
+    $('#app').classList.add('app--no-config');
+    toast('窗口较窄，配置面板已自动收起；拉宽窗口后点击节点可重新打开', 'error');
+  }
+}
+if (NARROW_CONFIG_Q.addEventListener) NARROW_CONFIG_Q.addEventListener('change', narrowAutoHideConfig);
 
 $('#config-close').addEventListener('click', hideConfig);
 
@@ -2646,12 +2665,15 @@ async function sendChat() {
   const heroInput = $('#hero-input');
   const text = (heroInput && String(heroInput.value || '').trim()) || chatInput.value.trim();
   if (!text) return;
+  if (state.analyzing) { toast('已有需求分析进行中，请稍候', 'error'); return; }
+  state.analyzing = true;
   chatInput.value = '';
   if (heroInput) heroInput.value = '';
   const heroSendBtn = $('#hero-send');
   if (heroSendBtn) { heroSendBtn.disabled = true; heroSendBtn.classList.add('is-loading'); }
   chatSend.disabled = true;
   const restoreSend = () => {
+    state.analyzing = false;
     if (heroSendBtn) { heroSendBtn.disabled = false; heroSendBtn.classList.remove('is-loading'); }
     chatSend.disabled = false;
   };
@@ -3232,10 +3254,17 @@ function connectSSE() {
   ev.onopen = () => {
     sseDot.classList.add('topbar__dot--live');
     sseStatus.textContent = '已连接';
+    state.sseNotified = false;
   };
   ev.onerror = () => {
     sseDot.classList.remove('topbar__dot--live');
     sseStatus.textContent = '重连中...';
+    // Notify once per outage — EventSource retries on its own schedule and
+    // fires onerror repeatedly while disconnected.
+    if (!state.sseNotified) {
+      state.sseNotified = true;
+      toast('事件连接断开，正在重连…', 'error');
+    }
   };
   // Use onmessage to handle all event kinds (same pattern as main frontend)
   ev.onmessage = (evt) => {
@@ -3469,6 +3498,7 @@ function updateTokenStats(data) {
 
 // ── Pipeline execution ──
 $('#btn-execute').addEventListener('click', () => {
+  if (state.analyzing) { toast('需求分析进行中，请等分析完成后再执行', 'error'); return; }
   if (state.nodes.length === 0) { toast('请先添加节点', 'error'); return; }
   // 优先使用 Flash 改写后的需求，否则用原始输入
   const task = state.rewrittenTask || (state.chatMessages.filter(m => m.role === 'user').pop() || {}).text || '';
@@ -3477,7 +3507,7 @@ $('#btn-execute').addEventListener('click', () => {
   $('#confirm-task').value = task;
   const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
   $('#confirm-nodes').innerHTML = state.nodes.map(n =>
-    `<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0">${escHtml(n.name)} <span style="color:var(--muted-2)">(${escHtml(typeLabels[n.type] || n.type)} · ${escHtml(n.model || '-')})</span></span>`
+    `<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0">${escHtml(n.name)} <span style="color:var(--muted-2)">(${escHtml(typeLabels[n.type] || n.type)} · ${escHtml(n.executor || 'reasonix')}/${escHtml(n.model || '-')})</span></span>`
   ).join('');
   $('#confirm-modal').style.display = 'flex';
 });
@@ -4508,9 +4538,12 @@ function showRunDashboard(runID) {
     runDash.runID = runID || state.runId || '';
     $('#run-dash').classList.remove('hidden');
     // The run dashboard lives in the right panel; make sure it is visible
-    // even when no node is selected.
-    configPanel.classList.remove('config--hidden');
-    $('#app').classList.remove('app--no-config');
+    // even when no node is selected. On narrow windows the panel stays
+    // collapsed (auto-hidden) so the chat/pipeline surface is not squeezed.
+    if (!NARROW_CONFIG_Q.matches) {
+      configPanel.classList.remove('config--hidden');
+      $('#app').classList.remove('app--no-config');
+    }
     initRunDashboard();
   const b = $('#rd-badge');
   b.className = 'run-dash__badge';
