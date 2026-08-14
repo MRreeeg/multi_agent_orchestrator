@@ -4197,12 +4197,14 @@ async function openSelfCheck() {
     // 1. Health: executor binaries（badge 不换行；二进制列省略号，悬停看全路径）
     html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.executors') + '</div>';
     html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;table-layout:fixed">' +
-      '<colgroup><col style="width:70px"><col style="width:64px"><col><col style="width:120px"></colgroup>' +
+      // fixed 布局下所有列宽由 colgroup 决定；状态列要给足 Available/Unavailable
+      // 的空间（英文比中文长近一倍），其余列 overflow 保护防重叠。
+      '<colgroup><col style="width:88px"><col style="width:118px"><col><col style="width:130px"></colgroup>' +
       '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">' + T('sc.col.executor') + '</th><th style="padding:4px 6px">' + T('sc.col.status') + '</th><th style="padding:4px 6px">' + T('sc.col.bin') + '</th><th style="padding:4px 6px">' + T('sc.col.version') + '</th></tr>';
     (d.health || []).forEach(h => {
       html += '<tr style="border-top:1px solid var(--border);font-size:12.5px">' +
-        '<td style="padding:6px;white-space:nowrap">' + escHtml(executorLabels[h.executor] || h.executor) + '</td>' +
-        '<td style="padding:6px;white-space:nowrap">' + selfcheckBadge(h.available, h.available ? T('sc.available') : T('sc.unavailable')) + '</td>' +
+        '<td style="padding:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + escHtml(executorLabels[h.executor] || h.executor) + '">' + escHtml(executorLabels[h.executor] || h.executor) + '</td>' +
+        '<td style="padding:6px;white-space:nowrap;overflow:hidden">' + selfcheckBadge(h.available, h.available ? T('sc.available') : T('sc.unavailable')) + '</td>' +
         '<td style="padding:6px;font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(h.bin || '') + '">' + escHtml(h.bin || '-') + '</td>' +
         '<td style="padding:6px;font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(h.version || (h.error ? h.error : '-')) + '">' + escHtml(h.version || (h.error ? h.error : '-')) + '</td></tr>';
     });

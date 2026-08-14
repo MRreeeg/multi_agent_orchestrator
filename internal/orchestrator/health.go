@@ -121,9 +121,16 @@ func probeVersion(ctx context.Context, bin string, prefix []string) (string, err
 	ch := make(chan result, 1)
 	go func() {
 		out, err := cmd.Output()
-		line := strings.TrimSpace(string(out))
-		if i := strings.IndexByte(line, '\n'); i >= 0 {
-			line = line[:i]
+		// 按行取第一条有意义的输出版本：跳过空行与 .cmd shim 的
+		// "Active code page: NNNN" 横幅（npm shim 会先打印它）。
+		line := ""
+		for _, l := range strings.Split(string(out), "\n") {
+			l = strings.TrimSpace(l)
+			if l == "" || strings.HasPrefix(l, "Active code page:") {
+				continue
+			}
+			line = l
+			break
 		}
 		if len(line) > 80 {
 			line = line[:80]
