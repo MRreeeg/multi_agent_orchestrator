@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -416,23 +415,12 @@ func TestOrchestratorNodeTypesExposeExecutorSpecificModels(t *testing.T) {
 	if executorModels == nil {
 		t.Fatal("executor node type missing")
 	}
-	if !slices.Contains(executorModels["mimo"], "xiaomi/mimo-v2.5") {
-		t.Fatalf("mimo models = %v, want xiaomi/mimo-v2.5", executorModels["mimo"])
-	}
-	if !slices.Contains(executorModels["reasonix"], "deepseek-flash") {
-		t.Fatalf("reasonix models = %v, want deepseek-flash", executorModels["reasonix"])
-	}
-	if !slices.Contains(executorModels["claude"], "sonnet") || !slices.Contains(executorModels["claude"], "ccs") {
-		t.Fatalf("claude models = %v, want sonnet and ccs", executorModels["claude"])
-	}
-	if !slices.Contains(executorModels["claude"], "deepseek-v4-flash") {
-		t.Fatalf("claude models = %v, want deepseek-v4-flash", executorModels["claude"])
-	}
-	if !slices.Contains(executorModels["codex"], "ccs") {
-		t.Fatalf("codex models = %v, want ccs", executorModels["codex"])
-	}
-	if !slices.Contains(executorModels["codex"], "deepseek-v4-flash") {
-		t.Fatalf("codex models = %v, want deepseek-v4-flash", executorModels["codex"])
+	// 探测优先：本机程序化探测到的模型会覆盖静态目录（每台电脑可能不同），
+	// 所以这里只断言"每个执行器都有可用模型列表"，不断言具体静态值。
+	for _, ex := range []string{"reasonix", "mimo", "codex", "claude", "opencode", "dsh"} {
+		if len(executorModels[ex]) == 0 {
+			t.Fatalf("%s models empty after probe merge: %v", ex, executorModels[ex])
+		}
 	}
 }
 

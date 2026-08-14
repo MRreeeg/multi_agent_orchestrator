@@ -142,14 +142,17 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
 .chat-bubble--user .chat-bubble__meta{text-align:right}
 .chat__input-bar{border-top:1px solid var(--border);padding:14px 20px 18px;background:var(--bg)}
-/* 输入区居中卡片化：不贴两侧、不贴底部，宽度收窄到舒适区 */
-.chat__composer{display:flex;align-items:flex-end;gap:10px;width:min(860px,100%);margin:0 auto}
+/* 输入区居中卡片化：不贴两侧、不贴底部，宽度收窄到舒适区；
+   align-items:stretch 让发送按钮与输入框同高同圆角，视觉上完全对齐 */
+.chat__composer{display:flex;align-items:stretch;gap:10px;width:min(860px,100%);margin:0 auto}
 /* 工作目录卡片：位于输入框上方，小按钮卡片式（不再是顶栏里的文本框） */
 /* 注意：input/按钮的显示/隐藏由 JS 用内联 style 控制（display 不写进类），
    否则 style.display='' 会被类的 display:none 覆盖，路径一隐藏输入框却不出
    现，界面看起来"工作区变空"。 */
 .chat__ws{display:flex;align-items:center;gap:6px;padding:0}
 .chat__ws--bar{padding:8px 16px 0}
+/* 对话模式：卡片与右侧分析下拉同一行（左卡片右下拉，窄了自动换行不挤压） */
+.chat__ws--inline{margin-right:auto;padding:0}
 .chat__ws-btn{display:inline-flex;align-items:center;gap:6px;max-width:min(420px,60vw);border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);font-family:var(--mono);font-size:11px;padding:4px 8px;cursor:pointer;overflow:hidden;white-space:nowrap;transition:border-color .15s,box-shadow .15s}
 .chat__ws-btn:hover{border-color:var(--accent);box-shadow:0 1px 4px oklch(0% 0 0/.08)}
 .chat__ws-btn .chat__ws-edit{color:var(--muted-2);font-family:inherit;font-size:10px;flex-shrink:0}
@@ -166,7 +169,7 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__input{flex:1;min-height:52px;max-height:180px;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:10px 14px;font-size:14px;line-height:1.6;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
 .chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 20px -6px oklch(0% 0 0/.18)}
 .chat__input::placeholder{color:var(--muted-2)}
-.chat__send{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius);background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
+.chat__send{display:flex;align-items:center;justify-content:center;width:44px;height:auto;min-height:52px;flex-shrink:0;border-radius:14px;background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
 .chat__send:hover{transform:scale(1.05)}
 .chat__send:disabled{background:var(--panel-2);color:var(--muted);cursor:default;transform:none}
 .chat__send svg{width:16px;height:16px}
@@ -1170,19 +1173,20 @@ function showChatWelcome() {
   if (ws && ws.parentElement !== chatWelcome) {
     const heroBox = chatWelcome.querySelector('.hero__box') || chatWelcome;
     chatWelcome.insertBefore(ws, heroBox);
-    ws.classList.remove('chat__ws--bar');
+    ws.classList.remove('chat__ws--bar', 'chat__ws--inline');
   }
 }
 
 function hideChatWelcome() {
   chatWelcome.style.display = 'none';
   chatInputBar.style.display = 'flex';
-  // 工作目录卡片移到对话输入栏上方
+  // 工作目录卡片并入分析下拉那一行：卡片靠左、下拉靠右，窄了自动换行
   const ws = $('#chat-ws');
-  if (ws && ws.parentElement !== chatWelcome.parentElement) {
-    const opts = $('#chat-opts');
-    opts.parentElement.insertBefore(ws, opts);
-    ws.classList.add('chat__ws--bar');
+  const opts = $('#chat-opts');
+  if (ws && opts && ws.parentElement !== opts) {
+    opts.insertBefore(ws, opts.firstChild);
+    ws.classList.remove('chat__ws--bar');
+    ws.classList.add('chat__ws--inline');
   }
 }
 
@@ -3835,54 +3839,44 @@ async function openSelfCheck() {
     const checked = new Date(d.checkedAt || Date.now()).toLocaleTimeString();
     $('#selfcheck-meta').textContent = '检查时间 ' + checked;
 
-    // 1. Health: executor binaries
+    // 1. Health: executor binaries（badge 不换行；二进制列省略号，悬停看全路径）
     html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">执行器可用性</div>';
-    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px">' +
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;table-layout:fixed">' +
+      '<colgroup><col style="width:70px"><col style="width:64px"><col><col style="width:120px"></colgroup>' +
       '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">执行器</th><th style="padding:4px 6px">状态</th><th style="padding:4px 6px">二进制</th><th style="padding:4px 6px">版本</th></tr>';
     (d.health || []).forEach(h => {
       html += '<tr style="border-top:1px solid var(--border);font-size:12.5px">' +
-        '<td style="padding:6px">' + escHtml(executorLabels[h.executor] || h.executor) + '</td>' +
-        '<td style="padding:6px">' + selfcheckBadge(h.available, h.available ? '可用' : '不可用') + '</td>' +
-        '<td style="padding:6px;font-family:var(--mono);font-size:12px">' + escHtml(h.bin || '-') + '</td>' +
-        '<td style="padding:6px;font-family:var(--mono);font-size:12px">' + escHtml(h.version || (h.error ? h.error : '-')) + '</td></tr>';
+        '<td style="padding:6px;white-space:nowrap">' + escHtml(executorLabels[h.executor] || h.executor) + '</td>' +
+        '<td style="padding:6px;white-space:nowrap">' + selfcheckBadge(h.available, h.available ? '可用' : '不可用') + '</td>' +
+        '<td style="padding:6px;font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(h.bin || '') + '">' + escHtml(h.bin || '-') + '</td>' +
+        '<td style="padding:6px;font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(h.version || (h.error ? h.error : '-')) + '">' + escHtml(h.version || (h.error ? h.error : '-')) + '</td></tr>';
     });
     html += '</table>';
 
-    // 2. Agents and their models
-    html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">Agent 与可用模型</div>';
-    (d.agents || []).forEach(a => {
-      html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;background:var(--card)">' +
-        '<div style="font-weight:600;font-size:13px;margin-bottom:6px">' + escHtml(a.label) +
-        '<span style="font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-left:8px">' + escHtml(a.type) + '</span></div>';
-      (a.executors || []).forEach(ex => {
-        const models = (a.modelsByExecutor && a.modelsByExecutor[ex]) || [];
-        html += '<div style="margin:4px 0;display:flex;gap:8px;align-items:baseline">' +
-          '<span style="font-family:var(--mono);font-size:11.5px;color:var(--accent);min-width:74px">' + escHtml(executorLabels[ex] || ex) + '</span>' +
-          '<span style="font-size:12.5px;color:var(--fg-2)">' + escHtml(models.join(' · ') || '—') + '</span></div>';
+    // 2. 本机探测的 Agent 与模型（纯程序化，不用 AI；首次打开自动初始化）
+    const probes = (d.probes && d.probes.executors) ? d.probes.executors : [];
+    const probedAt = d.probes && d.probes.probedAt ? new Date(d.probes.probedAt).toLocaleTimeString() : '';
+    html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">本机探测的 Agent 与模型（程序化） ' +
+      '<span style="font-weight:400;color:var(--muted-2);font-size:11px">' + (probedAt ? '探测于 ' + probedAt : '') + '</span>' +
+      (d.probes && d.probes.fromCache ? '<span style="font-weight:400;color:var(--muted-2);font-size:11px"> · 缓存</span>' : '<span style="font-weight:400;color:var(--accent);font-size:11px"> · 已按本机实际能力完成初始化探测</span>') + '</div>';
+    if (probes.length) {
+      html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;background:var(--card)">';
+      probes.forEach(pe => {
+        const label = executorLabels[pe.executor] || pe.executor;
+        html += '<div style="margin:6px 0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">' +
+          '<span style="font-family:var(--mono);font-size:11.5px;color:var(--accent);min-width:74px;font-weight:600">' + escHtml(label) + '</span>' +
+          (pe.available
+            ? '<span style="font-size:12.5px;color:var(--fg-2)">模型：' + escHtml((pe.models || []).join(' · ') || '—') + '</span>' +
+              ((pe.agents && pe.agents.length) ? '<span style="font-size:12px;color:var(--muted-2)">Agent：' + pe.agents.map(escHtml).join(' · ') + '</span>' : '')
+            : '<span style="font-size:12px;color:var(--muted-2)">未安装（不可用）</span>') +
+          (pe.error ? '<span style="font-size:11px;color:var(--danger);font-family:var(--mono)">' + escHtml(pe.error) + '</span>' : '') +
+          '</div>';
       });
       html += '</div>';
-    });
-
-    // 3. Skill catalog
-    const skills = d.skills || [];
-    html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">Skill 库 <span style="font-weight:400;color:var(--muted-2);font-size:12px">共 ' + skills.length + ' 个</span></div>';
-    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px">' +
-      '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">名称</th><th style="padding:4px 6px">说明</th><th style="padding:4px 6px">路径</th></tr>';
-    skills.forEach(s => {
-      html += '<tr style="border-top:1px solid var(--border);font-size:12.5px">' +
-        '<td style="padding:5px 6px;font-family:var(--mono);font-size:12px">' + escHtml(s.name) + '</td>' +
-        '<td style="padding:5px 6px;color:var(--fg-2)">' + escHtml(s.description || '') + '</td>' +
-        '<td style="padding:5px 6px;font-family:var(--mono);font-size:11px;color:var(--muted-2)">' + escHtml(s.path || '') + '</td></tr>';
-    });
-    if (!skills.length) html += '<tr><td style="padding:10px;color:var(--muted-2)">当前未发现可用 Skill</td></tr>';
-    html += '</table>';
-
-    if (d.skillRoots && d.skillRoots.length) {
-      html += '<div style="font-size:12px;color:var(--muted-2);margin-bottom:10px">Skill 搜索目录: ' +
-        d.skillRoots.map(x => '<span style="font-family:var(--mono);font-size:11px">' + escHtml(x) + '</span>').join(' &nbsp;·&nbsp; ') + '</div>';
     }
+    html += '<div style="font-size:11.5px;color:var(--muted-2);margin-bottom:12px">节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。</div>';
 
-    // 4. 客制化 DSH Agent（本地自动导入 $DSH_HOME/.agent-presets）
+    // 3. 客制化 DSH Agent（本地自动导入 $DSH_HOME/.agent-presets）
     const dshPresets = d.dshPresets || [];
     html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">客制化 DSH Agent（本地自动导入） <span style="font-weight:400;color:var(--muted-2);font-size:12px">共 ' + dshPresets.length + ' 个</span></div>';
     dshPresets.forEach(p => {
@@ -3899,7 +3893,61 @@ async function openSelfCheck() {
         '<br>也可手工放置：$DSH_HOME/.agent-presets/&lt;id&gt;/（agent.cordis.yml + preset.yml + headless.patch.yml）后重新自检。</div>';
     }
 
+    // 4. Skill 库（内容最多，放最下面；默认收起前 12 个 + 搜索框 + 展开按钮）
+    const skills = d.skills || [];
+    const SKILL_PREVIEW = 12;
+    html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">Skill 库 <span style="font-weight:400;color:var(--muted-2);font-size:12px">共 ' + skills.length + ' 个</span></div>';
+    html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
+      '<input id="skill-search" type="text" placeholder="搜索 skill 名称 / 说明…" style="flex:1;max-width:320px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg);font-size:12px;padding:0 10px;outline:none">' +
+      '<button id="skill-toggle" class="chat__ws-confirm" style="display:inline-flex" title="展开/收起全部 Skill">展开全部</button></div>';
+    html += '<table id="skill-table" style="width:100%;border-collapse:collapse;margin-bottom:14px">' +
+      '<tr style="text-align:left;color:var(--muted-2);font-size:12px"><th style="padding:4px 6px">名称</th><th style="padding:4px 6px">说明</th><th style="padding:4px 6px">路径</th></tr>';
+    skills.forEach((s, idx) => {
+      const hidden = idx >= SKILL_PREVIEW;
+      html += '<tr class="skill-row" data-name="' + escHtml((s.name || '').toLowerCase()) + '" data-desc="' + escHtml((s.description || '').toLowerCase()) + '"' + (hidden ? ' style="display:none"' : '') + '>' +
+        '<td style="padding:5px 6px;font-family:var(--mono);font-size:12px">' + escHtml(s.name) + '</td>' +
+        '<td style="padding:5px 6px;color:var(--fg-2)">' + escHtml(s.description || '') + '</td>' +
+        '<td style="padding:5px 6px;font-family:var(--mono);font-size:11px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px" title="' + escHtml(s.path || '') + '">' + escHtml(s.path || '') + '</td></tr>';
+    });
+    if (!skills.length) html += '<tr><td style="padding:10px;color:var(--muted-2)">当前未发现可用 Skill</td></tr>';
+    html += '</table>';
+
+    if (d.skillRoots && d.skillRoots.length) {
+      html += '<div style="font-size:12px;color:var(--muted-2);margin-bottom:10px">Skill 搜索目录: ' +
+        d.skillRoots.map(x => '<span style="font-family:var(--mono);font-size:11px">' + escHtml(x) + '</span>').join(' &nbsp;·&nbsp; ') + '</div>';
+    }
+
     body.innerHTML = html;
+
+    // Skill 搜索与展开/收起交互
+    const skillSearch = $('#skill-search');
+    const skillToggle = $('#skill-toggle');
+    let skillExpanded = skills.length <= SKILL_PREVIEW;
+    if (skillExpanded) skillToggle.style.display = 'none';
+    if (skillSearch) {
+      skillSearch.addEventListener('input', () => {
+        const q = skillSearch.value.trim().toLowerCase();
+        let matched = 0;
+        document.querySelectorAll('#skill-table .skill-row').forEach(row => {
+          const hit = !q || row.dataset.name.includes(q) || row.dataset.desc.includes(q);
+          row.style.display = hit ? '' : 'none';
+          if (hit) matched++;
+        });
+        const miss = document.getElementById('skill-no-match');
+        if (miss) miss.style.display = matched ? 'none' : '';
+      });
+    }
+    if (skillToggle) {
+      skillToggle.addEventListener('click', () => {
+        skillExpanded = !skillExpanded;
+        skillToggle.textContent = skillExpanded ? '收起' : '展开全部';
+        document.querySelectorAll('#skill-table .skill-row').forEach((row, idx) => {
+          const q = skillSearch ? skillSearch.value.trim().toLowerCase() : '';
+          const hit = !q || row.dataset.name.includes(q) || row.dataset.desc.includes(q);
+          row.style.display = (hit && (skillExpanded || idx < SKILL_PREVIEW)) ? '' : 'none';
+        });
+      });
+    }
   } catch (err) {
     body.innerHTML = '<div style="color:var(--red);padding:20px;text-align:center;font-size:13px">自检失败: ' + escHtml(err.message || err) + '</div>';
   }

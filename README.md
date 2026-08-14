@@ -1,154 +1,168 @@
 # 🧭 多智能体管家 · Multi-Agent Orchestrator
 
-> 把任务交给我，剩下的我来编排。
-> 一个把「**说一句话 → 自动编排 → 多 Agent 协作执行 → 审查决策 → 迭代收敛**」串成一条完整流水线的编排控制台。
+> **说一句话，剩下的交给管家。**
+>
+> 一个把「**描述任务 → 自动编排 → 多 Agent 协作执行 → 自动审查 → 迭代收敛**」串成完整流水线的
+> **跨 Agent 协调编排控制台**：架构师负责想、执行者负责做、审查者负责把关，中途你可以随时插手。
+
+![编排画布截图](docs/screenshots/canvas.png "需要补充：编排画布 + 运行看板截图")
 
 ---
 
-## ✨ 它是什么
+## ✨ 为什么你需要它
 
-这是一个 **多 Agent 协作编排系统**：你只需要描述任务，它会自动拆解、自动组建一支"虚拟团队"（架构师 → 执行者 → 审查者），让它们像真人团队一样分工协作、互相审查、迭代到通过为止。
-
-不再是"你手动拖节点、逐个配置、盯着一堆日志"的工程工具，而是一个 **管家式的智能工作台**：
-
-- 🗣️ **一句话编排**：输入任务 → 自动分析 → 自动生成「架构师 → 执行者 → 审查者」流程 → 一键执行
-- 👀 **运行看板**：执行时实时看到每个 Agent 在做什么、输出什么、进行到第几轮，随时可停止/干预
-- ✅ **审查决策卡**：审查者的 pass / revise / blocked 结论 + 置信度 + 修改清单 + 下一步，一眼看清
-- 🧠 **AI 进展分析**：随时点「分析进展」，管家告诉你"现在到哪了、卡在哪、下一步该干嘛"
-- 💬 **人工介入**：随时向保留的 Agent 会话发消息、打断、追问，不影响 Loop 历史
-- 📦 **原生桌面应用**：WebView2 独立窗口（不再是浏览器标签页），带应用图标、记住窗口位置
-- 🔌 **多执行器 + 多模型路由**：codex / mimo / claude / opencode / dsh（DeepSeek Harness）混用；deepseek 官方直连 / ccs（中转站）按节点自由路由
-
----
-
-## 🚀 快速开始
-
-### 方式一：桌面应用（推荐）
-```powershell
-scripts\start-desktop.bat     # 双击：自动构建并打开「多智能体管家」窗口
-```
-打开后，在首页输入框描述你的任务，点「✨ 生成编排」，检查自动生成的三个节点，点「执行」。
-
-### 方式二：浏览器控制台
-```powershell
-.\start.bat                   # 或 .\scripts\start-orchestrator.ps1
-# 自动打开 http://127.0.0.1:8788/orchestrator
-```
-
-### 依赖
-| 项 | 说明 |
+| 单 Agent 干活 | 本方案（多 Agent 编排） |
 |---|---|
-| Go 工具链 | 构建用 |
-| gcc（CGO）+ WebView2 运行时 | 桌面应用需要（Win11 / Edge 自带 WebView2） |
-| codex / mimo / claude / opencode / dsh CLI | 执行器；按节点配置 provider/模型 |
-| DeepSeek / 中转站 API key | 模型路由（见下方模型配置） |
+| 一个模型从头干到尾，贵且容易跑偏 | 按角色分工：**规划用强模型、执行用便宜/免费模型、审查用轻量模型**，按节点路由 |
+| 改 10 个文件的任务容易"做着做着忘了目标" | 架构师先定方案和验收标准，执行者照着做，审查者对表验收 |
+| 出错了只能看一堆日志 | 审查者给出 **pass / revise / blocked** 结论 + 修改清单，自动迭代到通过 |
+| 想插句话打断它？很难 | **随时人工介入**：发消息、打断、批准/拒绝工具、停止、恢复 |
+| 换个电脑环境就废了 | **一键自检**：纯程序化探测本机可用的 Agent 与模型，自动适配（不烧 AI） |
 
 ---
 
-## 🧩 一个典型 Loop 长什么样
+## 🚀 快速开始（小白版，约 3 分钟）
 
+### 前置条件（一次性）
+| 依赖 | 说明 |
+|---|---|
+| **Go 1.25+** | 构建控制台本体：https://go.dev/dl/ |
+| **DeepSeek API Key** | 规划/分析主力模型：`$env:DEEPSEEK_API_KEY = "sk-..."`（永不进仓库） |
+
+> 其他执行器（codex / mimo / claude / opencode / dsh）**可选**：装了哪个，控制台就能用哪个；
+> 一个都没装也能跑（默认走 DeepSeek 官方）。
+
+### 第 1 步：启动
+
+```powershell
+git clone https://github.com/MRreeeg/multi_agent_orchestrator.git
+cd multi_agent_orchestrator
+.\scripts\start-orchestrator.ps1        # 自动编译并打开 http://127.0.0.1:8788/orchestrator
 ```
-你："为项目 X 实现端口解析功能，含 14 场景测试，仅标准库"
 
-   ┌─────────┐   方案     ┌─────────┐   代码     ┌─────────┐
-   │  架构师  │ ───────▶ │  执行者  │ ───────▶ │  审查者  │
-   │ 设计&规划│          │ 实现&测试│          │ 核对计划 │
-   └─────────┘           └─────────┘           └─────────┘
-        ▲                                        │
-        └──────────── revise（返回修改）──────────┘
-        （pass → 结束；fixed → 跑满 N 轮）
-```
+> 想要原生桌面应用？双击 `scripts\start-desktop.bat`（WebView2 独立窗口，带图标、记住窗口位置）。
 
-- **架构师**：只读分析，产出设计文档（自动落盘到 `工作区/.reasonix/plans/`），列出每轮计划；
-- **执行者**：按方案写代码、跑测试，只做当前一轮；
-- **审查者**：**对照架构师设计文档 + 原始任务**判断覆盖度（不是只看当轮语法），输出 `pass / revise / blocked` + 修改清单；
-- 循环由 Orchestrator 控制，审查者决定要不要进入下一轮（`review_decides`）或固定轮数（`fixed`）。
+### 第 2 步：说一句话
+
+在首页输入框输入，例如：
+
+> **"实现一个端口范围解析函数，支持单端口/连续范围/逗号组合与边界错误场景，含表格驱动测试，仅标准库"**
+
+点「✨ 生成编排」——它会把这句话自动拆成 **架构师 → 执行者 → 审查者** 三个节点和它们的数据流。
+
+![需求分析 → 自动生成流水线](docs/screenshots/analyze.png "需要补充：需求分析生成流水线的截图")
+
+### 第 3 步：一键执行，随时插手
+
+点「▶ 执行」，运行看板实时显示每个 Agent 在做什么、进行到第几轮；审查者给出决策卡；
+**随时可以**：打开 Runtime Console 给某个 Agent 发消息/打断、批准或拒绝工具请求、停止本轮、恢复。
+
+![运行看板 + 审查决策卡](docs/screenshots/dashboard.png "需要补充：运行看板与审查决策卡截图")
 
 ---
 
-## 🎛️ 执行器与模型路由
+## 🧠 它是怎么工作的
 
-| 执行器 | run（一次性） | serve（保留 Runtime + Console） |
+```mermaid
+flowchart LR
+    U[你的一句话] --> A[需求分析<br/>Flash 模型]
+    A --> P[自动生成流水线 DAG]
+    P --> ARC[🏗 架构师<br/>只读 · 方案与验收标准]
+    ARC --> EXE[⚒ 执行者<br/>实现 + 测试验证]
+    EXE --> REV[🔍 审查者<br/>pass / revise / blocked]
+    REV -- revise --> EXE
+    REV -- pass --> D[✅ 完成]
+    H[👤 你] -.人工介入：消息 / 中断 / 批准工具 / 停止.-> EXE
+    H -.人工介入.-> REV
+```
+
+- **Loop 是运行时状态机**：画布上只有一组基础节点，迭代由 Orchestrator 控制（`fixed` 精确 N 轮 / `review_decides` 审查决定）。
+- **多执行器自由混用**：每个节点可选执行器（reasonix / mimo / codex / claude / opencode / dsh）与模型，互不干扰。
+- **客制化 Agent**：DSH 客制化预设（前端分析师·管家 / 架构师 / 执行者 / 审查者）可直接选作节点，卡片上标注「客制化 Agent」还是「Prompt 式」。
+
+### 💰 省钱的核心思路
+
+> **规划用贵的，执行用便宜的，审查用免费的。**
+
+控制台内置模型选择原则（成本优先），你也可以手动指定。常见组合：
+
+| 角色 | 推荐执行器 / 模型 | 成本 |
 |---|---|---|
-| **codex** | `codex exec` | `codex app-server`（WebSocket）+ Thread 复用 + 中断/恢复 |
-| **mimo** | `mimo run` | `mimo acp`（ACP JSON-RPC over stdio）+ 会话复用 |
-| **claude** | `claude -p --output-format json` | stream-json stdio 保留进程 + Console + 人工消息 |
+| 架构师 | deepseek-pro（reasonix） | 中等 |
+| 执行者 | `mimo-v2.5`（mimo）或 `opencode/deepseek-v4-flash-free`（opencode） | **低 / 免费** |
+| 审查者 | `deepseek-v4-flash`（dsh 官方直连）或免费模型 | 低 |
 
-**模型路由（每节点独立）：**
-- `providerRoute=ccswitch` / `model=ccs` → 省略 `--model`，走 cc-switch / 中转站（如 rightapi 的 gpt）
-- `providerRoute=` 空 + `model=deepseek-v4-flash` 等 → 原样透传，DeepSeek 官方直连（codex/claude 均支持）
-- 执行者 codex + deepseek 官方直连、审查者 codex + ccs 中转，**同一个 Loop 里可共存互不干扰**（cc-switch 配置器机制已适配，见手册）
+![节点模型路由配置](docs/screenshots/routing.png "需要补充：节点执行器/模型路由配置截图")
 
 ---
 
-## 🖥️ 前端体验（管家感）
+## 🔍 自检：换台电脑也能直接用
 
-- 浅色主题：暖白 + 青绿强调色，现代字体栈（Segoe UI Variable / Space Grotesk / Cascadia Code）
-- 首屏 hero：「把任务交给我，剩下的我来编排」+ 大输入框 + 示例 chips
-- 运行看板：节点状态点 + 实时输出摘要 + 迭代进度 + 停止/收起
-- Runtime Console：流式事件（问答展开、系统日志折叠）、两步确认发送、Enter 发送
-- 节点卡片直接显示输出摘要；启动失败保留错误供诊断
+控制台顶部「一键自检」面板：
+
+- **程序化探测**本机安装的每个执行器（跑 `mimo models` / `opencode models` / 读 codex/claude/dsh 配置），
+  列出**这台电脑真实可用**的 Agent 与模型——不同供应商、不同电脑，结果不同，**全程不调用 AI**；
+- 首次打开自动完成初始化探测，节点配置与分析入口的下拉会按探测结果适配；
+- Skill 库（支持搜索 + 展开/收起）、客制化 DSH Agent（自动导入 `$DSH_HOME/.agent-presets`）、
+  执行器二进制可用性一屏看完。
+
+![一键自检面板](docs/screenshots/selfcheck.png "需要补充：自检面板截图")
 
 ---
 
-## 📚 文档（随仓库分发，其他电脑拿到即可照做）
+## 🛠 功能一览
 
-| 文档 | 内容 |
+| 功能 | 说明 |
 |---|---|
-| [`MULTI_AGENT_README.md`](MULTI_AGENT_README.md) | 功能总览、运行方式、Codex/Mimo/Claude 与 CCSwitch 说明 |
-| [`NEW_AGENT_QUICKSTART.zh-CN.md`](NEW_AGENT_QUICKSTART.zh-CN.md) | **新 Agent / 模型快速接入执行手册**（10 个接入点 + 8 步实操 + 验收 + 排查） |
-| [`docs/deepseek-harness/`](docs/deepseek-harness) | **DSH（DeepSeek Harness）执行器**：定义式 Agent vs Prompt 式对比分析、接入配置、自定义 Agent 跨电脑打包复用、样例 agent pack |
-| [`docs/superpowers/specs/`](docs/superpowers/specs) | 设计文档（Mimo ACP、控制台 UX、执行器接入等） |
-| [`REASONIX.md`](REASONIX.md) | 底层引擎说明 |
-
-> 💡 想接入新的 Agent / 模型（如本机装个 Claude Code、或换个模型）？直接看 `NEW_AGENT_QUICKSTART.zh-CN.md`，按步骤改 10 个接入点即可，无需改框架核心。
-
----
-
-## 🏗️ 技术架构（简）
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  桌面应用 cmd/orchestrator-app（WebView2，无控制台窗口）  │
-│    或 浏览器控制台（start.bat → 127.0.0.1:8788）          │
-├─────────────────────────────────────────────────────────┤
-│  前端（单页 HTML）：hero / 画布 / 运行看板 / Console / 历史 │
-├─────────────────────────────────────────────────────────┤
-│  internal/serve：Orchestrator HTTP/SSE API + 前端         │
-├─────────────────────────────────────────────────────────┤
-│  internal/orchestrator：                                │
-│    Loop 状态机（迭代/审查/终止） · Pipeline DAG          │
-│    RuntimeManager（codex/mimo/claude 保留进程）          │
-│    审查者对照设计文档 · AI 进展分析接口                    │
-├─────────────────────────────────────────────────────────┤
-│  internal/executor/{codex,mimo,claude}：CLI/协议适配      │
-│  （codex app-server WS · mimo ACP stdio · claude stream-json）│
-└─────────────────────────────────────────────────────────┘
-浏览器 / 应用窗口 永远只连 Orchestrator 的 HTTP/SSE，不直连 Provider。
-```
+| 🗣 一句话编排 | 需求分析自动生成 DAG（串行/并行/汇聚），支持 Loop 语义 |
+| 🏗 三角色协作 | 架构师（只读规划）/ 执行者（实现+验证）/ 审查者（决策 JSON） |
+| 🔄 Loop 状态机 | `fixed` 固定轮数 / `review_decides` 审查决定，迭代记录可审计 |
+| 🔌 6 种执行器 | reasonix / mimo / codex / claude / opencode / dsh（DeepSeek Harness） |
+| 🧭 模型路由 | deepseek 官方直连 / CCSwitch 中转 / 每节点独立模型 |
+| 🤖 DSH 客制化 Agent | 前端分析师·管家等预设，headless 节点一键选用 |
+| 💬 人工介入 | Runtime Console 发消息/打断、权限批准卡片、停止/恢复 Run |
+| 📊 运行看板 | 实时节点状态、轮次、输出摘要、审查决策卡、AI 进展分析 |
+| 🔍 程序化自检 | 不烧 AI 的机器能力探测，跨电脑即插即用 |
+| 📦 桌面应用 | WebView2 原生窗口，可选浏览器模式 |
+| 🧩 共用 Skill | DSH 直接复用 codex/mimo 已安装的 skill，不重复下载 |
 
 ---
 
-## 📦 目录结构
+## 📚 文档索引
 
-```
-├─ cmd/orchestrator-app      # 原生桌面应用（WebView2）
-├─ cmd/reasonix              # CLI / serve 入口
-├─ internal/executor/        # codex / mimo / claude / opencode / dsh 执行器适配
-├─ internal/orchestrator/    # Loop、Pipeline、RuntimeManager、审查协议
-├─ internal/serve/           # HTTP/SSE 服务 + 前端（orchestrator_frontend）
-├─ scripts/                  # start-desktop / start-orchestrator 等
-├─ docs/                     # 设计文档、使用说明
-└─ NEW_AGENT_QUICKSTART.zh-CN.md  # 新 Agent 快速接入手册
-```
+- `MULTI_AGENT_README.md` — 多 Agent 编排完整说明
+- `NEW_AGENT_QUICKSTART.zh-CN.md` — 新执行器/新模型快速接入（10 个接入点）
+- `docs/deepseek-harness/` — DSH 执行器接入、客制化 Agent 打包与跨电脑复用
+- `docs/调试记录.md` — 调试与修复记录（含大量踩坑经验）
 
 ---
 
-## ⚠️ 安全
+## ❓ 常见问题
 
-- **API Key 绝不进入仓库**：key 只存在于本机（`~/.codex`、`~/.claude-deepseek` 等），代码/文档用占位符；
-- 桌面应用内嵌的模型子进程（reasonix）从 `bin/` 或 PATH 解析，需与 `orchestrator-app.exe` 同目录。
+**Q：会不会很烧钱？**
+A：默认按"成本优先"原则选模型，执行段可以切到免费模型；每个节点可独立指定模型，Token 统计实时可见。
+
+**Q：中途能插手吗？**
+A：能。执行期间可随时给 Agent 发消息、打断当前轮、批准/拒绝工具请求、停止或恢复 Run，插手的记录不会污染 Loop 历史。
+
+**Q：一定要装 6 个执行器吗？**
+A：不用。只装 DeepSeek 凭据即可跑通全流程；每多装一个执行器，节点下拉就多一种选择（自检自动发现）。
+
+**Q：API Key 会进仓库吗？**
+A：不会。Key 只走环境变量或本机凭据文件，仓库里没有真实密钥（有扫描保障）。
+
+---
+
+## 🔒 安全与边界
+
+- 审批策略：编排节点默认 `never`（headless 无人应答），只读角色（架构师/审查者）走只读沙箱；
+- 浏览器只连控制台自身的 HTTP/SSE，不直连任何 Provider 端点；
+- 自定义 DSH 预设与 shell 同等信任，只在你自己电脑上安装。
 
 ## 📄 License
 
-MIT —— 见 [LICENSE](LICENSE)。
+MIT（见 `LICENSE`）。
+
+---
+
+> ⭐ 如果这个项目帮到了你，欢迎 Star；遇到问题请开 Issue，附上「自检面板截图」最快定位。

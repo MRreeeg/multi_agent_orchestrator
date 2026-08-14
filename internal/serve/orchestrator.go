@@ -745,8 +745,8 @@ func (h *orchestratorHandler) listAgents(w http.ResponseWriter, _ *http.Request)
 // personas when the executor is dsh). Selecting an executor only swaps the
 // engine behind the analysis — the responsibility contract (the JSON schema)
 // is always built server-side and passed as the prompt, so it stays universal.
-func (h *orchestratorHandler) analysisOptions(w http.ResponseWriter, _ *http.Request) {
-	catalog := orchestrator.NodeTypeCatalog()
+func (h *orchestratorHandler) analysisOptions(w http.ResponseWriter, r *http.Request) {
+	catalog := orchestrator.NodeTypeCatalogWithProbes(r.Context())
 	executors := []string{}
 	modelsByExecutor := map[string][]string{}
 	if len(catalog) > 0 {
@@ -829,8 +829,10 @@ func analysisAgentProfiles() (out []analysisAgent) {
 	return out
 }
 
-func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, orchestrator.NodeTypeCatalog())
+func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, r *http.Request) {
+	// 程序化探测优先：前端下拉反映本机真实可用的模型（每台电脑可能不同），
+	// 探测失败时回落静态目录。
+	writeJSON(w, orchestrator.NodeTypeCatalogWithProbes(r.Context()))
 }
 
 // dshPresets returns the locally authored DSH agent presets
@@ -861,6 +863,7 @@ func (h *orchestratorHandler) selfcheck(w http.ResponseWriter, r *http.Request) 
 		"skillRoots": report.SkillRoots,
 		"health":     report.Health,
 		"dshPresets": report.DshPresets,
+		"probes":     report.Probes,
 	})
 }
 
