@@ -242,7 +242,7 @@ run_1785480397543_1
 
 1. Go 1.25+；
 2. Reasonix 全局配置/凭据，或设置本地 `REASONIX_HOME`；
-3. Codex、Mimo、CCSwitch 等 CLI；
+3. Codex、Mimo、CCSwitch、DeepSeek Harness（`npm i -g @deepseek-ai/dsh`）等 CLI；
 4. API Key、网络和 CCSwitch 路由；
 5. 目标工作区的读写权限。
 
@@ -273,6 +273,6 @@ go build ./cmd/reasonix
 
 ## 控制台与节点配置体验
 
-- 架构师/执行者/审查者节点都可自由选择 reasonix / mimo / codex 执行器，模型下拉只显示该执行器绑定的模型。
+- 架构师/执行者/审查者节点都可自由选择 reasonix / mimo / codex / claude / opencode / dsh 执行器，模型下拉只显示该执行器绑定的模型。
 - Runtime Console 窗口内容可滚轮滚动；流式增量按消息合并（推理浅色、回答高亮）。
 - 每个 Runtime 可独立开一个 Console 窗口，执行过程中已完成的节点也能随时打开它的 Console（runtimeID 在 SSE 合并中不会被丢失）。

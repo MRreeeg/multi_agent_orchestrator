@@ -946,14 +946,16 @@ function modelSupportsExecutor(model, executor) {
   const byExec = typeInfo?.modelsByExecutor || {};
   const allowed = byExec[executor] || [];
   if (allowed.length > 0 && allowed.includes(m)) return true;
-  // codex/claude own provider resolution: self-configured models (deepseek-xxx,
-  // claude full names, ...) pass through even when not in the preset list.
-  if (allowed.length > 0 && (executor === 'codex' || executor === 'claude')) return true;
+  // codex/claude/dsh own provider resolution: self-configured models
+  // (deepseek-xxx, claude full names, ...) pass through even when not in the
+  // preset list.
+  if (allowed.length > 0 && (executor === 'codex' || executor === 'claude' || executor === 'dsh')) return true;
   if (allowed.length > 0) return false;
   const mimo = isMimoModel(m);
   if (executor === 'mimo') return mimo;
   if (executor === 'codex') return true;
   if (executor === 'claude') return true;
+  if (executor === 'dsh') return true;
   if (executor === 'reasonix') return true;
   return false;
 }
@@ -1009,15 +1011,20 @@ function syncExecutorOptionsForNode(node) {
 
   // Codex/Claude support both modes: run uses a one-shot CLI; serve uses a
   // retained Runtime (app-server / stream-json) managed by Orchestrator.
+  // DSH headless is one-shot only: mode is pinned to run.
   const isCodex = node.executor === 'codex';
   const isClaude = node.executor === 'claude';
+  const isDsh = node.executor === 'dsh';
   const modeSelect = $('#cfg-mode');
   if ((isCodex || isClaude) && !['run', 'serve'].includes(node.mode)) node.mode = 'serve';
+  if (isDsh) node.mode = 'run';
   modeSelect.value = node.mode || 'serve';
-  modeSelect.disabled = false;
-  modeSelect.title = isCodex
-    ? 'Codex：run 使用一次性 exec；serve 使用保留 Runtime（app-server）'
-    : (isClaude ? 'Claude：run 使用一次性 claude -p；serve 使用保留 Runtime（stream-json）' : '');
+  modeSelect.disabled = isDsh;
+  modeSelect.title = isDsh
+    ? 'DSH：headless 一次性执行（run），无保留 Runtime'
+    : (isCodex
+      ? 'Codex：run 使用一次性 exec；serve 使用保留 Runtime（app-server）'
+      : (isClaude ? 'Claude：run 使用一次性 claude -p；serve 使用保留 Runtime（stream-json）' : ''));
 }
 
 function enforceNodeConstraints(node) {
@@ -1029,6 +1036,9 @@ function enforceNodeConstraints(node) {
       node.model = 'ccs';
       node.providerRoute = 'ccswitch';
     }
+  } else if (node.executor === 'dsh') {
+    // DSH headless is one-shot: run only.
+    node.mode = 'run';
   } else if (!node.mode) {
     node.mode = 'serve';
   }
@@ -1904,7 +1914,7 @@ $('#config-close').addEventListener('click', hideConfig);
         if (['ccs', 'ccswitch'].includes(String(node.model).toLowerCase())) {
           node.model = 'ccs';
           node.providerRoute = 'ccswitch';
-        } else if (node.executor === 'codex' || node.executor === 'claude') {
+        } else if (node.executor === 'codex' || node.executor === 'claude' || node.executor === 'dsh') {
           node.providerRoute = '';
         }
         $('#cfg-model').value = node.model;
@@ -1915,7 +1925,7 @@ $('#config-close').addEventListener('click', hideConfig);
       if (['codex', 'claude'].includes(node.executor) && ['ccs', 'ccswitch'].includes(String(node.model).toLowerCase())) {
         node.model = 'ccs';
         node.providerRoute = 'ccswitch';
-      } else if (node.executor === 'codex' || node.executor === 'claude') {
+      } else if (node.executor === 'codex' || node.executor === 'claude' || node.executor === 'dsh') {
         node.providerRoute = '';
       }
       if (!modelSupportsExecutor(node.model, node.executor || 'reasonix')) {
@@ -3636,7 +3646,7 @@ $('#selfcheck-modal').addEventListener('click', (e) => { if (e.target === e.curr
 $('#btn-selfcheck').addEventListener('click', () => openSelfCheck());
 $('#selfcheck-refresh').addEventListener('click', () => openSelfCheck());
 
-const executorLabels = { reasonix: 'reasonix', mimo: 'mimo', codex: 'Codex', claude: 'Claude', opencode: 'opencode' };
+const executorLabels = { reasonix: 'reasonix', mimo: 'mimo', codex: 'Codex', claude: 'Claude', opencode: 'opencode', dsh: 'DSH' };
 
 function selfcheckBadge(ok, text) {
   const cls = ok ? 'run-dash__badge run-dash__badge--done' : 'run-dash__badge run-dash__badge--err';

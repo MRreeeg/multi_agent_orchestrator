@@ -1403,6 +1403,7 @@ var (
 		ExecutorCodex:    &CodexPipelineExecutor{},
 		ExecutorClaude:   &ClaudePipelineExecutor{},
 		ExecutorOpencode: &OpenCodePipelineExecutor{},
+		ExecutorDsh:      &DshPipelineExecutor{},
 	}
 	executorsMu sync.Mutex
 )
@@ -3121,13 +3122,15 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		// discipline block plus the turn timeout.
 		spec.MaxSteps = 25
 	}
-	if executorName == ExecutorOpencode {
+	if executorName == ExecutorOpencode || executorName == ExecutorDsh {
 		// Per-role serve-mode tuning: the architect gets read-only tools so
 		// it can inspect the codebase without a write/execute exploration
 		// loop; the executor reads the codebase and writes the real
 		// deliverable, so it gets the longest budget. A budget timeout still
 		// recovers partial output from session history (see
-		// OpenCodeRuntimeManager.Execute).
+		// OpenCodeRuntimeManager.Execute). For dsh the read-only flag maps to
+		// DSH_PERMISSION_MODE=read-only (hard sandbox); TurnTimeout is not
+		// consumed by the one-shot headless runner.
 		switch node.Type {
 		case NodeArchitect:
 			spec.ToolsReadOnly = true
@@ -3290,13 +3293,13 @@ func resolveExecutorModelRef(workspace string, executor ExecutorType, mode strin
 	switch executor {
 	case ExecutorMimo:
 		return normalizeMimoExecutionModelRef(workspace, model)
-	case ExecutorCodex, ExecutorClaude, ExecutorOpencode:
-		// Codex/Claude/opencode pass model refs through verbatim: the CLI owns provider
-		// resolution (deepseek-v4-flash, gpt-5.6-luna, o3, ...). They must NOT
-		// be run through the Reasonix config resolver, which rewrites bare
-		// model names into "provider/model" pairs (e.g. deepseek-v4-flash ->
-		// deepseek-flash/deepseek-v4-flash) and breaks the codex app-server /
-		// exec model argument.
+	case ExecutorCodex, ExecutorClaude, ExecutorOpencode, ExecutorDsh:
+		// Codex/Claude/opencode/dsh pass model refs through verbatim: the CLI
+		// (or, for dsh, the harness settings) owns provider resolution
+		// (deepseek-v4-flash, gpt-5.6-luna, o3, ...). They must NOT be run
+		// through the Reasonix config resolver, which rewrites bare model
+		// names into "provider/model" pairs (e.g. deepseek-v4-flash ->
+		// deepseek-flash/deepseek-v4-flash) and breaks the CLI model argument.
 		return model
 	case ExecutorReasonix:
 		if strings.EqualFold(strings.TrimSpace(mode), "run") {
@@ -3322,10 +3325,17 @@ func validateNodeExecutionConfigAtWorkspaceWithRoute(executor ExecutorType, mode
 	providerRoute = strings.ToLower(strings.TrimSpace(providerRoute))
 	mode = strings.ToLower(strings.TrimSpace(mode))
 	if mode == "" {
-		mode = "serve"
+		if executor == ExecutorDsh {
+			// DSH headless is one-shot: an omitted mode means run.
+			mode = "run"
+		} else {
+			mode = "serve"
+		}
 	}
 	ccswitchRoute := (executor == ExecutorCodex || executor == ExecutorClaude) && (providerRoute == "ccs" || providerRoute == "ccswitch")
-	if model == "" && !ccswitchRoute {
+	// DSH reads its model from its own harness settings; the node model is an
+	// advisory --patch overlay, so an empty model is valid for dsh.
+	if model == "" && !ccswitchRoute && executor != ExecutorDsh {
 		return fmt.Errorf("model is required")
 	}
 
@@ -3395,6 +3405,17 @@ func validateNodeExecutionConfigAtWorkspaceWithRoute(executor ExecutorType, mode
 		}
 		if !strings.Contains(model, "/") {
 			return fmt.Errorf("opencode executor requires provider/model ref (e.g. opencode/deepseek-v4-flash-free)")
+		}
+	case ExecutorDsh:
+		// `run` is the one-shot `dsh --profile headless` path. `serve` is not
+		// supported: DSH headless has no retained session protocol. Provider
+		// routing is owned by DSH itself ($DSH_HOME/settings.yaml → llm-*),
+		// so a providerRoute has no meaning here.
+		if mode != "run" {
+			return fmt.Errorf("unsupported dsh mode %q; DSH headless is one-shot, use mode=run", mode)
+		}
+		if providerRoute != "" {
+			return fmt.Errorf("unsupported dsh provider route %q; DSH routes providers itself via its harness settings", providerRoute)
 		}
 	}
 	return nil

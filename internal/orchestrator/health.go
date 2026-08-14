@@ -8,6 +8,7 @@ import (
 	"time"
 
 	claudeclient "reasonix/internal/executor/claude"
+	dshclient "reasonix/internal/executor/dsh"
 	opencodeclient "reasonix/internal/executor/opencode"
 	"reasonix/internal/proc"
 )
@@ -34,31 +35,33 @@ type SelfCheck struct {
 }
 
 // CheckExecutors probes each supported executor binary in this build:
-// reasonix, mimo, codex, claude, opencode. Probing is read-only; binaries are
-// only queried for a --version line, they are never started as services.
-// Probes run in parallel so the report returns in the time of the slowest
-// single binary (bounded by the 3s version timeout), not the sum of all.
+// reasonix, mimo, codex, claude, opencode, dsh. Probing is read-only;
+// binaries are only queried for a --version line, they are never started as
+// services. Probes run in parallel so the report returns in the time of the
+// slowest single binary (bounded by the 3s version timeout), not the sum of
+// all.
 func CheckExecutors(ctx context.Context) []ExecutorHealth {
 	probes := []struct {
 		name   string
-		locate func() string
+		locate func() (string, []string)
 	}{
-		{"reasonix", findReasonixBin},
-		{"mimo", func() string { return lookupBin("mimo") }},
-		{"codex", func() string { return lookupBin("codex") }},
-		{"claude", func() string {
+		{"reasonix", func() (string, []string) { return findReasonixBin(), nil }},
+		{"mimo", func() (string, []string) { return lookupBin("mimo"), nil }},
+		{"codex", func() (string, []string) { return lookupBin("codex"), nil }},
+		{"claude", func() (string, []string) {
 			if bin := claudeclient.DiscoverBin(); bin != "" {
-				return bin
+				return bin, nil
 			}
-			return lookupBin("claude")
+			return lookupBin("claude"), nil
 		}},
-		{"opencode", opencodeclient.DiscoverBin},
+		{"opencode", func() (string, []string) { return opencodeclient.DiscoverBin(), nil }},
+		{"dsh", func() (string, []string) { bin, prefix, _ := dshclient.Command(); return bin, prefix }},
 	}
 	out := make([]ExecutorHealth, len(probes))
 	var wg sync.WaitGroup
 	for i, p := range probes {
 		wg.Add(1)
-		go func(i int, name string, locate func() string) {
+		go func(i int, name string, locate func() (string, []string)) {
 			defer wg.Done()
 			out[i] = probeOne(ctx, name, locate)
 		}(i, p.name, p.locate)
@@ -67,19 +70,27 @@ func CheckExecutors(ctx context.Context) []ExecutorHealth {
 	return out
 }
 
-func probeOne(ctx context.Context, name string, locate func() string) ExecutorHealth {
-	bin := strings.TrimSpace(locate())
+func probeOne(ctx context.Context, name string, locate func() (string, []string)) ExecutorHealth {
+	bin, prefix := locate()
+	bin = strings.TrimSpace(bin)
 	if bin == "" {
 		return ExecutorHealth{Executor: name, Available: false, Error: "binary not found on PATH"}
 	}
-	version, verr := probeVersion(ctx, bin)
+	version, verr := probeVersion(ctx, bin, prefix)
 	// A binary that fails to answer --version is not usable: report it as
 	// unavailable so the self-check panel does not claim a broken binary is
 	// ready to run.
 	if verr != nil {
-		return ExecutorHealth{Executor: name, Available: false, Bin: bin, Error: verr.Error()}
+		return ExecutorHealth{Executor: name, Available: false, Bin: displayCommand(bin, prefix), Error: verr.Error()}
 	}
-	return ExecutorHealth{Executor: name, Available: true, Bin: bin, Version: version}
+	return ExecutorHealth{Executor: name, Available: true, Bin: displayCommand(bin, prefix), Version: version}
+}
+
+func displayCommand(bin string, prefix []string) string {
+	if len(prefix) == 0 {
+		return bin
+	}
+	return strings.TrimSpace(bin + " " + strings.Join(prefix, " "))
 }
 
 func lookupBin(name string) string {
@@ -93,14 +104,15 @@ func lookupBin(name string) string {
 // 10s (not tighter) because freshly rebuilt Windows binaries can be held up
 // by antivirus first-scan or cold start while five probes run in parallel;
 // a 3s cap caused transient "unavailable" false positives in self-check.
-func probeVersion(ctx context.Context, bin string) (string, error) {
+func probeVersion(ctx context.Context, bin string, prefix []string) (string, error) {
 	type result struct {
 		line string
 		err  error
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(probeCtx, bin, "--version")
+	args := append(append([]string{}, prefix...), "--version")
+	cmd := exec.CommandContext(probeCtx, bin, args...)
 	proc.HideWindow(cmd)
 	ch := make(chan result, 1)
 	go func() {
@@ -159,7 +171,7 @@ func AllRuntimes() []RuntimeState {
 // config panel. It is the source of truth the frontend also uses when it
 // builds pipeline nodes.
 func NodeTypeCatalog() []NodeTypeInfo {
-	allExecutors := []ExecutorType{ExecutorReasonix, ExecutorMimo, ExecutorCodex, ExecutorClaude, ExecutorOpencode}
+	allExecutors := []ExecutorType{ExecutorReasonix, ExecutorMimo, ExecutorCodex, ExecutorClaude, ExecutorOpencode, ExecutorDsh}
 	return []NodeTypeInfo{
 		{
 			Type:   NodeArchitect,
@@ -171,6 +183,7 @@ func NodeTypeCatalog() []NodeTypeInfo {
 				ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
 				ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
+				ExecutorDsh:      {"deepseek-v4-flash", "deepseek-v4-pro"},
 			},
 			Skills:    skillCatalogNames(),
 			Executors: allExecutors,
@@ -185,6 +198,7 @@ func NodeTypeCatalog() []NodeTypeInfo {
 				ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
 				ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
+				ExecutorDsh:      {"deepseek-v4-flash", "deepseek-v4-pro"},
 			},
 			Skills:    skillCatalogNames(),
 			Executors: allExecutors,
@@ -199,6 +213,7 @@ func NodeTypeCatalog() []NodeTypeInfo {
 				ExecutorCodex:    {"ccs", "o3", "codex-default", "deepseek-v4-flash"},
 				ExecutorClaude:   {"ccs", "opus", "sonnet", "haiku", "claude-fable-5", "deepseek-v4-flash"},
 				ExecutorOpencode: {"opencode/deepseek-v4-flash-free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro"},
+				ExecutorDsh:      {"deepseek-v4-flash", "deepseek-v4-pro"},
 			},
 			Skills:    skillCatalogNames(),
 			Executors: allExecutors,

@@ -12,7 +12,7 @@
 本文件夹（`multi_agent_pack`）可整体拷贝到任意电脑。拿到后：
 
 1. 编译运行：`go build ./cmd/reasonix`（见 `MULTI_AGENT_README.md`）；
-2. 已有执行器：`reasonix` / `mimo` / `codex` / `claude`；
+2. 已有执行器：`reasonix` / `mimo` / `codex` / `claude` / `opencode` / `dsh`（DeepSeek Harness，见 `docs/deepseek-harness/`）；
 3. 想新增一个 Agent（如 `copilot`、`cursor`、`gemini-cli`）：按本手册第 3~8 节执行，约 8 步完成。
 
 > [!tip] 最快路径
@@ -361,18 +361,18 @@ go test ./internal/orchestrator -run TestClaudeServeReturnsVisibleTextEndToEnd -
 
 ## 8. 已实现执行器对照表
 
-| 能力 | codex | mimo | claude |
-|---|---|---|---|
-| run 一次性执行 | ✅ `codex exec` | ✅ `mimo run` | ✅ `claude -p --output-format json` |
-| serve 保留 Runtime | ✅ app-server WS | ✅ mimo acp（ACP stdio） | ✅ stream-json stdio |
-| 跨轮会话复用 | ✅ thread/resume | ✅ session/load | ✅ --resume / init session |
-| 流式事件合并进 Console | ✅ | ✅ | ✅ |
-| Interrupt 保留会话 | ✅ | ✅ | ✅ control_request interrupt |
-| Stop 杀进程 | ✅ | ✅ | ✅ 关 stdin + kill |
-| 人工 Turn（Console） | ✅ | ✅ | ✅ |
-| 权限映射 | ask→never / auto→yolo | ask→reject / auto→allow | ask→deny / auto→allow（控制协议） |
-| 节点类型下拉 | ✅ | ✅ | ✅ nodeTypes |
-| 模型独立（多节点） | ✅ 自配模型 | ✅ | ✅ 自配模型 |
+| 能力 | codex | mimo | claude | opencode | dsh |
+|---|---|---|---|---|---|
+| run 一次性执行 | ✅ `codex exec` | ✅ `mimo run` | ✅ `claude -p --output-format json` | ✅ `opencode run` | ✅ `dsh --profile headless` |
+| serve 保留 Runtime | ✅ app-server WS | ✅ mimo acp（ACP stdio） | ✅ stream-json stdio | ✅ opencode serve | ❌（headless 无保留协议，仅 run） |
+| 跨轮会话复用 | ✅ thread/resume | ✅ session/load | ✅ --resume / init session | ✅ | ❌（每次全新会话） |
+| 流式事件合并进 Console | ✅ | ✅ | ✅ | ✅ | ❌（一次性 stdout） |
+| Interrupt 保留会话 | ✅ | ✅ | ✅ control_request interrupt | ✅ | ❌（一次性进程） |
+| Stop 杀进程 | ✅ | ✅ | ✅ 关 stdin + kill | ✅ | ✅ ctx 取消 |
+| 人工 Turn（Console） | ✅ | ✅ | ✅ | ✅ | ❌ |
+| 权限映射 | ask→never / auto→yolo | ask→reject / auto→allow | ask→deny / auto→allow（控制协议） | ✅ | Trust/auto→`DSH_PERMISSION_MODE=danger-full-access`、只读→`read-only` |
+| 节点类型下拉 | ✅ | ✅ | ✅ | ✅ | ✅ nodeTypes |
+| 模型独立（多节点） | ✅ 自配模型 | ✅ | ✅ 自配模型 | ✅ provider/model | ⚠️ 受 `$DSH_HOME/settings.yaml` 优先约束（详见 docs/deepseek-harness/02） |
 
 ---
 
@@ -381,5 +381,6 @@ go test ./internal/orchestrator -run TestClaudeServeReturnsVisibleTextEndToEnd -
 - 方案文档（笔记库）：`G:\工作\学习笔记\多agent项目\方案\Reasonix 多Agent编排控制台 — 新Agent与模型快速接入方案（Claude Code实例）.md`
 - 调试记录：`G:\工作\学习笔记\多agent项目\Reasonix Orchestrator 调试记录.md` L-23 / L-24
 - 范例代码：`internal/executor/claude/`（claude.go / sdk_client.go / *_test.go）、`internal/orchestrator/claude_runtime.go`
+- **DSH（DeepSeek Harness）执行器范例**：`internal/executor/dsh/`（dsh.go / *_test.go）、`internal/orchestrator/dsh_pipeline.go`，文档见 `docs/deepseek-harness/`（对比分析 / 接入配置 / 自定义 Agent 打包复用）
 - Claude 协议：`github.com/Roasbeef/claude-agent-sdk-go/blob/main/docs/cli-protocol.md`、docs.runloop.ai Claude SDK Protocol
 - Mimo ACP 设计：`docs/superpowers/specs/2026-08-01-mimo-acp-websocket-design.md`

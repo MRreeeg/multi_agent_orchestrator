@@ -17,7 +17,7 @@
 - 🧠 **AI 进展分析**：随时点「分析进展」，管家告诉你"现在到哪了、卡在哪、下一步该干嘛"
 - 💬 **人工介入**：随时向保留的 Agent 会话发消息、打断、追问，不影响 Loop 历史
 - 📦 **原生桌面应用**：WebView2 独立窗口（不再是浏览器标签页），带应用图标、记住窗口位置
-- 🔌 **多执行器 + 多模型路由**：codex / mimo / claude 混用；deepseek 官方直连 / ccs（中转站）按节点自由路由
+- 🔌 **多执行器 + 多模型路由**：codex / mimo / claude / opencode / dsh（DeepSeek Harness）混用；deepseek 官方直连 / ccs（中转站）按节点自由路由
 
 ---
 
@@ -40,7 +40,7 @@ scripts\start-desktop.bat     # 双击：自动构建并打开「多智能体管
 |---|---|
 | Go 工具链 | 构建用 |
 | gcc（CGO）+ WebView2 运行时 | 桌面应用需要（Win11 / Edge 自带 WebView2） |
-| codex / mimo / claude CLI | 执行器；按节点配置 provider/模型 |
+| codex / mimo / claude / opencode / dsh CLI | 执行器；按节点配置 provider/模型 |
 | DeepSeek / 中转站 API key | 模型路由（见下方模型配置） |
 
 ---
@@ -97,6 +97,7 @@ scripts\start-desktop.bat     # 双击：自动构建并打开「多智能体管
 |---|---|
 | [`MULTI_AGENT_README.md`](MULTI_AGENT_README.md) | 功能总览、运行方式、Codex/Mimo/Claude 与 CCSwitch 说明 |
 | [`NEW_AGENT_QUICKSTART.zh-CN.md`](NEW_AGENT_QUICKSTART.zh-CN.md) | **新 Agent / 模型快速接入执行手册**（10 个接入点 + 8 步实操 + 验收 + 排查） |
+| [`docs/deepseek-harness/`](docs/deepseek-harness) | **DSH（DeepSeek Harness）执行器**：定义式 Agent vs Prompt 式对比分析、接入配置、自定义 Agent 跨电脑打包复用、样例 agent pack |
 | [`docs/superpowers/specs/`](docs/superpowers/specs) | 设计文档（Mimo ACP、控制台 UX、执行器接入等） |
 | [`REASONIX.md`](REASONIX.md) | 底层引擎说明 |
 
@@ -133,7 +134,7 @@ scripts\start-desktop.bat     # 双击：自动构建并打开「多智能体管
 ```
 ├─ cmd/orchestrator-app      # 原生桌面应用（WebView2）
 ├─ cmd/reasonix              # CLI / serve 入口
-├─ internal/executor/        # codex / mimo / claude 执行器适配
+├─ internal/executor/        # codex / mimo / claude / opencode / dsh 执行器适配
 ├─ internal/orchestrator/    # Loop、Pipeline、RuntimeManager、审查协议
 ├─ internal/serve/           # HTTP/SSE 服务 + 前端（orchestrator_frontend）
 ├─ scripts/                  # start-desktop / start-orchestrator 等

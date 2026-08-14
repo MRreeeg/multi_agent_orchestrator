@@ -27,6 +27,7 @@ const (
 	ExecutorCodex    ExecutorType = "codex"
 	ExecutorClaude   ExecutorType = "claude"
 	ExecutorOpencode ExecutorType = "opencode"
+	ExecutorDsh      ExecutorType = "dsh"
 )
 
 // validateContextPolicy checks that a context policy value is valid.
