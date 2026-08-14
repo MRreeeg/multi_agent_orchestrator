@@ -64,6 +64,13 @@ body{font:14px/1.6 var(--sans);font-weight:500;color:var(--fg);background:var(--
 ::-webkit-scrollbar-track{background:transparent}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button{cursor:pointer;font:inherit;border:none;background:none;color:inherit}
+/* 通用按钮基座：confirmDialog/弹窗操作按钮统一外观 */
+.btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 14px;border-radius:8px;font-size:12.5px;cursor:pointer;border:1px solid var(--border-strong);background:var(--card);color:var(--fg-2);transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn--primary{background:var(--accent);color:oklch(99% 0 0);border-color:var(--accent)}
+.btn--primary:hover{background:var(--accent-strong);color:oklch(99% 0 0)}
+.btn--ghost{background:transparent}
+.btn--ghost:hover{background:var(--accent-soft)}
 input,textarea,select{font:inherit;color:inherit}
 
 /* ── Layout ── */
@@ -497,6 +504,7 @@ input,textarea,select{font:inherit;color:inherit}
     <div class="topbar__title">多Agent 协作编排 · 架构 → 实现 → 审查</div>
     <div class="topbar__spacer"></div>
     <div class="topbar__preset">
+      <button class="topbar__btn" id="btn-save-preset" title="' + T('preset.saveTitle') + '">＋</button>
       <select id="preset-select" title="加载预设模板">
         <option value="">加载预设...</option>
       </select>
@@ -1003,12 +1011,12 @@ const I18N = {
     'sc.available': '可用', 'sc.unavailable': '不可用', 'sc.models': '模型：', 'sc.agents': 'Agent：', 'sc.notInstalled': '未安装（不可用）', 'sc.cached': ' · 缓存', 'sc.initProbe': ' · 已按本机实际能力完成初始化探测', 'sc.probedAt': '探测于 ',
     'sc.count': '共 ', 'sc.usable': '可用于节点', 'sc.noPatch': '无 headless 补丁', 'sc.emptyHint': '未发现本地客制化 agent。克隆/拉取仓库后一键安装：',
     'sc.searchPh': '搜索 skill 名称 / 说明…', 'sc.expand': '展开全部', 'sc.collapse': '收起', 'sc.colName': '名称', 'sc.colDesc': '说明', 'sc.colPath': '路径', 'sc.searchRoots': 'Skill 搜索目录: ',
-    'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情',
+    'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情', 'skill.none': '无',
     'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
     'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：',
     'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…',
     'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
-    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。',
+    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ 自定义模型…', 'model.promptTitle': '输入模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消',
     'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）', 'rd.title': '执行详情', 'rd.loading': '加载中…', 'rd.status': '状态：', 'rd.trigger': '触发：', 'rd.nodes': '节点：', 'rd.loop': 'Loop 循环', 'rd.loopProgress': '进度：', 'rd.mode': '模式：', 'rd.termination': '终止：', 'rd.review': '审查：', 'rd.agents': '各 Agent 执行情况',
   },
@@ -1033,12 +1041,12 @@ const I18N = {
     'sc.available': 'Available', 'sc.unavailable': 'Unavailable', 'sc.models': 'Models: ', 'sc.agents': 'Agents: ', 'sc.notInstalled': 'Not installed', 'sc.cached': ' · cached', 'sc.initProbe': ' · initial probe done for this machine', 'sc.probedAt': 'probed at ',
     'sc.count': '', 'sc.usable': 'usable', 'sc.noPatch': 'no headless patch', 'sc.emptyHint': 'No custom DSH agents found. Clone/pull the repo and install:',
     'sc.searchPh': 'Search skill name / description…', 'sc.expand': 'Expand all', 'sc.collapse': 'Collapse', 'sc.colName': 'Name', 'sc.colDesc': 'Description', 'sc.colPath': 'Path', 'sc.searchRoots': 'Skill search roots: ',
-    'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details',
+    'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details', 'skill.none': 'None',
     'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
     'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ',
     'rd.running': '● Running', 'rd.runningEllipsis': 'Running…',
     'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
-    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.',
+    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ Custom model…', 'model.promptTitle': 'Enter model name', 'model.promptPh': 'Model name (ccs/ccswitch routes via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel',
     'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)', 'rd.title': 'Run Details', 'rd.loading': 'Loading…', 'rd.status': 'Status: ', 'rd.trigger': 'Trigger: ', 'rd.nodes': 'Nodes: ', 'rd.loop': 'Loop', 'rd.loopProgress': 'Progress: ', 'rd.mode': 'Mode: ', 'rd.termination': 'Termination: ', 'rd.review': 'Review: ', 'rd.agents': 'Agent breakdown',
   },
@@ -1129,13 +1137,22 @@ function applyLang() {
   if (rdBadge) rdBadge.textContent = T('rd.running');
   // 配置面板字段 label（顺序对应 HTML：0 名称…13 审查节点）
   const cfgKeys = ['cfg.name', 'cfg.type', 'cfg.model', 'cfg.skill', 'cfg.agent', 'cfg.preset', 'cfg.mode', 'cfg.approval', 'cfg.reasoning', 'cfg.role', 'cfg.loop', 'cfg.loopMode', 'cfg.loopMax', 'cfg.loopReviewer'];
-  const cfgLabels = document.querySelectorAll('#config-fields .field__label');
+  const cfgLabels = document.querySelectorAll('#config-panel .field__label');
   cfgLabels.forEach((el, i) => { if (cfgKeys[i]) el.textContent = T(cfgKeys[i]); });
   const wsEdit = document.querySelector('#chat-ws-btn .chat__ws-edit');
   if (wsEdit) wsEdit.textContent = T('ws.switch');
   const wsPick = document.querySelector('#cwd-pick');
   if (wsPick) wsPick.textContent = T('ws.pick');
   if (cwdDisplay && cwdDisplay.textContent === '未设置工作目录') cwdDisplay.textContent = T('ws.unset');
+  // 欢迎页示例 chips（保持 data-sample 原样，仅切换显示文本）
+  const chips = document.querySelectorAll('#chat-welcome .hero__chip');
+  const chipKeys = ['hero.chip1', 'hero.chip2', 'hero.chip3'];
+  chips.forEach((el, i) => { if (chipKeys[i]) el.textContent = T(chipKeys[i]); });
+  // 预设下拉：内置模板本地化 + 自定义分组重渲染
+  if (typeof loadPresets === 'function') loadPresets();
+  // 模型 / Skill 下拉：placeholder 与自定义入口文案随语言刷新（保留当前选中值）
+  if (typeof populateModelSelect === 'function') populateModelSelect();
+  if (typeof populateSkillSelect === 'function') populateSkillSelect();
 }
 document.addEventListener('DOMContentLoaded', applyLang);
 document.querySelector('#btn-lang').addEventListener('click', () => {
@@ -1146,8 +1163,9 @@ document.querySelector('#btn-lang').addEventListener('click', () => {
   renderNodes();
   renderRuns();
   if (state.nodes.length) renderEdges();
-  const sc = $('#selfcheck-body');
-  if (sc && sc.children.length) openSelfCheck();
+  // 自检弹窗若正开着：用缓存重渲染，不重新请求；弹窗未开则不打扰
+  const scModal = $('#selfcheck-modal');
+  if (scModal && scModal.style.display === 'flex') openSelfCheck(true);
 });
 
 // ── State ──
@@ -1943,7 +1961,7 @@ async function deleteOrchestrationSession(sessionID, title, nativeName, nativePa
   const label = title || sessionID;
   const ok = await confirmDialog({
     title: '删除会话',
-    message: '确定删除会话「' + escHtml(label) + '」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。',
+    message: T('hist.deleteMsg1').replace('{n}', escHtml(label)),
     okText: '删除',
     danger: true,
   });
@@ -1971,7 +1989,7 @@ async function deleteNativeSession(name, title) {
   const label = title || name;
   const ok = await confirmDialog({
     title: '删除会话',
-    message: '确定删除会话「' + escHtml(label) + '」吗？<br>这会永久删除本地会话记录。',
+    message: T('hist.deleteMsg2').replace('{n}', escHtml(label)),
     okText: '删除',
     danger: true,
   });
@@ -2339,7 +2357,7 @@ function showConfig(nodeId) {
   configEmpty.classList.add('hidden');
   configFields.classList.remove('hidden');
   syncSideFab();
-  configTitle.textContent = '节点: ' + node.name;
+  configTitle.textContent = T('cfg.nodeTitle') + node.name;
   $('#cfg-name').value = node.name;
   $('#cfg-type').value = node.type;
   $('#cfg-model').value = node.model || '';
@@ -2399,16 +2417,16 @@ $('#config-close').addEventListener('click', hideConfig);
 // Config field change handlers
 ['cfg-name', 'cfg-type', 'cfg-model', 'cfg-skill', 'cfg-executor', 'cfg-dsh-preset', 'cfg-mode', 'cfg-approval', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
   const el = $('#' + id);
-  el.addEventListener('change', () => {
+  el.addEventListener('change', async () => {
     if (!state.selectedNode) return;
     const node = state.nodes.find(n => n.id === state.selectedNode);
     if (!node) return;
-    if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = '节点: ' + el.value; }
+    if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
     if (id === 'cfg-type') node.type = el.value;
     if (id === 'cfg-approval') node.approvalMode = el.value;
     if (id === 'cfg-model') {
       if (el.value === '__custom__') {
-        const custom = (window.prompt('输入模型名：ccs/ccswitch 走 ccswitch 路由；其他（如 deepseek-xxx、claude 全名）将透传给 CLI 自行解析。', node.model || '') || '').trim();
+        const custom = (await openSessionNameModal(T('model.promptTitle'), node.model || '', T('model.promptPh')) || '').trim();
         node.model = custom || node.model || '';
         if (['ccs', 'ccswitch'].includes(String(node.model).toLowerCase())) {
           node.model = 'ccs';
@@ -2470,7 +2488,7 @@ $('#config-close').addEventListener('click', hideConfig);
       if (!state.selectedNode) return;
       const node = state.nodes.find(n => n.id === state.selectedNode);
       if (!node) return;
-      if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = '节点: ' + el.value; }
+      if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
       if (id === 'cfg-role') node.role = el.value;
       renderNodes();
     });
@@ -2515,7 +2533,7 @@ $('#add-node-flash').addEventListener('click', () => createNode('reviewer', 60 +
 $('#add-node-mimo').addEventListener('click', () => createNode('executor', 60 + Math.random() * 200, 60 + Math.random() * 200));
 $('#btn-delete-node').addEventListener('click', () => { if (state.selectedNode) deleteNode(state.selectedNode); });
 $('#btn-clear-pipeline').addEventListener('click', async () => {
-  const ok = await confirmDialog({ title: '清空管道', message: '确定清空当前管道？所有节点与连线将被移除。', okText: '清空', danger: true });
+  const ok = await confirmDialog({ title: T('toolbar.clear'), message: T('toolbar.clearMsg'), okText: T('toolbar.clear'), danger: true });
   if (!ok) return;
   state.nodes = []; state.edges = []; state.nextNodeId = 1;
   hideConfig(); syncLoopConfigUI(); renderNodes(); renderEdges();
@@ -2760,7 +2778,7 @@ function renderEdges() {
     path.style.cursor = 'pointer';
     path.addEventListener('click', async e => {
       e.stopPropagation();
-      const ok = await confirmDialog({ title: '删除连线', message: '删除此连线？', okText: '删除', danger: true });
+      const ok = await confirmDialog({ title: T('hist.delete'), message: T('edge.deleteMsg'), okText: T('hist.delete'), danger: true });
       if (ok) {
         state.edges.splice(i, 1);
         renderEdges();
@@ -3720,9 +3738,10 @@ function autoSaveState() {
 
 // ── Session name modal (used by new-session and rename) ──
 let sessionNameModalResolve = null;
-function openSessionNameModal(titleLabel, defaultValue) {
+function openSessionNameModal(titleLabel, defaultValue, placeholder) {
   $('#session-name-modal-title').textContent = titleLabel;
-  $('#session-name-input').value = defaultValue;
+  $('#session-name-input').value = defaultValue || '';
+  if (placeholder) $('#session-name-input').placeholder = placeholder;
   $('#session-name-modal').style.display = 'flex';
   const input = $('#session-name-input');
   input.focus();
@@ -4196,12 +4215,23 @@ function selfcheckBadge(ok, text) {
   return '<span class="' + cls + '" style="font-size:11px">' + escHtml(text) + '</span>';
 }
 
-async function openSelfCheck() {
+let selfcheckCache = null;
+async function openSelfCheck(useCache) {
   const body = $('#selfcheck-body');
   $('#selfcheck-modal').style.display = 'flex';
+  if (useCache && selfcheckCache) { renderSelfCheck(selfcheckCache); return; }
   body.innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:24px;font-size:13px">' + T('sc.checking') + '</div>';
   try {
     const d = await apiGet('/selfcheck');
+    selfcheckCache = d;
+    renderSelfCheck(d);
+  } catch (err) {
+    body.innerHTML = '<div style="color:var(--red);padding:20px;text-align:center;font-size:13px">自检失败: ' + escHtml(err.message || err) + '</div>';
+  }
+}
+function renderSelfCheck(d) {
+  const body = $('#selfcheck-body');
+  try {
     let html = '';
     const checked = new Date(d.checkedAt || Date.now()).toLocaleTimeString();
     $('#selfcheck-meta').textContent = T('sc.checkedAt') + checked;
@@ -5019,23 +5049,89 @@ $('#btn-save-pipeline').addEventListener('click', async () => {
 });
 
 // ── Load presets ──
+const CUSTOM_PRESET_KEY = 'orch-custom-presets';
+// 内置预设本地化：名称/描述/节点标签/职责描述按 id 查字典（自定义预设保持用户原名）
+const BUILTIN_PRESET_I18N = {
+  'default-three-agent': { name: 'preset.d3.name', desc: 'preset.d3.desc', labels: ['preset.d3.l1', 'preset.d3.l2', 'preset.d3.l3'], roles: ['preset.d3.r1', 'preset.d3.r2', 'preset.d3.r3'] },
+  'parallel-research': { name: 'preset.pr.name', desc: 'preset.pr.desc', labels: ['preset.pr.l1', 'preset.pr.l2', 'preset.pr.l3', 'preset.pr.l4'], roles: ['preset.pr.r1', 'preset.pr.r2', 'preset.pr.r3', 'preset.pr.r4'] },
+  'design-review': { name: 'preset.dr.name', desc: 'preset.dr.desc', labels: ['preset.dr.l1', 'preset.dr.l2'], roles: ['preset.dr.r1', 'preset.dr.r2'] },
+  'loop-iterate': { name: 'preset.loop.name', desc: 'preset.loop.desc', labels: ['preset.d3.l1', 'preset.d3.l2', 'preset.d3.l3'], roles: ['preset.d3.r1', 'preset.d3.r2', 'preset.d3.r3'] },
+};
+function localizePreset(p) {
+  const m = BUILTIN_PRESET_I18N[p.id];
+  if (!m) return p;
+  const nodes = ((p.pipeline && p.pipeline.nodes) || []).map((n, i) => ({
+    ...n,
+    label: m.labels[i] ? T(m.labels[i]) : n.label,
+    roleDesc: m.roles[i] ? T(m.roles[i]) : n.roleDesc,
+  }));
+  return { ...p, name: T(m.name), desc: T(m.desc), pipeline: { ...(p.pipeline || {}), nodes } };
+}
+function loadCustomPresets() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_PRESET_KEY) || '[]'); } catch (_) { return []; }
+}
+function saveCustomPreset(name) {
+  const list = loadCustomPresets();
+  const preset = {
+    id: 'custom-' + Date.now(),
+    name: name,
+    desc: '',
+    custom: true,
+    pipeline: { nodes: state.nodes.map(n => ({ id: n.id, name: n.name, type: n.type, model: n.model, executor: n.executor, skill: n.skill, mode: n.mode, role: n.role, x: n.x, y: n.y })), edges: state.edges.map(e => ({ from: e.from, to: e.to })) },
+    loopConfig: state.loadedLoopConfig && state.loadedLoopConfig.enabled ? state.loadedLoopConfig : null,
+  };
+  list.push(preset);
+  localStorage.setItem(CUSTOM_PRESET_KEY, JSON.stringify(list));
+}
 async function loadPresets() {
   console.log('[presets] loading...');
   try {
     const presets = await apiGet('/presets');
     console.log('[presets] got', presets?.length, 'presets');
-    state.presets = presets || [];
-    presetSelect.innerHTML = '<option value="">' + T('preset.load') + '</option>';
-    state.presets.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      presetSelect.appendChild(opt);
-    });
+    const builtin = (presets || []).map(localizePreset);
+    const custom = loadCustomPresets();
+    state.presets = [...builtin, ...custom];
+    renderPresetSelect();
     console.log('[presets] dropdown populated with', presetSelect.options.length, 'options');
   } catch (err) { console.error('[presets] FAILED:', err); }
 }
+function renderPresetSelect() {
+  const builtin = state.presets.filter(p => !p.custom);
+  const custom = state.presets.filter(p => p.custom);
+  presetSelect.innerHTML = '<option value="">' + T('preset.load') + '</option>';
+  if (builtin.length) {
+    const g1 = document.createElement('optgroup');
+    g1.label = T('preset.builtinGroup');
+    builtin.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      g1.appendChild(opt);
+    });
+    presetSelect.appendChild(g1);
+  }
+  if (custom.length) {
+    const g2 = document.createElement('optgroup');
+    g2.label = T('preset.customGroup');
+    custom.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      g2.appendChild(opt);
+    });
+    presetSelect.appendChild(g2);
+  }
+}
 
+$('#btn-save-preset').addEventListener('click', async () => {
+  if (!state.nodes.length) { toast('当前没有可保存的节点', 'error'); return; }
+  const name = await openSessionNameModal(T('preset.saveTitle'), '', T('preset.savePh'));
+  if (!name) return;
+  saveCustomPreset(name);
+  toast(T('preset.loaded') + name, 'success');
+  await loadPresets();
+  switchPanel('chat');
+});
 presetSelect.addEventListener('change', async () => {
   const id = presetSelect.value;
   console.log('[preset-change] selected id:', id, 'presets count:', state.presets.length);
@@ -5044,7 +5140,7 @@ presetSelect.addEventListener('change', async () => {
   console.log('[preset-change] found preset:', preset?.name, 'pipeline nodes:', preset?.pipeline?.nodes?.length);
   if (!preset) return;
   if (state.nodes.length > 0) {
-    const ok = await confirmDialog({ title: '加载预设', message: '加载预设将替换当前管道，继续？', okText: '加载' });
+    const ok = await confirmDialog({ title: T('preset.loadTitle'), message: T('preset.loadMsg'), okText: T('preset.loadOk') });
     if (!ok) {
       presetSelect.value = '';
       return;
@@ -5086,7 +5182,7 @@ presetSelect.addEventListener('change', async () => {
       }
     });
   }
-  state.pipelineName = preset.name || '预设管道';
+  state.pipelineName = preset.name || T('preset.loadTitle');
   console.log('[preset-change] state.nodes now:', state.nodes.length, 'rendering...');
   switchPanel('pipeline');
   requestAnimationFrame(() => {
@@ -5095,8 +5191,12 @@ presetSelect.addEventListener('change', async () => {
     renderEdges();
     console.log('[preset-change] done, canvas children:', canvas.children.length, 'canvas dims:', canvas.offsetWidth, 'x', canvas.offsetHeight);
   });
-  toast('已加载预设: ' + preset.name, 'success');
+  toast(T('preset.loaded') + preset.name, 'success');
   presetSelect.value = '';
+  // 预设携带 Loop 配置时同步到 UI（如固定循环预设）
+  if (preset.loopConfig && preset.loopConfig.enabled) {
+    restoreLoopConfigUI(preset.loopConfig, { markDirty: false });
+  }
 });
 
 // ── Load models, skills ──
@@ -5169,7 +5269,7 @@ async function loadNodeTypes() {
 
 function populateModelSelect(node) {
   const sel = $('#cfg-model');
-  sel.innerHTML = '<option value="">选择模型...</option>';
+  sel.innerHTML = '<option value="">' + T('model.placeholder') + '</option>';
   const activeNode = node || (state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null);
   // 按当前 executor 过滤模型
   const executor = activeNode?.executor || 'reasonix';
@@ -5183,14 +5283,14 @@ function populateModelSelect(node) {
   // 自配模型入口：codex/claude 透传任意模型名给 CLI（如 deepseek-xxx）。
   const custom = document.createElement('option');
   custom.value = '__custom__';
-  custom.textContent = '✏️ 自定义模型…';
+  custom.textContent = T('model.custom');
   sel.appendChild(custom);
   sel.value = activeNode?.model || '';
 }
 
 function populateSkillSelect(node) {
   const sel = $('#cfg-skill');
-  sel.innerHTML = '<option value="">无</option>';
+  sel.innerHTML = '<option value="">' + T('skill.none') + '</option>';
   const activeNode = node || (state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null);
   const activeType = activeNode?.type || 'executor';
   const typeInfo = state.nodeTypes.find(t => t.type === activeType);

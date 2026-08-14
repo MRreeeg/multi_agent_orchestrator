@@ -2812,6 +2812,28 @@ func Presets() []PipelinePreset {
 				},
 			},
 		},
+		{
+			ID: "loop-iterate", Name: "循环迭代（固定 3 轮）",
+			Desc: "架构 → 实现 → 审查，固定循环 3 轮（Loop）",
+			Pipeline: Pipeline{
+				Nodes: []AgentNode{
+					{ID: "n1", Type: NodeArchitect, Label: "架构师", Model: "deepseek-pro", Skill: "brainstorming", Executor: ExecutorReasonix, Mode: "serve", RoleDesc: "设计系统架构和方案", X: 100, Y: 200},
+					{ID: "n2", Type: NodeExecutor, Label: "执行者", Model: "mimo-v2.5", Agent: "", Executor: ExecutorMimo, Mode: "serve", RoleDesc: "根据架构实现代码", X: 400, Y: 200},
+					{ID: "n3", Type: NodeReviewer, Label: "审查者", Model: "deepseek-flash", Skill: "review", Executor: ExecutorReasonix, Mode: "serve", RoleDesc: "审查代码质量和安全性", X: 700, Y: 200},
+				},
+				Edges: []Edge{
+					{ID: "e1", FromID: "n1", ToID: "n2", Label: "架构设计"},
+					{ID: "e2", FromID: "n2", ToID: "n3", Label: "代码审查"},
+				},
+			},
+			LoopConfig: &LoopConfig{
+				Enabled:         true,
+				Mode:            "fixed",
+				FixedIterations: 3,
+				ReviewNodeID:    "n3",
+				Protocol:        "loop-review-v1",
+			},
+		},
 	}
 }
 

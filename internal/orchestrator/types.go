@@ -241,6 +241,8 @@ type PipelinePreset struct {
 	Name     string   `json:"name"`
 	Desc     string   `json:"desc"`
 	Pipeline Pipeline `json:"pipeline"`
+	// LoopConfig is an optional loop setup applied when the preset loads.
+	LoopConfig *LoopConfig `json:"loopConfig,omitempty"`
 }
 
 // Stats aggregates token/cost data across all runs.
