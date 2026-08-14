@@ -1927,17 +1927,18 @@ func (s *Store) markInterrupted() error {
 		}
 	}
 
-	// A persisted retained runtime (Codex app-server WebSocket, Mimo ACP stdio,
-	// Claude stream-json stdio) only belongs to the process that launched it.
-	// Preserve the provider ThreadID/session for a later resume, but never show
-	// a historical runtime as alive after the orchestrator restarts.
+	// A persisted serve runtime only belongs to the process that launched it.
+	// After an orchestrator restart every child process is gone, regardless of
+	// executor (reasonix serve included) — never show a historical runtime as
+	// alive. Preserve the provider ThreadID/session for a later resume, but
+	// clear the process identity (endpoint/port/PID) so the UI cannot click a
+	// dead endpoint.
 	for _, rt := range s.runtimeStates {
-		retained := rt.Executor == string(ExecutorCodex) || rt.Executor == string(ExecutorMimo) || rt.Executor == string(ExecutorClaude)
-		if !retained || rt.Status == RuntimeStopped || rt.Status == RuntimeError {
+		if rt.Status == RuntimeStopped || rt.Status == RuntimeError {
 			continue
 		}
 		rt.Status = RuntimeStopped
-		rt.Error = "orchestrator restarted; retained runtime is no longer connected"
+		rt.Error = "orchestrator restarted; serve runtime is no longer connected"
 		rt.Endpoint = ""
 		rt.Port = 0
 		rt.PID = 0
