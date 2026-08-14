@@ -605,15 +605,15 @@ input,textarea,select{font:inherit;color:inherit}
         <div class="pipeline__toolbar">
           <button class="pipe-btn" id="add-node-pro" title="添加架构师">
             <span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block"></span>
-            + 架构师
+            <span class="pipe-add-label">+ 架构师</span>
           </button>
           <button class="pipe-btn" id="add-node-flash" title="添加审查者">
             <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
-            + 审查者
+            <span class="pipe-add-label">+ 审查者</span>
           </button>
           <button class="pipe-btn" id="add-node-mimo" title="添加执行者">
             <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>
-            + 执行者
+            <span class="pipe-add-label">+ 执行者</span>
           </button>
           <div class="sep"></div>
           <button class="pipe-btn" id="btn-auto-layout" title="自动布局">
@@ -998,7 +998,7 @@ const I18N = {
     'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
     'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消',
-    'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…',
+    'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）',
   },
   en: {
     'app.name': 'Multi-Agent Butler', 'app.sub': 'Multi-Agent Orchestrator',
@@ -1028,7 +1028,7 @@ const I18N = {
     'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
     'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel',
-    'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…',
+    'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)',
   },
 };
 let currentLang = 'zh';
@@ -1093,6 +1093,20 @@ function applyLang() {
   setTitle('#rd-executor', 'run.analyze');
   set('#gcm-cancel', 'dlg.cancel');
   set('#gcm-ok', 'dlg.ok');
+  setTitle('#preset-select', 'preset.load');
+  const psOpt = document.querySelector('#preset-select option:first-child');
+  if (psOpt) psOpt.textContent = T('preset.load');
+  [['#cfg-type option[value="architect"]', 'cfg.typeArchitect'], ['#cfg-type option[value="reviewer"]', 'cfg.typeReviewer'], ['#cfg-type option[value="executor"]', 'cfg.typeExecutor']].forEach(function (pair) {
+    const el = document.querySelector(pair[0]); if (el) el.textContent = T(pair[1]);
+  });
+  document.querySelectorAll('.pipe-add-label').forEach(function (el, i) {
+    const keys = ['node.architect', 'node.reviewer', 'node.executor'];
+    if (keys[i]) el.textContent = '+ ' + T(keys[i]);
+  });
+  setTitle('#btn-auto-layout', 'toolbar.autoLayout'); set('#btn-auto-layout', 'toolbar.autoLayout');
+  setTitle('#btn-delete-node', 'toolbar.delete'); set('#btn-delete-node', 'toolbar.delete');
+  setTitle('#btn-clear-pipeline', 'toolbar.clear'); set('#btn-clear-pipeline', 'toolbar.clear');
+  set('#selfcheck-close-btn', 'dlg.close');
   set('#selfcheck-title', 'sc.title');
   set('#selfcheck-refresh', 'sc.refresh');
   const sse = document.querySelector('#sse-status');
@@ -2453,7 +2467,7 @@ $('#config-close').addEventListener('click', hideConfig);
 
 // ── Node management ──
 function createNode(type, x, y) {
-  const typeNames = { architect: '架构师', reviewer: '审查者', executor: '执行者' };
+  const typeNames = { architect: T('node.architect'), reviewer: T('node.reviewer'), executor: T('node.executor') };
   const node = {
     id: state.nextNodeId++,
     name: typeNames[type] + '-' + state.nextNodeId,
@@ -2628,7 +2642,7 @@ function renderNodes() {
       const hasConsole = isRuntimeConsole && !!node.runtime.runtimeID;
       const hasWeb = !isRuntimeConsole && !!node.runtime.endpoint && node.runtime.executor !== 'mimo';
       const portHint = node.runtime.port ? ' :' + node.runtime.port : '';
-      badge.textContent = '进入';
+      badge.textContent = T('badge.enter');
       if (hasConsole) {
         badge.title = '进入 Runtime Console' + portHint + (s === 'stopped' || s === 'error' ? '（已停止，查看历史）' : '');
         badge.addEventListener('click', (e) => {
@@ -4033,7 +4047,7 @@ $('#btn-execute').addEventListener('click', () => {
   if (!task) { toast('请先在对话框中输入需求', 'error'); return; }
   // Show confirmation modal
   $('#confirm-task').value = task;
-  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  const typeLabels = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
   $('#confirm-nodes').innerHTML = state.nodes.map(n =>
     `<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0">${escHtml(n.name)} <span style="color:var(--muted-2)">(${escHtml(typeLabels[n.type] || n.type)} · ${escHtml(n.executor || 'reasonix')}/${escHtml(n.model || '-')})</span></span>`
   ).join('');
@@ -4295,7 +4309,7 @@ async function openSelfCheck() {
 }
 
 async function showNodeDetail(node) {
-  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  const typeLabels = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
   $('#node-detail-title').textContent = node.name + ' (' + (typeLabels[node.type] || node.type) + ')';
 
   // Try to fetch full run data from API for stderr
@@ -4916,7 +4930,7 @@ async function loadPresets() {
     const presets = await apiGet('/presets');
     console.log('[presets] got', presets?.length, 'presets');
     state.presets = presets || [];
-    presetSelect.innerHTML = '<option value="">加载预设...</option>';
+    presetSelect.innerHTML = '<option value="">' + T('preset.load') + '</option>';
     state.presets.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
@@ -5137,7 +5151,7 @@ function renderNodeStats(nodes) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted-2)">暂无数据</td></tr>';
     return;
   }
-  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  const typeLabels = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
   tbody.innerHTML = nodes.map(n => `
     <tr>
       <td>${escHtml(typeLabels[n.type] || n.type)}</td>
@@ -5199,7 +5213,7 @@ async function resumeLoopRun(runID) {
 // ── Loop Run dashboard ──
 const runDash = { active: false, runID: '', nodes: {} };
 function initRunDashboard() {
-  const typeLabels = { architect: '架构师', executor: '执行者', reviewer: '审查者' };
+  const typeLabels = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
   runDash.nodes = {};
   $('#rd-nodes').innerHTML = state.nodes.map(n => {
     runDash.nodes[String(n.id)] = { name: n.name, type: n.type, status: 'pending', output: '' };
@@ -5366,9 +5380,9 @@ function renderRuns() {
     // 友好编号：第 N 次执行（run id 保留在副行与悬停提示）
     const friendlyLabel = T('run.execLabel').replace('{n}', String(idx + 1));
     const resumeButton = r.status === 'interrupted' && cfg.enabled
-      ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">' + T('run.resume') + '</button>` : '';
+      ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">${T('run.resume')}</button>` : '';
     const cancelButton = r.status === 'running'
-      ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">' + T('run.stop') + '</button>` : '';
+      ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">${T('run.stop')}</button>` : '';
     return `
     <div class="run-card" style="cursor:pointer;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px" title="${escHtml(r.id)}">
       <div style="display:flex;align-items:center;gap:8px">
@@ -5378,15 +5392,15 @@ function renderRuns() {
       </div>
       ${taskPreview ? `<div style="font-size:11px;color:var(--muted-2);margin-top:4px">${escHtml(taskPreview)}</div>` : ''}
       <div style="font-size:11px;color:var(--muted-2);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap">
-        <span>' + T('run.nodes') + '${successCount}/${nodeCount}</span>
-        ${failCount > 0 ? `<span style="color:var(--danger)">' + T('run.failed') + '${failCount}</span>` : ''}
-        <span>' + T('run.trigger') + '${escHtml(trigger)}</span>
+        <span>${T('run.nodes')}${successCount}/${nodeCount}</span>
+        ${failCount > 0 ? `<span style="color:var(--danger)">${T('run.failed')}${failCount}</span>` : ''}
+        <span>${T('run.trigger')}${escHtml(trigger)}</span>
         ${started ? `<span>${started}${finished ? ' → ' + finished : ''}</span>` : ''}
       </div>
       ${cfg.enabled ? `<div style="font-size:11px;color:var(--muted-2);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap">
-        <span>' + T('run.loopInfo') + '${current} / ${max}</span><span>' + T('run.mode') + '${escHtml(mode)}</span>
-        ${r.terminationReason ? `<span>' + T('run.term') + '${escHtml(r.terminationReason)}</span>` : ''}
-        ${finalDecision ? `<span>' + T('run.review') + '${escHtml(finalDecision)}</span>` : ''}
+        <span>${T('run.loopInfo')}${current} / ${max}</span><span>${T('run.mode')}${escHtml(mode)}</span>
+        ${r.terminationReason ? `<span>${T('run.term')}${escHtml(r.terminationReason)}</span>` : ''}
+        ${finalDecision ? `<span>${T('run.review')}${escHtml(finalDecision)}</span>` : ''}
       </div>` : ''}
       ${r.error ? `<div style="font-size:11px;color:var(--danger);margin-top:4px">${escHtml(r.error.substring(0, 100))}</div>` : ''}
       ${resumeButton}${cancelButton}
@@ -5415,7 +5429,7 @@ function showSessionDetail(session, runs) {
       const tokens = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.totalTokens || 0), 0) : 0);
       const cost = (r.nodeStates ? Object.values(r.nodeStates).reduce((a, ns) => a + (ns.tokenUsage?.costYuan || 0), 0) : 0);
       return `<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:12px" title="${escHtml(r.id)}">
-        <div>${statusIcons[r.status] || '⏳'} ' + T('run.execLabel').replace('{n}', String(idx + 1)) + ' <span style="color:var(--muted-2)">${r.status}</span> <span style="color:var(--muted-2);font-family:var(--mono);font-size:10px">${escHtml(r.id)}</span></div>
+        <div>${statusIcons[r.status] || '⏳'} ${T('run.execLabel').replace('{n}', String(idx + 1))} <span style="color:var(--muted-2)">${r.status}</span> <span style="color:var(--muted-2);font-family:var(--mono);font-size:10px">${escHtml(r.id)}</span></div>
         <div style="color:var(--muted-2);margin-top:4px">Token: ${formatNumber(tokens)} · ¥${cost.toFixed(4)}</div>
       </div>`;
     }).join('');
