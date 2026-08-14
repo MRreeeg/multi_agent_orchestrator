@@ -690,18 +690,14 @@ input,textarea,select{font:inherit;color:inherit}
           </select>
         </div>
         <div class="field">
-          <label class="field__label">Agent</label>
-          <input class="field__input" id="cfg-agent" type="text" placeholder="mimo agent，如 coder" />
-        </div>
-        <div class="field">
           <label class="field__label">Skill</label>
           <select class="field__select" id="cfg-skill">
             <option value="">无</option>
           </select>
         </div>
         <div class="field">
-          <label class="field__label">执行器</label>
-          <select class="field__select" id="cfg-executor">
+          <label class="field__label" title="驱动本节点的 Agent 引擎（reasonix / mimo / codex / claude / opencode / dsh）">Agent</label>
+          <select class="field__select" id="cfg-executor" title="驱动本节点的 Agent 引擎（reasonix / mimo / codex / claude / opencode / dsh）">
           </select>
         </div>
         <div class="field" id="dsh-preset-field" style="display:none">
@@ -1167,11 +1163,9 @@ function syncConfigFieldState(node) {
   }
 
   $('#cfg-executor').disabled = false;
-  $('#cfg-agent').disabled = isCodex; // Codex doesn't use agent config
   $('#cfg-skill').disabled = false; // All executors can use skill (Codex injects via prompt)
 
-  $('#cfg-executor').title = isCodex ? 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）' : '可手动选择执行器';
-  $('#cfg-agent').title = isCodex ? 'Codex 不使用 agent 配置' : (isMimo ? 'mimo executor 会传递 agent 配置；留空最稳妥' : '默认执行器当前不会使用 agent');
+  $('#cfg-executor').title = isCodex ? 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）' : '驱动本节点的 Agent 引擎';
   $('#cfg-skill').title = isCodex ? 'Codex 通过 Prompt 注入 Skill 内容' : (isMimo ? 'mimo executor 当前不会使用 skill，但可保留配置' : '默认执行器可使用 skill');
 }
 
@@ -2086,7 +2080,6 @@ function showConfig(nodeId) {
   $('#cfg-name').value = node.name;
   $('#cfg-type').value = node.type;
   $('#cfg-model').value = node.model || '';
-  $('#cfg-agent').value = node.agent || '';
   $('#cfg-skill').value = node.skill || '';
   $('#cfg-executor').value = node.executor || 'reasonix';
   $('#cfg-mode').value = node.mode || 'serve';
@@ -2124,7 +2117,7 @@ if (NARROW_CONFIG_Q.addEventListener) NARROW_CONFIG_Q.addEventListener('change',
 $('#config-close').addEventListener('click', hideConfig);
 
 // Config field change handlers
-['cfg-name', 'cfg-type', 'cfg-model', 'cfg-agent', 'cfg-skill', 'cfg-executor', 'cfg-dsh-preset', 'cfg-mode', 'cfg-approval', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
+['cfg-name', 'cfg-type', 'cfg-model', 'cfg-skill', 'cfg-executor', 'cfg-dsh-preset', 'cfg-mode', 'cfg-approval', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
   const el = $('#' + id);
   el.addEventListener('change', () => {
     if (!state.selectedNode) return;
@@ -2162,7 +2155,6 @@ $('#config-close').addEventListener('click', hideConfig);
         node.agent = '';
       }
     }
-    if (id === 'cfg-agent') node.agent = el.value;
     if (id === 'cfg-skill') node.skill = el.value;
     if (id === 'cfg-executor') {
       node.executor = el.value;
@@ -2358,10 +2350,13 @@ function renderNodes() {
         cancelConnect();
       });
     });
-    // Port badge for serve runtime — show for starting/ready/idle/busy, gray for stopped/error
-    // runtime_console runtimes (codex ws, mimo acp, claude stream-json) expose
-    // their entry through the Orchestrator console even when the provider has
-    // no port (claude has Port=0) — otherwise the user could never open it.
+    // Port badge for serve runtime.
+    //
+    // 两条规则分开，互不干扰：
+    //   颜色 = serve 状态（绿 ready / 黄 starting·idle·busy / 灰 stopped·error）
+    //   入口 = 按 runtime 类型固定（runtime_console 永远进 Runtime Console 小窗口；
+    //          浏览器类型永远打开 agent 网页）——绝不因为状态变化让同一个
+    //          runtime 一会儿进小窗口、一会儿开网页。
     const rtConsoleNoPort = node.runtime && node.runtime.accessMode === 'runtime_console';
     if (node.runtime && (node.runtime.port || rtConsoleNoPort)) {
       const badge = document.createElement('div');
@@ -2370,33 +2365,35 @@ function renderNodes() {
       const s = node.runtime.status;
       const isRuntimeConsole = node.runtime.accessMode === 'runtime_console';
       const isActive = s === 'starting' || s === 'ready' || s === 'idle' || s === 'busy';
-      // Codex app-server uses an internal WebSocket protocol. Never navigate the browser
-      // to that endpoint: its output and controls are exposed through the Orchestrator console.
-      const canOpenConsole = isRuntimeConsole && !!node.runtime.runtimeID;
-      const canOpenBrowser = isActive && node.runtime.endpoint && node.runtime.executor !== 'mimo' && !isRuntimeConsole;
+      // 入口（固定）：console 类型 → Orchestrator Runtime Console（含已停止的历史）；
+      // 浏览器类型 → agent 网页（仅 active 时可用，stopped/error 给提示不打开死链）。
+      const hasConsole = isRuntimeConsole && !!node.runtime.runtimeID;
+      const hasWeb = !isRuntimeConsole && !!node.runtime.endpoint && node.runtime.executor !== 'mimo';
       badge.style.background = s === 'ready' ? 'var(--success)' :
                                s === 'idle' ? '#e6a800' :
                                s === 'busy' ? 'var(--accent)' :
                                s === 'starting' ? '#e6a800' :
                                'var(--muted-2)';
-      badge.title = canOpenConsole ? (s === 'stopped' ? '打开已停止 Runtime 的控制台记录' : '打开 Orchestrator Runtime Console') :
-                    s === 'starting' ? 'Runtime 正在启动，点击可提前打开' :
-                    canOpenBrowser ? '点击打开 agent 页面' :
-                    (s === 'stopped' ? 'Runtime 已停止' : 'Runtime 不可用');
-      if (canOpenConsole) {
+      if (hasConsole) {
+        badge.title = s === 'stopped' || s === 'error' ? '打开已停止 Runtime 的控制台记录' : '打开 Orchestrator Runtime Console';
         badge.addEventListener('click', (e) => {
           e.stopPropagation();
           openRuntimeConsole(node.runtime.runtimeID);
         });
-      } else if (canOpenBrowser) {
-        badge.addEventListener('click', (e) => {
-          e.stopPropagation();
-          // Open the agent page in the OS default browser (independent
-          // window) via the server, which handles the platform launcher.
-          api('POST', '/runtime/open', { endpoint: node.runtime.endpoint }).catch(() => {
-            window.open(node.runtime.endpoint, '_blank');
+      } else if (hasWeb) {
+        badge.title = isActive ? '点击打开 agent 页面' : (s === 'stopped' ? 'Runtime 已停止' : 'Runtime 不可用');
+        if (isActive) {
+          badge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Open the agent page in the OS default browser (independent
+            // window) via the server, which handles the platform launcher.
+            api('POST', '/runtime/open', { endpoint: node.runtime.endpoint }).catch(() => {
+              window.open(node.runtime.endpoint, '_blank');
+            });
           });
-        });
+        }
+      } else {
+        badge.title = s === 'stopped' ? 'Runtime 已停止' : 'Runtime 不可用';
       }
       el.appendChild(badge);
     }
