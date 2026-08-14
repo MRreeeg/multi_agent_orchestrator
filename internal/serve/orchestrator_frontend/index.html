@@ -142,6 +142,15 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
 .chat-bubble--user .chat-bubble__meta{text-align:right}
 .chat__input-bar{border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;background:var(--bg)}
+/* 工作目录卡片：位于输入框上方，小按钮卡片式（不再是顶栏里的文本框） */
+.chat__ws{display:flex;align-items:center;gap:6px;padding:8px 16px 0;background:var(--bg)}
+.chat__ws-btn{display:inline-flex;align-items:center;gap:6px;max-width:min(420px,60vw);border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);font-family:var(--mono);font-size:11px;padding:4px 8px;cursor:pointer;overflow:hidden;white-space:nowrap;transition:border-color .15s,box-shadow .15s}
+.chat__ws-btn:hover{border-color:var(--accent);box-shadow:0 1px 4px oklch(0% 0 0/.08)}
+.chat__ws-btn .chat__ws-edit{color:var(--muted-2);font-family:inherit;font-size:10px;flex-shrink:0}
+.chat__ws-btn:hover .chat__ws-edit{color:var(--accent)}
+.chat__ws-input{display:none;height:26px;width:min(420px,55vw);font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:8px;background:var(--card);color:var(--fg);padding:0 8px;outline:none}
+.chat__ws-confirm{display:none;height:26px;padding:0 10px;font-size:11px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);cursor:pointer}
+.chat__ws-confirm:hover{border-color:var(--accent);color:var(--accent)}
 .chat__opts{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:8px 16px 0;flex-wrap:wrap;background:var(--bg)}
 .chat__opt-label{font-size:10.5px;color:var(--muted-2);font-family:var(--mono)}
 .chat__opt{border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--fg-2);font-size:11px;padding:2px 6px;max-width:180px;outline:none;transition:border-color .15s}
@@ -411,12 +420,6 @@ input,textarea,select{font:inherit;color:inherit}
     <div class="topbar__sep"></div>
     <div class="topbar__title">多Agent 协作编排 · 架构 → 实现 → 审查</div>
     <div class="topbar__spacer"></div>
-    <div class="topbar__cwd" style="display:flex;align-items:center;gap:6px">
-      <span style="font-size:11px;color:var(--muted);white-space:nowrap">工作目录:</span>
-      <span id="cwd-display" style="font-family:var(--mono);font-size:11px;color:var(--fg-2);max-width:min(360px,34vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg)" title="点击修改工作目录（悬停可见完整路径）" onclick="showCwdEditor()"></span>
-      <input id="cwd-input" type="text" style="display:none;height:24px;width:min(400px,40vw);font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:5px;background:var(--bg);color:var(--fg);padding:0 8px;outline:none" />
-      <button id="cwd-confirm" class="topbar__btn" style="display:none;height:22px;padding:0 6px;font-size:11px" onclick="confirmCwd()">确定</button>
-    </div>
     <div class="topbar__preset">
       <select id="preset-select" title="加载预设模板">
         <option value="">加载预设...</option>
@@ -486,11 +489,22 @@ input,textarea,select{font:inherit;color:inherit}
             </div>
           </div>
         </div>
+        <div class="chat__ws" id="chat-ws">
+          <button class="chat__ws-btn" id="chat-ws-btn" title="点击修改工作目录（悬停可见完整路径）" onclick="showCwdEditor()">
+            <span>📁</span>
+            <span id="cwd-display" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</span>
+            <span class="chat__ws-edit">✏️ 切换</span>
+          </button>
+          <input class="chat__ws-input" id="cwd-input" type="text" />
+          <button class="chat__ws-confirm" id="cwd-confirm" onclick="confirmCwd()">确定</button>
+        </div>
         <div class="chat__opts" id="chat-opts">
           <span class="chat__opt-label">分析执行器</span>
           <select class="chat__opt" id="chat-executor" title="需求分析使用的执行器"></select>
           <span class="chat__opt-label">分析模型</span>
           <select class="chat__opt" id="chat-model" title="需求分析使用的模型"></select>
+          <span class="chat__opt-label">分析人设</span>
+          <select class="chat__opt" id="chat-agent" title="需求分析使用的 Agent 人设：dsh 执行器下为本机客制化 agent 预设（自检自动导入）"></select>
         </div>
         <div class="chat__input-bar" id="chat-input-bar">
           <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
@@ -600,6 +614,7 @@ input,textarea,select{font:inherit;color:inherit}
         <span class="run-dash__spacer"></span>
         <select class="run-dash__sel" id="rd-executor" title="分析进展使用的执行器"></select>
         <select class="run-dash__sel" id="rd-model" title="分析进展使用的模型"></select>
+        <select class="run-dash__sel" id="rd-agent" title="分析进展使用的 Agent 人设：dsh 执行器下为本机客制化 agent 预设"></select>
         <button class="run-dash__btn" id="rd-analyze" title="AI 分析当前执行进展">分析进展</button>
         <button class="run-dash__btn" id="rd-stop" title="停止当前 Loop">停止</button>
         <button class="run-dash__btn" id="rd-close" title="收起看板">收起</button>
@@ -1217,14 +1232,17 @@ fetchCwd();
 // Fallback lists keep the pickers usable when /analysis/options fails or the
 // server returns an old shape (e.g. stale executable): without them the
 // select would collapse to a single "reasonix" with empty models.
-const ANALYSIS_DEFAULT_EXECUTORS = ['reasonix', 'opencode', 'codex', 'claude', 'mimo'];
+// dsh 是第一项：默认用 DSH 客制化 agent 做分析。
+const ANALYSIS_DEFAULT_EXECUTORS = ['dsh', 'reasonix', 'opencode', 'codex', 'claude', 'mimo'];
 const ANALYSIS_DEFAULT_MODELS_BY_EXECUTOR = {
+  dsh: ['deepseek-v4-flash', 'deepseek-v4-pro'],
   reasonix: ['deepseek-pro', 'deepseek-flash', 'deepseek'],
   opencode: ['opencode/deepseek-v4-flash-free', 'deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro'],
   codex: ['ccs', 'o3', 'codex-default', 'deepseek-v4-flash'],
   claude: ['ccs', 'opus', 'sonnet', 'haiku', 'claude-fable-5', 'deepseek-v4-flash'],
   mimo: ['mimo-v2.5-pro', 'mimo-v2.5', 'xiaomi/mimo-v2.5']
 };
+const ANALYSIS_DEFAULT_AGENT = 'frontend-analyst';
 async function loadAnalysisOptions() {
   let data = null;
   let optionsFailed = false;
@@ -1240,24 +1258,49 @@ async function loadAnalysisOptions() {
   const live = data && Array.isArray(data.executors) && data.executors.length && typeof data.modelsByExecutor === 'object';
   const executors = live ? data.executors : ANALYSIS_DEFAULT_EXECUTORS;
   const byExec = live ? data.modelsByExecutor : ANALYSIS_DEFAULT_MODELS_BY_EXECUTOR;
+  const dshPresets = (live && Array.isArray(data.dshPresets)) ? data.dshPresets : [];
+  const subAgents = (live && Array.isArray(data.agents)) ? data.agents : [];
   const fillModels = (executor, modelSel) => {
     if (!modelSel) return;
     const models = (byExec[executor] || []).filter(Boolean);
-    const defModel = models.includes('deepseek-flash') ? 'deepseek-flash' : models[0];
+    const defModel = models.includes('deepseek-v4-flash') ? 'deepseek-v4-flash' : (models.includes('deepseek-flash') ? 'deepseek-flash' : models[0]);
     modelSel.innerHTML = models.map(m =>
       '<option value="' + escHtml(m) + '"' + (m === defModel ? ' selected' : '') + '>' + escHtml(m) + '</option>'
     ).join('');
   };
-  const fillExecutor = (execSel, modelSel) => {
-    if (!execSel) return;
-    execSel.innerHTML = executors.map(e =>
-      '<option value="' + escHtml(e) + '">' + escHtml(e) + '</option>'
-    ).join('');
-    execSel.addEventListener('change', () => fillModels(execSel.value, modelSel));
-    fillModels(execSel.value, modelSel);
+  const fillAgent = (executor, agentSel) => {
+    if (!agentSel) return;
+    if (executor === 'dsh') {
+      // dsh 的"人设"= 本机客制化 agent 预设；默认前端分析师·管家
+      agentSel.innerHTML = '<option value="">默认（内置 persona，Prompt 式）</option>' +
+        dshPresets.map(p =>
+          '<option value="' + escHtml(p.id) + '"' + (p.id === ANALYSIS_DEFAULT_AGENT ? ' selected' : '') + '>' +
+          escHtml(p.name + '（' + p.id + '）') + (p.hasPatch ? '' : ' · 无 headless 补丁') + '</option>'
+        ).join('');
+    } else {
+      // 其他执行器：reasonix subagent 人设
+      agentSel.innerHTML = '<option value="">默认（无）</option>' +
+        subAgents.map(a =>
+          '<option value="' + escHtml(a.name) + '">' + escHtml(a.name) + '</option>'
+        ).join('');
+    }
   };
-  fillExecutor($('#chat-executor'), $('#chat-model'));
-  fillExecutor($('#rd-executor'), $('#rd-model'));
+  const fillExecutor = (execSel, modelSel, agentSel) => {
+    if (!execSel) return;
+    // 默认 dsh（客制化 agent 分析）；后端未把 dsh 排第一时也显式选中
+    const defaultExec = executors.includes('dsh') ? 'dsh' : (executors[0] || 'reasonix');
+    execSel.innerHTML = executors.map(e =>
+      '<option value="' + escHtml(e) + '"' + (e === defaultExec ? ' selected' : '') + '>' + escHtml(e) + '</option>'
+    ).join('');
+    execSel.addEventListener('change', () => {
+      fillModels(execSel.value, modelSel);
+      fillAgent(execSel.value, agentSel);
+    });
+    fillModels(execSel.value, modelSel);
+    fillAgent(execSel.value, agentSel);
+  };
+  fillExecutor($('#chat-executor'), $('#chat-model'), $('#chat-agent'));
+  fillExecutor($('#rd-executor'), $('#rd-model'), $('#rd-agent'));
 }
 loadAnalysisOptions();
 
@@ -2791,7 +2834,8 @@ async function sendChat() {
       history,
       pipelineInfo,
       executor: $('#chat-executor').value || '',
-      model: $('#chat-model').value || ''
+      model: $('#chat-model').value || '',
+      agent: $('#chat-agent').value || ''
     });
     console.log('[sendChat] analysis result:', JSON.stringify(analysis).substring(0, 500));
     // Loop is a runtime repetition of one base DAG. If the model still
@@ -3769,7 +3813,9 @@ async function openSelfCheck() {
         '<div style="font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:4px">' + escHtml(p.dir || '') + '</div></div>';
     });
     if (!dshPresets.length) {
-      html += '<div style="font-size:12.5px;color:var(--muted-2);padding:6px 0 12px">未发现本地客制化 agent。在 $DSH_HOME/.agent-presets/&lt;id&gt;/ 下放置 agent.cordis.yml + preset.yml（可选 headless.patch.yml）后重新自检即可自动导入。</div>';
+      html += '<div style="font-size:12.5px;color:var(--muted-2);padding:6px 0 12px">未发现本地客制化 agent。克隆/拉取仓库后一键安装：<br>' +
+        '<span style="font-family:var(--mono);font-size:11.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 8px;display:inline-block;margin-top:4px">cd docs\\deepseek-harness\\dsh-agent-pack &amp;&amp; .\\install.ps1 -Mode user</span>' +
+        '<br>也可手工放置：$DSH_HOME/.agent-presets/&lt;id&gt;/（agent.cordis.yml + preset.yml + headless.patch.yml）后重新自检。</div>';
     }
 
     body.innerHTML = html;
@@ -4750,7 +4796,8 @@ $('#rd-analyze').addEventListener('click', async () => {
   try {
     const res = await apiPost('/runs/' + encodeURIComponent(runID) + '/analysis', {
       executor: $('#rd-executor').value || '',
-      model: $('#rd-model').value || ''
+      model: $('#rd-model').value || '',
+      agent: $('#rd-agent').value || ''
     });
     const a = res || {};
     const blocking = (Array.isArray(a.blocking) && a.blocking.length)

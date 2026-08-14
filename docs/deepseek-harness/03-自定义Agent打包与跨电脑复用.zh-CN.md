@@ -122,9 +122,12 @@ dsh --version
 # 2) 配凭据（环境变量即可，不进仓库）
 $env:DEEPSEEK_API_KEY = "sk-..."
 
-# 3) 装 agent pack（用户级，全电脑生效）
+# 3) 装 agent pack（用户级，全电脑生效：skills + persona + 4 个客制化 agent 预设）
 cd my-agent-pack
 .\install.ps1 -Mode user
+
+# 3b)（强烈推荐）让 DSH 直接复用本机其他 agent 已下载的 skill，不重复安装：
+.\install.ps1 -Mode user -SkillDirs "C:\Users\你\.codex\skills;C:\Users\你\.local\share\mimocode\builtin_skills\0.1.9\skills"
 
 # 4) （可选）按需改模型
 notepad $env:DSH_HOME\settings.yaml    # agent-default-model
@@ -132,6 +135,18 @@ notepad $env:DSH_HOME\settings.yaml    # agent-default-model
 # 5) 验证
 dsh --profile headless "你是什么角色？有哪些 skill？"
 ```
+
+> 第 3b 步把已有 skill 根写进 `$DSH_HOME/cordis.patch.yml` 的 `skill-filesystem.customSkillDirs`（幂等托管块，可重复运行），DSH 的 Web 会话和 headless 节点都能按需发现它们——codex 的 52 个社区 skill、mimocode 内置 skill、`<skill-pack 目录>` 等，一份文件两套系统消费，谁都不用再下载一遍。
+
+### 5.1 客制化 agent 预设的跨电脑使用（自检自动导入）
+
+客制化 agent 预设（`presets/<id>/`）随 pack 一起分发，第 3 步已装进 `$DSH_HOME/.agent-presets/<id>/`。别人电脑上：
+
+1. `git clone`（或拉取）仓库 → 运行第 3 步的 `install.ps1 -Mode user`；
+2. 启动 Reasonix 控制台 → `/selfcheck` 的「客制化 DSH Agent」区**自动导入**并列出 4 个预设；
+3. dsh 节点的「客制化 Agent」下拉直接可选（前端分析师·管家 / 架构师 / 执行者 / 审查者）。
+
+自检只负责**导入展示**已安装的预设；安装动作由 install.ps1 完成（预设目录零依赖，复制即用）。
 
 > 如果 pack 里有自定义 cordis 插件依赖（`@deepseek-ai/...`），用 `dsh plugin --profile web add <pkg>`（web）或给 headless profile 装依赖后分发 `package.json`。skills/persona 本身零依赖，跨机复制即用。
 

@@ -1,6 +1,8 @@
 # dsh-agent-pack 安装器
 # 用法：
 #   .\install.ps1 -Mode user                # 用户级：skills + persona + 客制化 agent 预设 → $DSH_HOME + Reasonix 技能根
+#   .\install.ps1 -Mode user -SkillDirs "C:\Users\x\.codex\skills;C:\Users\x\.local\share\mimocode\builtin_skills\0.1.9\skills"
+#                                          # 让 DSH 直接复用本机已有 agent 的 skill（不重复下载/安装）
 #   .\install.ps1 -Mode project -Workspace G:\work\my-project   # 项目级：装进 <workspace>/.agents/skills
 #   .\install.ps1 -Mode temp -Task "..."    # 临时：直接 --patch 跑一次 DSH，不落盘
 #   .\install.ps1 -Mode temp -Task "..." -Preset reviewer   # 临时用某个客制化 agent 的 headless 补丁跑一次
@@ -12,6 +14,7 @@ param(
     [string]$Workspace = '',
     [string]$Task = '',
     [string]$Preset = '',
+    [string]$SkillDirs = '',
     [switch]$SkipDsh,
     [switch]$SkipReasonix,
     [switch]$SkipPresets
@@ -21,6 +24,28 @@ $ErrorActionPreference = 'Stop'
 $PackRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SkillRoot = Join-Path $PackRoot 'skills'
 $PresetRoot = Join-Path $PackRoot 'presets'
+
+# 共用 skill 标记块：install.ps1 管理的 skill-filesystem.customSkillDirs 配置段。
+$SkillBlockStart = '# >>> dsh-agent-pack: shared skill dirs (install.ps1 managed) >>>'
+$SkillBlockEnd = '# <<< dsh-agent-pack: shared skill dirs <<<'
+
+# 把 -SkillDirs 写进 $DSH_HOME/cordis.patch.yml 的托管标记块内（幂等）。
+# 效果：DSH（Web 会话与 headless 节点）直接复用本机其他 agent 已下载的 skill。
+function Update-SharedSkillBlock([string]$patchPath, [string]$dirs) {
+    $block = $SkillBlockStart + "`n# DSH 直接复用本机其他 agent 已下载/解压的 skill（codex / mimocode / skillpack），`n# 不重复安装。改后重启 DSH 生效。用 install.ps1 -Mode user -SkillDirs 重新生成。`n- id: skill-filesystem`n  config:`n    customSkillDirs:`n"
+    $block += (($dirs -split ';' | Where-Object { $_.Trim() }) | ForEach-Object { "      - '" + $_.Trim() + "'" }) -join "`n"
+    $block += "`n" + $SkillBlockEnd
+    $content = ''
+    if (Test-Path $patchPath) { $content = Get-Content $patchPath -Raw }
+    $pattern = '(?s)' + [regex]::Escape($SkillBlockStart) + '.*?' + [regex]::Escape($SkillBlockEnd)
+    if ($content -match [regex]::Escape($SkillBlockStart)) {
+        $content = [regex]::Replace($content, $pattern, $block)
+    } else {
+        $content = $content.TrimEnd() + "`n`n" + $block + "`n"
+    }
+    Set-Content -Path $patchPath -Value $content -Encoding UTF8
+    Write-Host "[+] 共用 skill 目录 -> $patchPath"
+}
 
 function Copy-SkillsTo([string]$destRoot) {
     if (-not $destRoot) { return }
@@ -65,6 +90,9 @@ switch ($Mode) {
                     Copy-Item $packPatch $homePatch
                 }
                 Write-Host "[+] persona overlay -> $homePatch"
+            }
+            if ($SkillDirs) {
+                Update-SharedSkillBlock $homePatch $SkillDirs
             }
             Write-Host "[+] DSH home: $dshHome"
         }

@@ -46,6 +46,9 @@ dsh-agent-pack/
 # 用户级（这台电脑所有 DSH 会话 + 客制化 agent 预设 + Reasonix 技能根都生效）
 .\install.ps1 -Mode user
 
+# 用户级 + 让 DSH 直接复用本机其他 agent 已下载的 skill（不重复安装）
+.\install.ps1 -Mode user -SkillDirs "C:\Users\x\.codex\skills;C:\Users\x\.local\share\mimocode\builtin_skills\0.1.9\skills"
+
 # 项目级（只装进某个 workspace 的技能根）
 .\install.ps1 -Mode project -Workspace G:\work\my-project
 

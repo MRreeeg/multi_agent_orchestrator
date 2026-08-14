@@ -367,6 +367,16 @@ func runAnalysisExec(ctx context.Context, bin, workDir, prompt, executor, model,
 		Executor:  exType,
 		NodeID:    "analysis",
 		MaxSteps:  25,
+		// Headless has no interactive approval surface: the analysis subprocess
+		// must never sit on a pending "ask". Trusted nodes map to
+		// DSH_PERMISSION_MODE=danger-full-access (approval never).
+		Trust: true,
+	}
+	// For dsh the analysis "agent persona" is a locally authored DSH preset id
+	// (e.g. frontend-analyst); pass it through so the analysis runs under the
+	// customized agent's persona and tool catalog.
+	if exType == "dsh" {
+		spec.DshPreset = strings.TrimSpace(agent)
 	}
 	res, err := exec.Execute(ctx, spec, nil)
 	if err != nil && res == nil {
@@ -731,9 +741,10 @@ func (h *orchestratorHandler) listAgents(w http.ResponseWriter, _ *http.Request)
 
 // analysisOptions returns the executor picklist with per-executor model lists
 // for the requirement/progress analysis entry points, mirroring the node-type
-// catalog.  Selecting an executor only swaps the engine behind the analysis —
-// the responsibility contract (the JSON schema) is always built server-side
-// and passed as the prompt, so it stays universal.
+// catalog, plus the locally authored DSH agent presets (available as analysis
+// personas when the executor is dsh). Selecting an executor only swaps the
+// engine behind the analysis — the responsibility contract (the JSON schema)
+// is always built server-side and passed as the prompt, so it stays universal.
 func (h *orchestratorHandler) analysisOptions(w http.ResponseWriter, _ *http.Request) {
 	catalog := orchestrator.NodeTypeCatalog()
 	executors := []string{}
@@ -753,7 +764,16 @@ func (h *orchestratorHandler) analysisOptions(w http.ResponseWriter, _ *http.Req
 	if agents == nil {
 		agents = []analysisAgent{}
 	}
-	writeJSON(w, map[string]any{"executors": executors, "modelsByExecutor": modelsByExecutor, "agents": agents})
+	dshPresets := dshclient.ListAgentPresets()
+	if dshPresets == nil {
+		dshPresets = []dshclient.AgentPresetInfo{}
+	}
+	writeJSON(w, map[string]any{
+		"executors":        executors,
+		"modelsByExecutor": modelsByExecutor,
+		"agents":           agents,
+		"dshPresets":       dshPresets,
+	})
 }
 
 type analysisAgent struct {
@@ -774,7 +794,15 @@ var analysisAgentCache struct {
 // executable's working directory, mirroring `reasonix subagent list`. Builtin
 // subagent skills are included, same as the CLI. Failures degrade to an empty
 // list so the analysis entry points stay usable. Results are cached for 30s.
-func analysisAgentProfiles() []analysisAgent {
+func analysisAgentProfiles() (out []analysisAgent) {
+	// A malformed skill directory (bad frontmatter, unexpected file layout)
+	// must never take the whole /analysis/options endpoint down: degrade to an
+	// empty list, exactly like the other failure paths.
+	defer func() {
+		if recover() != nil {
+			out = nil
+		}
+	}()
 	analysisAgentCache.mu.Lock()
 	defer analysisAgentCache.mu.Unlock()
 	if analysisAgentCache.agents != nil && time.Since(analysisAgentCache.fetched) < 30*time.Second {
@@ -790,7 +818,6 @@ func analysisAgentProfiles() []analysisAgent {
 		opts.ExcludedPaths = cfg.SkillExcludedPaths()
 		opts.MaxDepth = cfg.SkillMaxDepth()
 	}
-	var out []analysisAgent
 	for _, sk := range skill.New(opts).List() {
 		if sk.RunAs == skill.RunSubagent {
 			out = append(out, analysisAgent{Name: sk.Name, Description: sk.Description})
