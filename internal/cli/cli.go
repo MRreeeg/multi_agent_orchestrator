@@ -126,6 +126,9 @@ func Run(args []string, version string) int {
 	case "review":
 		configureCLIThemeFromConfigNoProbe()
 		return reviewCommand(rest)
+	case "assist":
+		configureCLIThemeFromConfigNoProbe()
+		return assistCommand(rest)
 	case "bot":
 		configureCLIThemeFromConfigNoProbe()
 		return botCommand(rest, version)

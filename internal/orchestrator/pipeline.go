@@ -2003,18 +2003,45 @@ func (s *Store) executePipeline(ctx context.Context, run *PipelineRun, pipe *Pip
 }
 
 // gatherInput collects output from upstream nodes.
+// assistHint returns the auxiliary task dispatch section for a node when its
+// assist switch is on. The node may then delegate small side tasks (image
+// analysis first) to a vision-capable model via `reasonix assist`; the hint
+// explicitly says to keep going when the command is unavailable, so a pipeline
+// without any configured assist backend never blocks on this.
+func assistHint(node *AgentNode) string {
+	if node == nil || node.AssistEnabled == "off" {
+		return ""
+	}
+	return "## 辅助小任务分发（识图等）\n" +
+		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，运行：\n" +
+		"reasonix assist \"任务描述\" [--image 图片路径...]\n" +
+		"把返回的分析结果纳入你的工作；若命令不可用或失败，说明原因并继续其余工作，不要卡住。"
+}
+
 func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) string {
 	node := findNode(pipe, nodeID)
 	upstream := upstreamEdges(pipe, nodeID)
 	if len(upstream) == 0 {
 		if run.Task != "" {
+			if hint := assistHint(node); hint != "" {
+				if node != nil && node.RoleDesc != "" {
+					return fmt.Sprintf("## 节点职责\n%s\n\n## 原始任务\n%s\n\n%s", node.RoleDesc, run.Task, hint)
+				}
+				return fmt.Sprintf("%s\n\n%s", run.Task, hint)
+			}
 			if node != nil && node.RoleDesc != "" {
 				return fmt.Sprintf("## 节点职责\n%s\n\n## 原始任务\n%s", node.RoleDesc, run.Task)
 			}
 			return run.Task
 		}
 		if node != nil && node.RoleDesc != "" {
+			if hint := assistHint(node); hint != "" {
+				return fmt.Sprintf("你是一个%s。你的任务是：%s。请开始工作。\n\n%s", node.Label, node.RoleDesc, hint)
+			}
 			return fmt.Sprintf("你是一个%s。你的任务是：%s。请开始工作。", node.Label, node.RoleDesc)
+		}
+		if hint := assistHint(node); hint != "" {
+			return fmt.Sprintf("请完成你的角色任务。角色：%s\n\n%s", node.Label, hint)
 		}
 		return fmt.Sprintf("请完成你的角色任务。角色：%s", node.Label)
 	}
@@ -2023,6 +2050,9 @@ func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) str
 	var parts []string
 	if node != nil && node.RoleDesc != "" {
 		parts = append(parts, "## 节点职责\n"+node.RoleDesc)
+	}
+	if hint := assistHint(node); hint != "" {
+		parts = append(parts, hint)
 	}
 	if run.Task != "" {
 		parts = append(parts, "## 原始任务\n"+run.Task)

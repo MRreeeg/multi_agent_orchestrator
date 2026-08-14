@@ -147,6 +147,10 @@ type AgentNode struct {
 	// via its headless.patch.yml; when empty, the node uses DSH's stock
 	// headless persona plus prompt/skill injection.
 	DshPreset string  `json:"dshPreset,omitempty"`
+	// AssistEnabled controls the auxiliary task dispatch hint (image analysis
+	// first): "off" disables it; empty or "on" enables it. Empty is the default
+	// so legacy nodes and built-in presets get the hint without migration.
+	AssistEnabled string `json:"assistEnabled,omitempty"`
 	InputMap  string  `json:"inputMap"`  // how to map upstream output to this node's input
 	OutputMap string  `json:"outputMap"` // how to map this node's output for downstream
 	X         float64 `json:"x"`         // editor canvas X
