@@ -504,7 +504,7 @@ input,textarea,select{font:inherit;color:inherit}
     <div class="topbar__title">多Agent 协作编排 · 架构 → 实现 → 审查</div>
     <div class="topbar__spacer"></div>
     <div class="topbar__preset">
-      <button class="topbar__btn" id="btn-save-preset" title="' + T('preset.saveTitle') + '">＋</button>
+      <button class="topbar__btn" id="btn-save-preset" title="保存当前管道为预设">＋</button>
       <select id="preset-select" title="加载预设模板">
         <option value="">加载预设...</option>
       </select>
@@ -769,10 +769,10 @@ input,textarea,select{font:inherit;color:inherit}
         </div>
         <div class="field">
           <label class="field__label">权限模式</label>
-          <select class="field__select" id="cfg-approval" title="工具调用批准策略：auto 全自动放行；ask 时工具请求会挂起并在 Runtime Console 弹出待批准卡片（仅 mimo/claude serve 生效）">
-            <option value="auto">auto（全自动放行）</option>
-            <option value="ask">ask（人工批准）</option>
-            <option value="yolo">yolo（全自动放行）</option>
+          <select class="field__select" id="cfg-approval">
+            <option value="auto">auto</option>
+            <option value="ask">ask</option>
+            <option value="yolo">yolo</option>
           </select>
         </div>
         <div class="field" id="reasoning-effort-field" style="display:none">
@@ -1014,9 +1014,9 @@ const I18N = {
     'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情', 'skill.none': '无',
     'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
     'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：',
-    'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…',
+    'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…', 'rd.iter': '第 {cur} 轮 / 共 {max} 轮',
     'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
-    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ 自定义模型…', 'model.promptTitle': '输入模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
+    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'cfg.rolePh': '描述该节点的职责...（点击打开大窗口）', 'cfg.execTitle': '驱动本节点的 Agent 引擎', 'cfg.execTitleCodex': 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）', 'cfg.skillTitle': '默认执行器可使用 skill', 'cfg.skillTitleCodex': 'Codex 通过 Prompt 注入 Skill 内容', 'cfg.skillTitleMimo': 'mimo executor 当前不会使用 skill，但可保留配置', 'cfg.dshTitle': '本地客制化的 DSH agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 DSH 内置 persona（Prompt 式）。', 'cfg.dshDefault': '默认（内置 persona，Prompt 式）', 'cfg.dshNoPatch': ' · 无 headless 补丁，不可用于节点', 'loop.off': '关闭', 'loop.on': '开启', 'loop.modeReview': '审查者决定', 'loop.modeFixed': '固定次数', 'loop.pickReviewer': '选择审查节点...', 'loop.overlay': 'Loop 运行时回到执行者 · {mode} · {max} 轮', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ 自定义模型…', 'model.promptTitle': '输入模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消',
     'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）', 'rd.title': '执行详情', 'rd.loading': '加载中…', 'rd.status': '状态：', 'rd.trigger': '触发：', 'rd.nodes': '节点：', 'rd.loop': 'Loop 循环', 'rd.loopProgress': '进度：', 'rd.mode': '模式：', 'rd.termination': '终止：', 'rd.review': '审查：', 'rd.agents': '各 Agent 执行情况',
   },
@@ -1044,9 +1044,9 @@ const I18N = {
     'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details', 'skill.none': 'None',
     'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
     'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ',
-    'rd.running': '● Running', 'rd.runningEllipsis': 'Running…',
+    'rd.running': '● Running', 'rd.runningEllipsis': 'Running…', 'rd.iter': 'Round {cur} / {max}',
     'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
-    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ Custom model…', 'model.promptTitle': 'Enter model name', 'model.promptPh': 'Model name (ccs/ccswitch routes via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
+    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'cfg.rolePh': 'Describe this node role... (click to open large editor)', 'cfg.execTitle': 'Agent engine driving this node', 'cfg.execTitleCodex': 'Codex: run = one-shot exec; serve = retained Runtime (app-server)', 'cfg.skillTitle': 'Default executors can use skill', 'cfg.skillTitleCodex': 'Codex injects Skill via prompt', 'cfg.skillTitleMimo': 'mimo executor does not use skill; kept for compatibility', 'cfg.dshTitle': 'Locally customized DSH agent ($DSH_HOME/.agent-presets). Selected node runs with that agent persona and toolset (custom); empty uses DSH built-in persona (prompt-based).', 'cfg.dshDefault': 'Default (built-in persona, prompt-based)', 'cfg.dshNoPatch': ' · no headless patch, not usable for nodes', 'loop.off': 'Off', 'loop.on': 'On', 'loop.modeReview': 'Review decides', 'loop.modeFixed': 'Fixed rounds', 'loop.pickReviewer': 'Select review node...', 'loop.overlay': 'Loop returns to executor · {mode} · {max} rounds', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ Custom model…', 'model.promptTitle': 'Enter model name', 'model.promptPh': 'Model name (ccs/ccswitch routes via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel',
     'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)', 'rd.title': 'Run Details', 'rd.loading': 'Loading…', 'rd.status': 'Status: ', 'rd.trigger': 'Trigger: ', 'rd.nodes': 'Nodes: ', 'rd.loop': 'Loop', 'rd.loopProgress': 'Progress: ', 'rd.mode': 'Mode: ', 'rd.termination': 'Termination: ', 'rd.review': 'Review: ', 'rd.agents': 'Agent breakdown',
   },
@@ -1111,6 +1111,7 @@ function applyLang() {
   setTitle('#chat-model', 'opt.model');
   setTitle('#chat-agent', 'opt.agent');
   setTitle('#rd-executor', 'run.analyze');
+  setTitle('#btn-save-preset', 'preset.saveTitle');
   set('#gcm-cancel', 'dlg.cancel');
   set('#gcm-ok', 'dlg.ok');
   setTitle('#preset-select', 'preset.load');
@@ -1139,6 +1140,29 @@ function applyLang() {
   const cfgKeys = ['cfg.name', 'cfg.type', 'cfg.model', 'cfg.skill', 'cfg.agent', 'cfg.preset', 'cfg.mode', 'cfg.approval', 'cfg.reasoning', 'cfg.role', 'cfg.loop', 'cfg.loopMode', 'cfg.loopMax', 'cfg.loopReviewer'];
   const cfgLabels = document.querySelectorAll('#config-panel .field__label');
   cfgLabels.forEach((el, i) => { if (cfgKeys[i]) el.textContent = T(cfgKeys[i]); });
+  // Loop 区下拉选项 + 职责描述 placeholder（跟随语言）
+  const loopOpts = [
+    ['#cfg-loop-enabled option[value="false"]', 'loop.off'],
+    ['#cfg-loop-enabled option[value="true"]', 'loop.on'],
+    ['#cfg-loop-mode option[value="review_decides"]', 'loop.modeReview'],
+    ['#cfg-loop-mode option[value="fixed"]', 'loop.modeFixed'],
+    ['#cfg-loop-reviewer option:first-child', 'loop.pickReviewer'],
+  ];
+  loopOpts.forEach(([sel, key]) => { const el = document.querySelector(sel); if (el) el.textContent = T(key); });
+  setPh('#cfg-role', 'cfg.rolePh');
+  // 预设/默认节点名与职责描述：标记了 _nameKey/_roleKey 的节点跟随语言（用户改过名的清除标记后不再跟随）
+  state.nodes.forEach(n => {
+    if (n._nameKey) n.name = T(n._nameKey);
+    if (n._roleKey) n.role = T(n._roleKey);
+  });
+  if (state.selectedNode) {
+    const selNode = state.nodes.find(n => n.id === state.selectedNode);
+    if (selNode) {
+      configTitle.textContent = T('cfg.nodeTitle') + selNode.name;
+      $('#cfg-name').value = selNode.name;
+      $('#cfg-role').value = selNode.role || '';
+    }
+  }
   const wsEdit = document.querySelector('#chat-ws-btn .chat__ws-edit');
   if (wsEdit) wsEdit.textContent = T('ws.switch');
   const wsPick = document.querySelector('#cwd-pick');
@@ -1150,9 +1174,15 @@ function applyLang() {
   chips.forEach((el, i) => { if (chipKeys[i]) el.textContent = T(chipKeys[i]); });
   // 预设下拉：内置模板本地化 + 自定义分组重渲染
   if (typeof loadPresets === 'function') loadPresets();
-  // 模型 / Skill 下拉：placeholder 与自定义入口文案随语言刷新（保留当前选中值）
+  // 模型 / Skill / DSH 预设下拉：placeholder 与自定义入口文案随语言刷新（保留当前选中值）
   if (typeof populateModelSelect === 'function') populateModelSelect();
   if (typeof populateSkillSelect === 'function') populateSkillSelect();
+  if (typeof populateDshPresetSelect === 'function') {
+    populateDshPresetSelect(state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null);
+  }
+  setTitle('#cfg-executor', 'cfg.execTitle');
+  setTitle('#cfg-skill', 'cfg.skillTitle');
+  setTitle('#cfg-dsh-preset', 'cfg.dshTitle');
 }
 document.addEventListener('DOMContentLoaded', applyLang);
 document.querySelector('#btn-lang').addEventListener('click', () => {
@@ -1172,9 +1202,9 @@ document.querySelector('#btn-lang').addEventListener('click', () => {
 const state = {
   activePanel: 'chat',
   nodes: [
-    { id: 1, name: '架构师', type: 'architect', model: 'deepseek-pro', skill: 'brainstorming', mode: 'serve', role: '设计系统架构', x: 60, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
-    { id: 2, name: '执行者', type: 'executor', model: 'mimo-v2.5-pro', skill: '', mode: 'serve', role: '编码实现', x: 310, y: 160, status: 'idle', executor: 'mimo', agent: '' },
-    { id: 3, name: '审查者', type: 'reviewer', model: 'deepseek-flash', skill: 'review', mode: 'serve', role: '审查代码', x: 560, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+    { id: 1, name: '架构师', _nameKey: 'node.architect', type: 'architect', model: 'deepseek-pro', skill: 'brainstorming', mode: 'serve', role: '设计系统架构', x: 60, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+    { id: 2, name: '执行者', _nameKey: 'node.executor', type: 'executor', model: 'mimo-v2.5-pro', skill: '', mode: 'serve', role: '编码实现', x: 310, y: 160, status: 'idle', executor: 'mimo', agent: '' },
+    { id: 3, name: '审查者', _nameKey: 'node.reviewer', type: 'reviewer', model: 'deepseek-flash', skill: 'review', mode: 'serve', role: '审查代码', x: 560, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
   ],
   edges: [
     { from: 1, to: 2, mode: 'linear' },
@@ -1429,21 +1459,18 @@ function syncConfigFieldState(node) {
   }
 
   // 权限模式：仅 mimo/claude/opencode 的 serve 模式生效（挂起为批准卡片）；
-  // reasonix/dsh/run 由服务端策略控制，前端禁用并说明，避免"选了没用"。
+  // reasonix/dsh/run 由服务端策略控制，前端禁用，避免"选了没用"。
   const approvalSel = $('#cfg-approval');
   if (approvalSel) {
     const approvalSupported = (node?.executor === 'mimo' || node?.executor === 'claude' || node?.executor === 'opencode') && node?.mode === 'serve';
     approvalSel.disabled = !approvalSupported;
-    approvalSel.title = approvalSupported
-      ? '工具请求将挂起为卡片，由你在 Runtime Console 批准/拒绝'
-      : '当前执行器/模式不支持此选项（reasonix/dsh/run 由服务端策略控制，无需前端选择）';
   }
 
   $('#cfg-executor').disabled = false;
   $('#cfg-skill').disabled = false; // All executors can use skill (Codex injects via prompt)
 
-  $('#cfg-executor').title = isCodex ? 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）' : '驱动本节点的 Agent 引擎';
-  $('#cfg-skill').title = isCodex ? 'Codex 通过 Prompt 注入 Skill 内容' : (isMimo ? 'mimo executor 当前不会使用 skill，但可保留配置' : '默认执行器可使用 skill');
+  $('#cfg-executor').title = isCodex ? T('cfg.execTitleCodex') : T('cfg.execTitle');
+  $('#cfg-skill').title = isCodex ? T('cfg.skillTitleCodex') : (isMimo ? T('cfg.skillTitleMimo') : T('cfg.skillTitle'));
 }
 
 // ── DOM refs ──
@@ -2421,7 +2448,7 @@ $('#config-close').addEventListener('click', hideConfig);
     if (!state.selectedNode) return;
     const node = state.nodes.find(n => n.id === state.selectedNode);
     if (!node) return;
-    if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
+    if (id === 'cfg-name') { node.name = el.value; node._nameKey = null; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
     if (id === 'cfg-type') node.type = el.value;
     if (id === 'cfg-approval') node.approvalMode = el.value;
     if (id === 'cfg-model') {
@@ -2471,7 +2498,7 @@ $('#config-close').addEventListener('click', hideConfig);
       }
     }
     if (id === 'cfg-mode') node.mode = el.value;
-    if (id === 'cfg-role') node.role = el.value;
+    if (id === 'cfg-role') { node.role = el.value; node._roleKey = null; }
     if (id === 'cfg-reasoning-effort') node.reasoningEffort = el.value;
     if (id === 'cfg-dsh-preset') {
       node.dshPreset = el.value || '';
@@ -2488,8 +2515,8 @@ $('#config-close').addEventListener('click', hideConfig);
       if (!state.selectedNode) return;
       const node = state.nodes.find(n => n.id === state.selectedNode);
       if (!node) return;
-      if (id === 'cfg-name') { node.name = el.value; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
-      if (id === 'cfg-role') node.role = el.value;
+      if (id === 'cfg-name') { node.name = el.value; node._nameKey = null; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
+      if (id === 'cfg-role') { node.role = el.value; node._roleKey = null; }
       renderNodes();
     });
   }
@@ -2850,7 +2877,8 @@ function renderLoopOverlay() {
   label.setAttribute('x', minX + 12);
   label.setAttribute('y', minY + 18);
   const max = cfg.mode === 'fixed' ? (cfg.fixedIterations || cfg.maxIterations || 0) : (cfg.maxIterations || 0);
-  label.textContent = `Loop 运行时回到执行者 · ${cfg.mode} · ${max} 轮`;
+  const modeLabel = cfg.mode === 'fixed' ? T('loop.modeFixed') : T('loop.modeReview');
+  label.textContent = T('loop.overlay').replace('{mode}', modeLabel).replace('{max}', max);
   g.appendChild(label);
   svgEdges.appendChild(g);
 }
@@ -3945,7 +3973,7 @@ function connectSSE() {
           if (e.detail) {
             try {
               const it = JSON.parse(e.detail);
-              $('#rd-iter').textContent = '第 ' + (it.iteration ?? '-') + ' 轮 / 共 ' + (it.maxIterations ?? '-') + ' 轮';
+              $('#rd-iter').textContent = T('rd.iter').replace('{cur}', it.iteration ?? '-').replace('{max}', it.maxIterations ?? '-');
             } catch (_) {}
           }
           break;
@@ -4971,7 +4999,7 @@ function syncLoopConfigUI() {
   $('#loop-reviewer-field').style.display = enabled ? '' : 'none';
   const reviewerSel = $('#cfg-loop-reviewer');
   const prevReviewer = reviewerSel.value;
-  reviewerSel.innerHTML = '<option value="">选择审查节点...</option>';
+  reviewerSel.innerHTML = '<option value="">' + T('loop.pickReviewer') + '</option>';
   state.nodes.filter(n => n.type === 'reviewer').forEach(n => {
     const opt = document.createElement('option');
     opt.value = n.id;
@@ -5063,7 +5091,9 @@ function localizePreset(p) {
   const nodes = ((p.pipeline && p.pipeline.nodes) || []).map((n, i) => ({
     ...n,
     label: m.labels[i] ? T(m.labels[i]) : n.label,
+    labelKey: m.labels[i] || null,   // i18n key：应用预设后节点名可随语言切换
     roleDesc: m.roles[i] ? T(m.roles[i]) : n.roleDesc,
+    roleKey: m.roles[i] || null,     // i18n key：职责描述随语言切换
   }));
   return { ...p, name: T(m.name), desc: T(m.desc), pipeline: { ...(p.pipeline || {}), nodes } };
 }
@@ -5156,9 +5186,11 @@ presetSelect.addEventListener('change', async () => {
     pipe.nodes.forEach(n => {
       const newId = state.nextNodeId++;
       idMap[n.id] = newId;
+      const isBuiltin = !preset.custom;
       state.nodes.push({
         id: newId,
-        name: n.name,
+        name: isBuiltin && n.label ? n.label : (n.name || ''),
+        _nameKey: isBuiltin ? (n.labelKey || null) : null,
         type: n.type,
         model: n.model || '',
         providerRoute: n.providerRoute || ((['codex', 'claude'].includes(n.executor) && ['ccs', 'ccswitch'].includes(String(n.model || '').toLowerCase())) ? 'ccswitch' : ''),
@@ -5166,7 +5198,8 @@ presetSelect.addEventListener('change', async () => {
         skill: n.skill || '',
         mode: n.mode || 'serve',
         executor: n.executor || 'reasonix',
-        role: n.role || '',
+        role: isBuiltin && n.roleDesc != null ? n.roleDesc : (n.role || ''),
+        _roleKey: isBuiltin ? (n.roleKey || null) : null,
         x: n.x || 60,
         y: n.y || 60,
         status: 'idle',
@@ -5195,7 +5228,13 @@ presetSelect.addEventListener('change', async () => {
   presetSelect.value = '';
   // 预设携带 Loop 配置时同步到 UI（如固定循环预设）
   if (preset.loopConfig && preset.loopConfig.enabled) {
-    restoreLoopConfigUI(preset.loopConfig, { markDirty: false });
+    const lc = { ...preset.loopConfig };
+    // 预设里的审查节点是模板 id（n3），必须映射到新建节点的数字 id，
+    // 否则 Loop 指向不存在的节点，画布 Loop 圈与执行都会失效
+    if (lc.reviewNodeID && idMap[lc.reviewNodeID] != null) {
+      lc.reviewNodeID = String(idMap[lc.reviewNodeID]);
+    }
+    restoreLoopConfigUI(lc, { markDirty: false });
   }
 });
 
@@ -5315,11 +5354,11 @@ function populateSkillSelect(node) {
 function populateDshPresetSelect(node) {
   const sel = $('#cfg-dsh-preset');
   if (!sel) return;
-  sel.innerHTML = '<option value="">默认（内置 persona，Prompt 式）</option>';
+  sel.innerHTML = '<option value="">' + T('cfg.dshDefault') + '</option>';
   (state.dshPresets || []).forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = p.hasPatch ? (p.name + '（' + p.id + '）') : (p.name + '（' + p.id + ' · 无 headless 补丁，不可用于节点）');
+    opt.textContent = p.hasPatch ? (p.name + '（' + p.id + '）') : (p.name + '（' + p.id + T('cfg.dshNoPatch') + '）');
     opt.disabled = !p.hasPatch;
     sel.appendChild(opt);
   });
