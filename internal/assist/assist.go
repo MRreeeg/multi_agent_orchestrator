@@ -30,10 +30,18 @@ const (
 	DefaultTimeout  = 90 * time.Second
 )
 
+// Driver names. "opencode" uses the OpenAI-compatible zen/go route;
+// "claude" uses the Anthropic-compatible zen route.
+const (
+	DriverOpenCode = "opencode"
+	DriverClaude   = "claude"
+)
+
 // Options configures a single assist dispatch.
 type Options struct {
 	Task      string
 	Images    []string // local image file paths; read and sent as data URIs
+	Driver    string   // assist driver: "opencode" (default) | "claude"
 	Endpoint  string
 	Model     string
 	APIKey    string
@@ -44,6 +52,11 @@ type Options struct {
 // Env returns Options filled from environment variables where present, keeping
 // existing field values as higher priority.
 func (o *Options) env() {
+	if o.Driver == "" {
+		if v := strings.TrimSpace(os.Getenv("REASONIX_ASSIST_DRIVER")); v != "" {
+			o.Driver = v
+		}
+	}
 	if o.Endpoint == "" {
 		if v := strings.TrimSpace(os.Getenv("REASONIX_ASSIST_ENDPOINT")); v != "" {
 			o.Endpoint = v
@@ -173,11 +186,22 @@ type chatResponse struct {
 // errors with actionable messages.
 func Run(opts Options) (string, error) {
 	opts.env()
+	if opts.Driver == "" {
+		opts.Driver = DriverOpenCode
+	}
 	if opts.Endpoint == "" {
-		opts.Endpoint = DefaultEndpoint
+		if opts.Driver == DriverClaude {
+			opts.Endpoint = "https://opencode.ai/zen"
+		} else {
+			opts.Endpoint = DefaultEndpoint
+		}
 	}
 	if opts.Model == "" {
-		opts.Model = DefaultModel
+		if opts.Driver == DriverClaude {
+			opts.Model = "claude-sonnet-4-6"
+		} else {
+			opts.Model = DefaultModel
+		}
 	}
 	if opts.MaxTokens <= 0 {
 		opts.MaxTokens = DefaultMaxToken
@@ -189,6 +213,14 @@ func Run(opts Options) (string, error) {
 		return "", fmt.Errorf("assist: empty task and no images")
 	}
 
+	if opts.Driver == DriverClaude {
+		return runAnthropic(opts)
+	}
+	return runOpenAI(opts)
+}
+
+// runOpenAI talks to an OpenAI-compatible /chat/completions endpoint.
+func runOpenAI(opts Options) (string, error) {
 	content := []contentPart{{Type: "text", Text: opts.Task}}
 	if len(opts.Images) > 0 {
 		for _, img := range opts.Images {
@@ -249,4 +281,117 @@ func Run(opts Options) (string, error) {
 		return "", fmt.Errorf("assist: empty completion from %s", opts.Model)
 	}
 	return parsed.Choices[0].Message.Content, nil
+}
+
+// anthropic types for the Anthropic-compatible zen route (/v1/messages).
+type anthropicContent struct {
+	Type   string             `json:"type"` // "text" | "image"
+	Text   string             `json:"text,omitempty"`
+	Source *anthropicImageSrc `json:"source,omitempty"`
+}
+
+type anthropicImageSrc struct {
+	Type      string `json:"type"` // "base64"
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
+}
+
+type anthropicRequest struct {
+	Model     string             `json:"model"`
+	MaxTokens int                `json:"max_tokens"`
+	Messages  []anthropicMessage `json:"messages"`
+}
+
+type anthropicMessage struct {
+	Role    string             `json:"role"`
+	Content []anthropicContent `json:"content"`
+}
+
+type anthropicResponse struct {
+	Content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"content"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// runAnthropic talks to an Anthropic-compatible /v1/messages endpoint.
+func runAnthropic(opts Options) (string, error) {
+	content := []anthropicContent{{Type: "text", Text: opts.Task}}
+	for _, img := range opts.Images {
+		raw, err := os.ReadFile(img)
+		if err != nil {
+			return "", fmt.Errorf("assist: cannot read image %s: %w", img, err)
+		}
+		if len(raw) == 0 {
+			return "", fmt.Errorf("assist: image file is empty: %s", img)
+		}
+		content = append(content, anthropicContent{
+			Type: "image",
+			Source: &anthropicImageSrc{
+				Type:      "base64",
+				MediaType: imageMime(img),
+				Data:      base64.StdEncoding.EncodeToString(raw),
+			},
+		})
+	}
+
+	body, err := json.Marshal(anthropicRequest{
+		Model:     opts.Model,
+		MaxTokens: opts.MaxTokens,
+		Messages:  []anthropicMessage{{Role: "user", Content: content}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("assist: marshal request: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		strings.TrimRight(opts.Endpoint, "/")+"/v1/messages", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("assist: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("anthropic-version", "2023-06-01")
+	if opts.APIKey != "" {
+		req.Header.Set("x-api-key", opts.APIKey)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("assist: request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return "", fmt.Errorf("assist: read response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		detail := strings.TrimSpace(string(raw))
+		if len(detail) > 300 {
+			detail = detail[:300]
+		}
+		return "", fmt.Errorf("assist: %s from %s (%s)", resp.Status, opts.Endpoint, detail)
+	}
+
+	var parsed anthropicResponse
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return "", fmt.Errorf("assist: parse response: %w", err)
+	}
+	if parsed.Error != nil && parsed.Error.Message != "" {
+		return "", fmt.Errorf("assist: upstream error: %s", parsed.Error.Message)
+	}
+	var text strings.Builder
+	for _, c := range parsed.Content {
+		if c.Type == "text" && c.Text != "" {
+			text.WriteString(c.Text)
+		}
+	}
+	if text.Len() == 0 {
+		return "", fmt.Errorf("assist: empty completion from %s", opts.Model)
+	}
+	return text.String(), nil
 }

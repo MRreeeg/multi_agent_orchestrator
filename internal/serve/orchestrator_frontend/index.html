@@ -787,12 +787,35 @@ input,textarea,select{font:inherit;color:inherit}
           <label class="field__label">职责描述（点击打开大窗口编辑）</label>
           <textarea class="field__textarea" id="cfg-role" placeholder="描述该节点的职责...（点击打开大窗口）" readonly style="cursor:pointer"></textarea>
         </div>
-        <div class="field">
-          <label class="field__label">识图辅助</label>
-          <select class="field__select" id="cfg-assist" title="遇到截图/设计稿/报错图时，自动注入识图辅助说明：节点可把图像分析交给辅助视觉模型（mimo），失败不阻塞主流程">
-            <option value="">开启</option>
-            <option value="off">关闭</option>
-          </select>
+        <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+          <div class="field">
+            <label class="field__label">辅助手</label>
+            <select class="field__select" id="cfg-assist-enabled" title="节点的专属辅助 agent：可把识图等小任务交给它（默认 mimo 视觉），失败不阻塞主流程">
+              <option value="">开启</option>
+              <option value="off">关闭</option>
+            </select>
+          </div>
+          <div class="field" id="assist-model-field">
+            <label class="field__label">辅助模型</label>
+            <select class="field__select" id="cfg-assist-model" title="辅助 agent 使用的视觉/对话模型（mimo-v2.5 已验证支持识图）">
+              <option value="mimo-v2.5">mimo-v2.5（视觉 ✓）</option>
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+              <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+              <option value="qwen3.6-plus">qwen3.6-plus</option>
+              <option value="qwen3.5-plus">qwen3.5-plus</option>
+            </select>
+          </div>
+          <div class="field" id="assist-driver-field">
+            <label class="field__label">驱动</label>
+            <select class="field__select" id="cfg-assist-driver" title="辅助请求走的模型路由：opencode（OpenAI 兼容 zen/go）或 claude（Anthropic 兼容 zen）">
+              <option value="opencode">opencode（zen/go）</option>
+              <option value="claude">claude（zen anthropic）</option>
+            </select>
+          </div>
+          <div class="field" id="assist-role-field">
+            <label class="field__label">职责</label>
+            <textarea class="field__textarea" id="cfg-assist-role" rows="2" placeholder="例如：识图——描述截图/设计稿/报错图，或完成交给你的独立小任务"></textarea>
+          </div>
         </div>
       </div>
       <!-- Loop Configuration (pipeline-level) -->
@@ -1020,10 +1043,10 @@ const I18N = {
     'sc.searchPh': '搜索 skill 名称 / 说明…', 'sc.expand': '展开全部', 'sc.collapse': '收起', 'sc.colName': '名称', 'sc.colDesc': '说明', 'sc.colPath': '路径', 'sc.searchRoots': 'Skill 搜索目录: ',
     'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情', 'skill.none': '无',
     'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
-    'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：',
+    'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.agent': 'Agent：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：', 'nd.unset': '未设置', 'nd.port': '端口：', 'nd.endpoint': '端点：', 'nd.policy': '策略：', 'nd.retained': 'retained（保留至手动停止）', 'nd.access': '访问方式：', 'nd.accessLocal': '本地历史会话', 'nd.accessConsole': 'Orchestrator Runtime Console', 'nd.accessBrowser': '浏览器', 'nd.enterConsole': '进入控制台', 'nd.noWeb': '无网页入口 — 使用本地 mimo 历史会话', 'nd.interrupt': 'Interrupt（保留 runtime）', 'nd.soon': '后续版本支持', 'nd.noRuntime': '无运行时实例（一次性执行，已结束）', 'nd.output': '输出内容', 'nd.errorTitle': '错误信息', 'nd.logs': '思考/工具日志', 'nd.emptyTitle': '⚠️ 执行完成但没有返回正文', 'nd.emptyHint': '这通常表示执行器没有真正产出内容，或输出被吞掉了。请优先查看下方日志。', 'nd.pendingTitle': '⏳ 尚未执行', 'nd.pendingHint': '执行流水线后，此节点的输出将显示在这里', 'nd.rtRunning': '🟢 运行中', 'nd.rtIdle': '🟡 空闲（可进入）', 'nd.rtBusy': '🔵 忙碌中', 'nd.rtStopped': '⚫ 已停止', 'nd.rtUnknown': '未知',
     'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…', 'rd.iter': '第 {cur} 轮 / 共 {max} 轮', 'rd.noRun': '没有可分析的 Run', 'rd.analyzing': '⏳ 正在分析执行进展…', 'rd.blocking': '卡点：', 'rd.noBlocking': '暂无卡点', 'rd.suggest': '建议：', 'rd.analysisTitle': '📊 执行进展分析', 'rd.analysisFail': '分析失败: ', 'rd.failedParen': '（失败 {n}）', 'toast.noLoop': '没有正在运行的 Loop', 'toast.stopReq': '已请求停止当前 Loop', 'toast.stopFail': '停止 Loop 失败: ',
     'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
-    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.assist': '识图辅助', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'cfg.rolePh': '描述该节点的职责...（点击打开大窗口）', 'cfg.execTitle': '驱动本节点的 Agent 引擎', 'cfg.execTitleCodex': 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）', 'cfg.skillTitle': '默认执行器可使用 skill', 'cfg.skillTitleCodex': 'Codex 通过 Prompt 注入 Skill 内容', 'cfg.skillTitleMimo': 'mimo executor 当前不会使用 skill，但可保留配置', 'cfg.dshTitle': '本地客制化的 DSH agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 DSH 内置 persona（Prompt 式）。', 'cfg.dshDefault': '默认（内置 persona，Prompt 式）', 'cfg.dshNoPatch': ' · 无 headless 补丁，不可用于节点', 'loop.off': '关闭', 'loop.on': '开启', 'loop.modeReview': '审查者决定', 'loop.modeFixed': '固定次数', 'loop.pickReviewer': '选择审查节点...', 'loop.overlay': 'Loop 运行时回到执行者 · {mode} · {max} 轮', 'assist.on': '开启', 'assist.off': '关闭', 'assist.title': '遇到截图/设计稿/报错图时自动注入识图辅助：节点可把图像分析交给辅助视觉模型（mimo），失败不阻塞主流程', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ 自定义模型…', 'model.promptTitle': '输入模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
+    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.assist': '辅助手', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'cfg.rolePh': '描述该节点的职责...（点击打开大窗口）', 'cfg.execTitle': '驱动本节点的 Agent 引擎', 'cfg.execTitleCodex': 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）', 'cfg.skillTitle': '默认执行器可使用 skill', 'cfg.skillTitleCodex': 'Codex 通过 Prompt 注入 Skill 内容', 'cfg.skillTitleMimo': 'mimo executor 当前不会使用 skill，但可保留配置', 'cfg.dshTitle': '本地客制化的 DSH agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 DSH 内置 persona（Prompt 式）。', 'cfg.dshDefault': '默认（内置 persona，Prompt 式）', 'cfg.dshNoPatch': ' · 无 headless 补丁，不可用于节点', 'loop.off': '关闭', 'loop.on': '开启', 'loop.modeReview': '审查者决定', 'loop.modeFixed': '固定次数', 'loop.pickReviewer': '选择审查节点...', 'loop.overlay': 'Loop 运行时回到执行者 · {mode} · {max} 轮', 'assist.on': '开启', 'assist.off': '关闭', 'assist.model': '辅助模型', 'assist.driver': '驱动', 'assist.role': '职责', 'assist.rolePh': '例如：识图——描述截图/设计稿/报错图，或完成交给你的独立小任务', 'assist.enabledTitle': '节点的专属辅助 agent：可把识图等小任务交给它（默认 mimo 视觉），失败不阻塞主流程', 'assist.modelTitle': '辅助 agent 使用的视觉/对话模型', 'assist.driverTitle': '辅助请求走的模型路由：opencode（OpenAI 兼容 zen/go）或 claude（Anthropic 兼容 zen）', 'assist.driverOpenCode': 'opencode（zen/go）', 'assist.driverClaude': 'claude（zen anthropic）', 'assist.badgeTitle': '辅助手：识图等小任务', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ 自定义模型…', 'model.promptTitle': '输入模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消',
     'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）', 'rd.title': '执行详情', 'rd.loading': '加载中…', 'rd.status': '状态：', 'rd.trigger': '触发：', 'rd.nodes': '节点：', 'rd.loop': 'Loop 循环', 'rd.loopProgress': '进度：', 'rd.mode': '模式：', 'rd.termination': '终止：', 'rd.review': '审查：', 'rd.agents': '各 Agent 执行情况',
   },
@@ -1050,10 +1073,10 @@ const I18N = {
     'sc.searchPh': 'Search skill name / description…', 'sc.expand': 'Expand all', 'sc.collapse': 'Collapse', 'sc.colName': 'Name', 'sc.colDesc': 'Description', 'sc.colPath': 'Path', 'sc.searchRoots': 'Skill search roots: ',
     'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details', 'skill.none': 'None',
     'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
-    'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ',
+    'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.agent': 'Agent: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ', 'nd.unset': 'Not set', 'nd.port': 'Port: ', 'nd.endpoint': 'Endpoint: ', 'nd.policy': 'Policy: ', 'nd.retained': 'retained (until manually stopped)', 'nd.access': 'Access: ', 'nd.accessLocal': 'Local history', 'nd.accessConsole': 'Orchestrator Runtime Console', 'nd.accessBrowser': 'Browser', 'nd.enterConsole': 'Open console', 'nd.noWeb': 'No web entry — use local mimo history', 'nd.interrupt': 'Interrupt (keep runtime)', 'nd.soon': 'Coming soon', 'nd.noRuntime': 'No runtime instance (one-shot execution, finished)', 'nd.output': 'Output', 'nd.errorTitle': 'Error', 'nd.logs': 'Reasoning / tool logs', 'nd.emptyTitle': '⚠️ Finished but returned no content', 'nd.emptyHint': 'Usually means the executor produced nothing or output was swallowed. Check the logs below.', 'nd.pendingTitle': '⏳ Not executed yet', 'nd.pendingHint': 'This node output will appear here after the pipeline runs', 'nd.rtRunning': '🟢 Running', 'nd.rtIdle': '🟡 Idle (enterable)', 'nd.rtBusy': '🔵 Busy', 'nd.rtStopped': '⚫ Stopped', 'nd.rtUnknown': 'Unknown',
     'rd.running': '● Running', 'rd.runningEllipsis': 'Running…', 'rd.iter': 'Round {cur} / {max}', 'rd.noRun': 'No run to analyze', 'rd.analyzing': '⏳ Analyzing run progress...', 'rd.blocking': 'Blockers: ', 'rd.noBlocking': 'No blockers', 'rd.suggest': 'Suggestions: ', 'rd.analysisTitle': '📊 Run Progress Analysis', 'rd.analysisFail': 'Analysis failed: ', 'rd.failedParen': ' (failed {n})', 'toast.noLoop': 'No Loop is running', 'toast.stopReq': 'Stop requested for current Loop', 'toast.stopFail': 'Failed to stop Loop: ',
     'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
-    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.assist': 'Vision assist', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'cfg.rolePh': 'Describe this node role... (click to open large editor)', 'cfg.execTitle': 'Agent engine driving this node', 'cfg.execTitleCodex': 'Codex: run = one-shot exec; serve = retained Runtime (app-server)', 'cfg.skillTitle': 'Default executors can use skill', 'cfg.skillTitleCodex': 'Codex injects Skill via prompt', 'cfg.skillTitleMimo': 'mimo executor does not use skill; kept for compatibility', 'cfg.dshTitle': 'Locally customized DSH agent ($DSH_HOME/.agent-presets). Selected node runs with that agent persona and toolset (custom); empty uses DSH built-in persona (prompt-based).', 'cfg.dshDefault': 'Default (built-in persona, prompt-based)', 'cfg.dshNoPatch': ' · no headless patch, not usable for nodes', 'loop.off': 'Off', 'loop.on': 'On', 'loop.modeReview': 'Review decides', 'loop.modeFixed': 'Fixed rounds', 'loop.pickReviewer': 'Select review node...', 'loop.overlay': 'Loop returns to executor · {mode} · {max} rounds', 'assist.on': 'On', 'assist.off': 'Off', 'assist.title': 'Injects vision-assist hint on nodes: image analysis can be delegated to an auxiliary vision model (mimo); failures never block the main flow', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ Custom model…', 'model.promptTitle': 'Enter model name', 'model.promptPh': 'Model name (ccs/ccswitch routes via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
+    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.assist': 'Helper agent', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'cfg.rolePh': 'Describe this node role... (click to open large editor)', 'cfg.execTitle': 'Agent engine driving this node', 'cfg.execTitleCodex': 'Codex: run = one-shot exec; serve = retained Runtime (app-server)', 'cfg.skillTitle': 'Default executors can use skill', 'cfg.skillTitleCodex': 'Codex injects Skill via prompt', 'cfg.skillTitleMimo': 'mimo executor does not use skill; kept for compatibility', 'cfg.dshTitle': 'Locally customized DSH agent ($DSH_HOME/.agent-presets). Selected node runs with that agent persona and toolset (custom); empty uses DSH built-in persona (prompt-based).', 'cfg.dshDefault': 'Default (built-in persona, prompt-based)', 'cfg.dshNoPatch': ' · no headless patch, not usable for nodes', 'loop.off': 'Off', 'loop.on': 'On', 'loop.modeReview': 'Review decides', 'loop.modeFixed': 'Fixed rounds', 'loop.pickReviewer': 'Select review node...', 'loop.overlay': 'Loop returns to executor · {mode} · {max} rounds', 'assist.on': 'On', 'assist.off': 'Off', 'assist.model': 'Helper model', 'assist.driver': 'Driver', 'assist.role': 'Duty', 'assist.rolePh': 'e.g. vision — describe screenshots/designs/error images, or handle small side tasks', 'assist.enabledTitle': "Node's dedicated helper agent: delegate vision/small tasks (default mimo); failures never block", 'assist.modelTitle': 'Vision/chat model used by the helper agent', 'assist.driverTitle': 'Route for assist requests: opencode (OpenAI-compatible zen/go) or claude (Anthropic-compatible zen)', 'assist.driverOpenCode': 'opencode (zen/go)', 'assist.driverClaude': 'claude (zen anthropic)', 'assist.badgeTitle': 'Helper: vision & small tasks', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ Custom model…', 'model.promptTitle': 'Enter model name', 'model.promptPh': 'Model name (ccs/ccswitch routes via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel',
     'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)', 'rd.title': 'Run Details', 'rd.loading': 'Loading…', 'rd.status': 'Status: ', 'rd.trigger': 'Trigger: ', 'rd.nodes': 'Nodes: ', 'rd.loop': 'Loop', 'rd.loopProgress': 'Progress: ', 'rd.mode': 'Mode: ', 'rd.termination': 'Termination: ', 'rd.review': 'Review: ', 'rd.agents': 'Agent breakdown',
   },
@@ -1150,17 +1173,22 @@ function applyLang() {
   }
   const rdBadge = document.querySelector('#rd-badge');
   if (rdBadge) rdBadge.textContent = T('rd.running');
-  // 配置面板字段 label（顺序对应 HTML：0 名称…14 审查节点）
-  const cfgKeys = ['cfg.name', 'cfg.type', 'cfg.model', 'cfg.skill', 'cfg.agent', 'cfg.preset', 'cfg.mode', 'cfg.approval', 'cfg.reasoning', 'cfg.role', 'cfg.assist', 'cfg.loop', 'cfg.loopMode', 'cfg.loopMax', 'cfg.loopReviewer'];
+  // 配置面板字段 label（顺序对应 HTML：0 名称…17 审查节点）
+  const cfgKeys = ['cfg.name', 'cfg.type', 'cfg.model', 'cfg.skill', 'cfg.agent', 'cfg.preset', 'cfg.mode', 'cfg.approval', 'cfg.reasoning', 'cfg.role', 'cfg.assist', 'assist.model', 'assist.driver', 'assist.role', 'cfg.loop', 'cfg.loopMode', 'cfg.loopMax', 'cfg.loopReviewer'];
   const cfgLabels = document.querySelectorAll('#config-panel .field__label');
   cfgLabels.forEach((el, i) => { if (cfgKeys[i]) el.textContent = T(cfgKeys[i]); });
-  // 识图辅助下拉选项与提示（跟随语言）
+  // 辅助手控件（跟随语言）
   const assistOpts = [
-    ['#cfg-assist option[value=""]', 'assist.on'],
-    ['#cfg-assist option[value="off"]', 'assist.off'],
+    ['#cfg-assist-enabled option[value=""]', 'assist.on'],
+    ['#cfg-assist-enabled option[value="off"]', 'assist.off'],
+    ['#cfg-assist-driver option[value="opencode"]', 'assist.driverOpenCode'],
+    ['#cfg-assist-driver option[value="claude"]', 'assist.driverClaude'],
   ];
   assistOpts.forEach(([sel, key]) => { const el = document.querySelector(sel); if (el) el.textContent = T(key); });
-  setTitle('#cfg-assist', 'assist.title');
+  setTitle('#cfg-assist-enabled', 'assist.enabledTitle');
+  setTitle('#cfg-assist-model', 'assist.modelTitle');
+  setTitle('#cfg-assist-driver', 'assist.driverTitle');
+  setPh('#cfg-assist-role', 'assist.rolePh');
   // Loop 区下拉选项 + 职责描述 placeholder（跟随语言）
   const loopOpts = [
     ['#cfg-loop-enabled option[value="false"]', 'loop.off'],
@@ -1223,9 +1251,9 @@ document.querySelector('#btn-lang').addEventListener('click', () => {
 const state = {
   activePanel: 'chat',
   nodes: [
-    { id: 1, name: '架构师', _nameKey: 'node.architect', type: 'architect', model: 'deepseek-pro', skill: 'brainstorming', mode: 'serve', role: '设计系统架构', x: 60, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
-    { id: 2, name: '执行者', _nameKey: 'node.executor', type: 'executor', model: 'mimo-v2.5-pro', skill: '', mode: 'serve', role: '编码实现', x: 310, y: 160, status: 'idle', executor: 'mimo', agent: '' },
-    { id: 3, name: '审查者', _nameKey: 'node.reviewer', type: 'reviewer', model: 'deepseek-flash', skill: 'review', mode: 'serve', role: '审查代码', x: 560, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+    { id: 1, name: '架构师', _nameKey: 'node.architect', type: 'architect', model: 'deepseek-pro', skill: 'brainstorming', mode: 'serve', role: '设计系统架构', assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' }, x: 60, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+    { id: 2, name: '执行者', _nameKey: 'node.executor', type: 'executor', model: 'mimo-v2.5-pro', skill: '', mode: 'serve', role: '编码实现', assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' }, x: 310, y: 160, status: 'idle', executor: 'mimo', agent: '' },
+    { id: 3, name: '审查者', _nameKey: 'node.reviewer', type: 'reviewer', model: 'deepseek-flash', skill: 'review', mode: 'serve', role: '审查代码', assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' }, x: 560, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
   ],
   edges: [
     { from: 1, to: 2, mode: 'linear' },
@@ -2413,7 +2441,15 @@ function showConfig(nodeId) {
   $('#cfg-executor').value = node.executor || 'reasonix';
   $('#cfg-mode').value = node.mode || 'serve';
   $('#cfg-approval').value = node.approvalMode || 'auto';
-  $('#cfg-assist').value = node.assistEnabled || '';
+  const assist = node.assist || {};
+  const assistOn = assist.enabled !== false;
+  $('#cfg-assist-enabled').value = assistOn ? '' : 'off';
+  $('#cfg-assist-model').value = assist.model || 'mimo-v2.5';
+  $('#cfg-assist-driver').value = assist.driver || 'opencode';
+  $('#cfg-assist-role').value = assist.role || '';
+  $('#assist-model-field').style.display = assistOn ? '' : 'none';
+  $('#assist-driver-field').style.display = assistOn ? '' : 'none';
+  $('#assist-role-field').style.display = assistOn ? '' : 'none';
   $('#cfg-role').value = node.role || '';
   syncConfigFieldState(node);
   // highlight node
@@ -2464,7 +2500,7 @@ if (NARROW_CONFIG_Q.addEventListener) NARROW_CONFIG_Q.addEventListener('change',
 $('#config-close').addEventListener('click', hideConfig);
 
 // Config field change handlers
-['cfg-name', 'cfg-type', 'cfg-model', 'cfg-skill', 'cfg-executor', 'cfg-dsh-preset', 'cfg-mode', 'cfg-approval', 'cfg-assist', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
+['cfg-name', 'cfg-type', 'cfg-model', 'cfg-skill', 'cfg-executor', 'cfg-dsh-preset', 'cfg-mode', 'cfg-approval', 'cfg-assist-enabled', 'cfg-assist-model', 'cfg-assist-driver', 'cfg-assist-role', 'cfg-role', 'cfg-reasoning-effort'].forEach(id => {
   const el = $('#' + id);
   el.addEventListener('change', async () => {
     if (!state.selectedNode) return;
@@ -2473,7 +2509,14 @@ $('#config-close').addEventListener('click', hideConfig);
     if (id === 'cfg-name') { node.name = el.value; node._nameKey = null; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
     if (id === 'cfg-type') node.type = el.value;
     if (id === 'cfg-approval') node.approvalMode = el.value;
-    if (id === 'cfg-assist') node.assistEnabled = el.value;
+    if (id === 'cfg-assist-enabled') {
+      if (!node.assist) node.assist = {};
+      node.assist.enabled = el.value !== 'off';
+      ['assist-model-field', 'assist-driver-field', 'assist-role-field'].forEach(f => { const fe = $('#' + f); if (fe) fe.style.display = el.value === 'off' ? 'none' : ''; });
+    }
+    if (id === 'cfg-assist-model') { if (!node.assist) node.assist = { enabled: true }; node.assist.model = el.value; }
+    if (id === 'cfg-assist-driver') { if (!node.assist) node.assist = { enabled: true }; node.assist.driver = el.value; }
+    if (id === 'cfg-assist-role') { if (!node.assist) node.assist = { enabled: true }; node.assist.role = el.value; }
     if (id === 'cfg-model') {
       if (el.value === '__custom__') {
         const custom = (await openSessionNameModal(T('model.promptTitle'), node.model || '', T('model.promptPh')) || '').trim();
@@ -2533,13 +2576,14 @@ $('#config-close').addEventListener('click', hideConfig);
     showConfig(node.id);
     renderNodes();
   });
-  if (id === 'cfg-name' || id === 'cfg-role') {
+  if (id === 'cfg-name' || id === 'cfg-role' || id === 'cfg-assist-role') {
     el.addEventListener('input', () => {
       if (!state.selectedNode) return;
       const node = state.nodes.find(n => n.id === state.selectedNode);
       if (!node) return;
       if (id === 'cfg-name') { node.name = el.value; node._nameKey = null; configTitle.textContent = T('cfg.nodeTitle') + el.value; }
       if (id === 'cfg-role') { node.role = el.value; node._roleKey = null; }
+      if (id === 'cfg-assist-role') { if (!node.assist) node.assist = { enabled: true }; node.assist.role = el.value; }
       renderNodes();
     });
   }
@@ -2558,7 +2602,7 @@ function createNode(type, x, y) {
     executor: type === 'executor' ? 'mimo' : 'reasonix',
     mode: 'serve',
     approvalMode: 'auto',
-    assistEnabled: '',
+    assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' },
     role: '',
     x: x,
     y: y,
@@ -2638,6 +2682,7 @@ function renderNodes() {
         <div class="node__model">${escHtml(node.model || T('node.noModel'))}</div>
         <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || T('node.defaultAgent')) : (node.skill || T('node.noSkill')))}</div>
         <div class="${agentSourceClass(node)}">${agentSourceLine(node)}</div>
+        ${node.assist && node.assist.enabled !== false ? `<div class="node__assist" title="${escHtml(node.assist.role || T('assist.badgeTitle'))}" style="font-size:10.5px;color:var(--muted-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🤝 ${escHtml(node.assist.model || 'mimo-v2.5')}</div>` : ''}
         ${node.runtime && node.runtime.output ? `<div class="node__output">${escHtml(node.runtime.output)}</div>` : ''}
       </div>
     `;
@@ -4516,40 +4561,41 @@ async function showNodeDetail(node) {
   let html = `
     <div style="margin-bottom:16px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-        <div><span style="color:var(--muted-2)">' + T('nd.type') + '</span>${escHtml(typeLabels[node.type] || node.type)}</div>
-        <div><span style="color:var(--muted-2)">' + T('nd.model') + '</span><span class="mono">${escHtml(node.model || '-')}</span></div>
-        <div><span style="color:var(--muted-2)">' + T('nd.status') + '</span>${statusIcon} ${statusText}</div>
-        <div><span style="color:var(--muted-2)">${node.executor === 'mimo' ? 'Agent' : 'Skill'}：</span>${escHtml(node.executor === 'mimo' ? (node.agent || '默认') : (node.skill || '无'))}</div>
-        <div style="grid-column:span 2"><span style="color:var(--muted-2)">' + T('nd.role') + '</span>${escHtml(node.role || '未设置')}</div>
-        <div style="grid-column:span 2"><span style="color:var(--muted-2)">' + T('nd.source') + '</span>${agentSourceLine(node)}</div>
+        <div><span style="color:var(--muted-2)">${T('nd.type')}</span>${escHtml(typeLabels[node.type] || node.type)}</div>
+        <div><span style="color:var(--muted-2)">${T('nd.model')}</span><span class="mono">${escHtml(node.model || '-')}</span></div>
+        <div><span style="color:var(--muted-2)">${T('nd.status')}</span>${statusIcon} ${statusText}</div>
+        <div><span style="color:var(--muted-2)">${node.executor === 'mimo' ? T('nd.agent') : T('nd.skill')}</span>${escHtml(node.executor === 'mimo' ? (node.agent || T('node.defaultAgent')) : (node.skill || T('node.noSkill')))}</div>
+        <div style="grid-column:span 2"><span style="color:var(--muted-2)">${T('nd.role')}</span>${escHtml(node.role || T('nd.unset'))}</div>
+        <div style="grid-column:span 2"><span style="color:var(--muted-2)">${T('nd.source')}</span>${agentSourceLine(node)}</div>
       </div>
     </div>
   `;
   // Runtime status section
   if (node.runtime) {
     const rt = node.runtime;
-    const rtStatus = rt.status === 'ready' ? '🟢 运行中' :
-                     rt.status === 'idle' ? '🟡 空闲（可进入）' :
-                     rt.status === 'busy' ? '🔵 忙碌中' :
-                     rt.status === 'stopped' ? '⚫ 已停止' :
-                     '⏳ ' + (rt.status || '未知');
+    const rtStatus = rt.status === 'ready' ? T('nd.rtRunning') :
+                     rt.status === 'idle' ? T('nd.rtIdle') :
+                     rt.status === 'busy' ? T('nd.rtBusy') :
+                     rt.status === 'stopped' ? T('nd.rtStopped') :
+                     '⏳ ' + (rt.status || T('nd.rtUnknown'));
     const canOpen = (rt.status === 'ready' || rt.status === 'idle' || rt.status === 'busy') && rt.endpoint;
     const canStop = rt.status && rt.status !== 'stopped' && rt.status !== 'error';
+    const accessLabel = rt.accessMode === 'local_history' ? T('nd.accessLocal') : rt.accessMode === 'runtime_console' ? T('nd.accessConsole') : T('nd.accessBrowser');
     html += `
       <div style="margin-bottom:12px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
         <div style="font-size:12px;font-weight:600;margin-bottom:6px">Runtime</div>
         <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 8px">
-          <span style="color:var(--muted-2)">' + T('nd.status') + '</span><span>${rtStatus}</span>
-          <span style="color:var(--muted-2)">端口：</span><span class="mono">${rt.port || '-'}</span>
-          <span style="color:var(--muted-2)">端点：</span><span class="mono" style="font-size:10px">${rt.endpoint || '-'}</span>
-          <span style="color:var(--muted-2)">策略：</span><span>retained（保留至手动停止）</span>
-          <span style="color:var(--muted-2)">访问方式：</span><span>${rt.accessMode === 'local_history' ? '本地历史会话' : rt.accessMode === 'runtime_console' ? 'Orchestrator Runtime Console' : '浏览器'}</span>
+          <span style="color:var(--muted-2)">${T('nd.status')}</span><span>${rtStatus}</span>
+          <span style="color:var(--muted-2)">${T('nd.port')}</span><span class="mono">${rt.port || '-'}</span>
+          <span style="color:var(--muted-2)">${T('nd.endpoint')}</span><span class="mono" style="font-size:10px">${rt.endpoint || '-'}</span>
+          <span style="color:var(--muted-2)">${T('nd.policy')}</span><span>${T('nd.retained')}</span>
+          <span style="color:var(--muted-2)">${T('nd.access')}</span><span>${accessLabel}</span>
         </div>
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          ${rt.accessMode === 'runtime_console' ? `<button onclick="openRuntimeConsole('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer">进入控制台</button>` : (canOpen && rt.executor !== 'mimo' ? `<button onclick="openRuntimeBrowser('${escHtml(rt.endpoint || '')}')" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer">Open</button>` : '')}
-          ${canOpen && rt.executor === 'mimo' ? `<span style="font-size:11px;color:var(--muted-2)">无网页入口 — 使用本地 mimo 历史会话</span>` : ''}
+          ${rt.accessMode === 'runtime_console' ? `<button onclick="openRuntimeConsole('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer">${T('nd.enterConsole')}</button>` : (canOpen && rt.executor !== 'mimo' ? `<button onclick="openRuntimeBrowser('${escHtml(rt.endpoint || '')}')" style="font-size:11px;color:var(--accent);padding:4px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer">Open</button>` : '')}
+          ${canOpen && rt.executor === 'mimo' ? `<span style="font-size:11px;color:var(--muted-2)">${T('nd.noWeb')}</span>` : ''}
           ${canStop ? `<button onclick="stopRuntime('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;padding:4px 8px;border:1px solid var(--danger);border-radius:4px;background:none;color:var(--danger);cursor:pointer">Stop</button>` : ''}
-          ${rt.accessMode === 'runtime_console' ? `<button onclick="interruptRuntime('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--warning);cursor:pointer">Interrupt（保留 runtime）</button>` : `<button disabled title="后续版本支持" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--muted-2);cursor:not-allowed">Interrupt（保留 runtime）</button>`}
+          ${rt.accessMode === 'runtime_console' ? `<button onclick="interruptRuntime('${escHtml(rt.runtimeID || '')}')" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--warning);cursor:pointer">${T('nd.interrupt')}</button>` : `<button disabled title="${T('nd.soon')}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--muted-2);cursor:not-allowed">${T('nd.interrupt')}</button>`}
         </div>
       </div>
     `;
@@ -4557,7 +4603,7 @@ async function showNodeDetail(node) {
     html += `
       <div style="margin-bottom:12px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">
         <div style="font-size:12px;font-weight:600;margin-bottom:6px">Runtime</div>
-        <div style="font-size:11px;color:var(--muted-2)">无运行时实例（一次性执行，已结束）</div>
+        <div style="font-size:11px;color:var(--muted-2)">${T('nd.noRuntime')}</div>
       </div>
     `;
   }
@@ -4565,7 +4611,7 @@ async function showNodeDetail(node) {
   if (output.output) {
     html += `
       <div style="margin-bottom:12px">
-        <div style="font-size:13px;color:var(--muted-2);margin-bottom:4px;font-weight:600">输出内容</div>
+        <div style="font-size:13px;color:var(--muted-2);margin-bottom:4px;font-weight:600">${T('nd.output')}</div>
         <pre style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:13px;font-family:var(--mono);white-space:pre-wrap;max-height:400px;overflow-y:auto">${escHtml(output.output)}</pre>
       </div>
     `;
@@ -4573,7 +4619,7 @@ async function showNodeDetail(node) {
   if (output.error) {
     html += `
       <div style="margin-bottom:12px">
-        <div style="font-size:13px;color:var(--red);margin-bottom:4px;font-weight:600">错误信息</div>
+        <div style="font-size:13px;color:var(--red);margin-bottom:4px;font-weight:600">${T('nd.errorTitle')}</div>
         <pre style="background:var(--card);border:1px solid var(--red);border-radius:var(--radius);padding:10px;font-size:13px;font-family:var(--mono);white-space:pre-wrap;color:var(--red)">${escHtml(output.error)}</pre>
       </div>
     `;
@@ -4581,7 +4627,7 @@ async function showNodeDetail(node) {
   if (output.stderr) {
     html += `
       <div style="margin-bottom:12px">
-        <div style="font-size:13px;color:var(--muted-2);margin-bottom:4px;font-weight:600">思考/工具日志</div>
+        <div style="font-size:13px;color:var(--muted-2);margin-bottom:4px;font-weight:600">${T('nd.logs')}</div>
         <pre style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:12.5px;font-family:var(--mono);white-space:pre-wrap;max-height:300px;overflow-y:auto;color:var(--muted-2)">${escHtml(output.stderr)}</pre>
       </div>
     `;
@@ -4589,15 +4635,15 @@ async function showNodeDetail(node) {
   if (output.status === 'empty') {
     html += `
       <div style="color:var(--yellow);text-align:center;padding:20px;border:1px dashed var(--yellow);border-radius:var(--radius)">
-        <div style="font-size:14px;margin-bottom:8px">⚠️ 执行完成但没有返回正文</div>
-        <div style="font-size:12px">这通常表示执行器没有真正产出内容，或输出被吞掉了。请优先查看下方日志。</div>
+        <div style="font-size:14px;margin-bottom:8px">${T('nd.emptyTitle')}</div>
+        <div style="font-size:12px">${T('nd.emptyHint')}</div>
       </div>
     `;
   } else if (!output.output && !output.error) {
     html += `
       <div style="color:var(--muted-2);text-align:center;padding:20px;border:1px dashed var(--border);border-radius:var(--radius)">
-        <div style="font-size:14px;margin-bottom:8px">⏳ 尚未执行</div>
-        <div style="font-size:12px">执行流水线后，此节点的输出将显示在这里</div>
+        <div style="font-size:14px;margin-bottom:8px">${T('nd.pendingTitle')}</div>
+        <div style="font-size:12px">${T('nd.pendingHint')}</div>
       </div>
     `;
   }
@@ -5109,6 +5155,16 @@ const BUILTIN_PRESET_I18N = {
   'design-review': { name: 'preset.dr.name', desc: 'preset.dr.desc', labels: ['preset.dr.l1', 'preset.dr.l2'], roles: ['preset.dr.r1', 'preset.dr.r2'] },
   'loop-iterate': { name: 'preset.loop.name', desc: 'preset.loop.desc', labels: ['preset.d3.l1', 'preset.d3.l2', 'preset.d3.l3'], roles: ['preset.d3.r1', 'preset.d3.r2', 'preset.d3.r3'] },
 };
+// normalizeAssist builds a default helper-agent config for a preset node.
+// New Assist objects pass through; legacy `assistEnabled` ("off" disables)
+// migrates; built-in presets without either default to enabled.
+function normalizeAssist(n) {
+  if (n && n.assist && typeof n.assist === 'object') {
+    return { enabled: n.assist.enabled !== false, model: n.assist.model || 'mimo-v2.5', driver: n.assist.driver || 'opencode', role: n.assist.role || '' };
+  }
+  return { enabled: !n || n.assistEnabled !== 'off', model: 'mimo-v2.5', driver: 'opencode', role: '' };
+}
+
 function localizePreset(p) {
   const m = BUILTIN_PRESET_I18N[p.id];
   if (!m) return p;
@@ -5131,7 +5187,7 @@ function saveCustomPreset(name) {
     name: name,
     desc: '',
     custom: true,
-    pipeline: { nodes: state.nodes.map(n => ({ id: n.id, name: n.name, type: n.type, model: n.model, executor: n.executor, skill: n.skill, mode: n.mode, role: n.role, assistEnabled: n.assistEnabled || '', x: n.x, y: n.y })), edges: state.edges.map(e => ({ from: e.from, to: e.to })) },
+    pipeline: { nodes: state.nodes.map(n => ({ id: n.id, name: n.name, type: n.type, model: n.model, executor: n.executor, skill: n.skill, mode: n.mode, role: n.role, assist: normalizeAssist(n), x: n.x, y: n.y })), edges: state.edges.map(e => ({ from: e.from, to: e.to })) },
     loopConfig: state.loadedLoopConfig && state.loadedLoopConfig.enabled ? state.loadedLoopConfig : null,
   };
   list.push(preset);
@@ -5224,7 +5280,7 @@ presetSelect.addEventListener('change', async () => {
         executor: n.executor || 'reasonix',
         role: isBuiltin && n.roleDesc != null ? n.roleDesc : (n.role || ''),
         _roleKey: isBuiltin ? (n.roleKey || null) : null,
-        assistEnabled: n.assistEnabled || '',
+        assist: normalizeAssist(n),
         x: n.x || 60,
         y: n.y || 60,
         status: 'idle',

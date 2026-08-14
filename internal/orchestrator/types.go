@@ -147,14 +147,24 @@ type AgentNode struct {
 	// via its headless.patch.yml; when empty, the node uses DSH's stock
 	// headless persona plus prompt/skill injection.
 	DshPreset string  `json:"dshPreset,omitempty"`
-	// AssistEnabled controls the auxiliary task dispatch hint (image analysis
-	// first): "off" disables it; empty or "on" enables it. Empty is the default
-	// so legacy nodes and built-in presets get the hint without migration.
-	AssistEnabled string `json:"assistEnabled,omitempty"`
+	// Assist configures the node's auxiliary "helper hand": a small assistant
+	// agent (default: mimo vision) that the node can delegate side tasks to
+	// (image analysis first) during a run. Nil or Enabled=false means no helper.
+	Assist *AssistConfig `json:"assist,omitempty"`
 	InputMap  string  `json:"inputMap"`  // how to map upstream output to this node's input
 	OutputMap string  `json:"outputMap"` // how to map this node's output for downstream
 	X         float64 `json:"x"`         // editor canvas X
 	Y         float64 `json:"y"`         // editor canvas Y
+}
+
+// AssistConfig describes the auxiliary helper agent attached to a node.
+// The node delegates small side tasks (image analysis first) to this helper
+// during a single run; the helper never blocks the main flow.
+type AssistConfig struct {
+	Enabled bool   `json:"enabled,omitempty"` // false disables the helper
+	Model   string `json:"model,omitempty"`   // vision/assist model, e.g. mimo-v2.5
+	Driver  string `json:"driver,omitempty"`  // assist driver: "opencode" (default, OpenAI-compatible zen/go) | "claude" (anthropic-compatible zen)
+	Role    string `json:"role,omitempty"`    // free-form duty description, e.g. "识图：描述截图/设计稿/报错图"
 }
 
 // Edge defines data flow between two nodes.

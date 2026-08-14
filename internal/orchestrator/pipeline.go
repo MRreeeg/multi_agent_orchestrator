@@ -2003,18 +2003,33 @@ func (s *Store) executePipeline(ctx context.Context, run *PipelineRun, pipe *Pip
 }
 
 // gatherInput collects output from upstream nodes.
-// assistHint returns the auxiliary task dispatch section for a node when its
-// assist switch is on. The node may then delegate small side tasks (image
-// analysis first) to a vision-capable model via `reasonix assist`; the hint
+// assistHint returns the auxiliary helper-agent section for a node when its
+// Assist config is enabled. The node may then delegate small side tasks (image
+// analysis first) to the configured helper via `reasonix assist`; the hint
 // explicitly says to keep going when the command is unavailable, so a pipeline
 // without any configured assist backend never blocks on this.
 func assistHint(node *AgentNode) string {
-	if node == nil || node.AssistEnabled == "off" {
+	if node == nil || node.Assist == nil || !node.Assist.Enabled {
 		return ""
 	}
-	return "## 辅助小任务分发（识图等）\n" +
+	duty := strings.TrimSpace(node.Assist.Role)
+	if duty == "" {
+		duty = "识图：描述截图/设计稿/报错图等图像内容，或完成交给你的独立小任务"
+	}
+	model := strings.TrimSpace(node.Assist.Model)
+	modelPart := ""
+	if model != "" {
+		modelPart = " --model " + model
+	}
+	driver := strings.TrimSpace(node.Assist.Driver)
+	driverPart := ""
+	if driver != "" {
+		driverPart = " --driver " + driver
+	}
+	return "## 辅助手（Helper Agent）\n" +
+		"你有一个专属辅助 agent（默认识图），职责：" + duty + "\n" +
 		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，运行：\n" +
-		"reasonix assist \"任务描述\" [--image 图片路径...]\n" +
+		"reasonix assist \"任务描述\" [--image 图片路径...]" + modelPart + driverPart + "\n" +
 		"把返回的分析结果纳入你的工作；若命令不可用或失败，说明原因并继续其余工作，不要卡住。"
 }
 
