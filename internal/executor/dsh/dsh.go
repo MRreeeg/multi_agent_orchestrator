@@ -59,6 +59,10 @@ type ExecOptions struct {
 	// persona override and prunes tool rows the preset does not provide.
 	// An unknown preset or a preset without a headless patch fails the run.
 	AgentPreset string
+	// ReasoningEffort is the reasoning effort for the model
+	// ("high" | "medium" | "low"), written into the temporary
+	// agent-default-model patch (DSH's own model route honors it).
+	ReasoningEffort string
 	// Bin overrides the discovered dsh entry (binary or "node <bin.js>" prefix).
 	Bin string
 }
@@ -93,13 +97,14 @@ func (e *DshExecutor) Exec(ctx context.Context, prompt string, opts ExecOptions)
 	args = append(args, prefix...)
 	args = append(args, "--profile", "headless")
 
-	// Per-node model: write a temporary patch-list overlay that replaces the
-	// `agent-default-model` composition row. Removed after the run; the file
-	// only ever carries a model id, never credentials.
+	// Per-node model (+ optional reasoning effort): write a temporary
+	// patch-list overlay that replaces the `agent-default-model` composition
+	// row. Removed after the run; the file only ever carries a model id and an
+	// effort level, never credentials.
 	var patchPath string
 	var patchCleanup func()
-	if strings.TrimSpace(opts.Model) != "" {
-		patchPath, patchCleanup, err = writeModelPatch(strings.TrimSpace(opts.Model))
+	if strings.TrimSpace(opts.Model) != "" || strings.TrimSpace(opts.ReasoningEffort) != "" {
+		patchPath, patchCleanup, err = writeModelPatch(strings.TrimSpace(opts.Model), strings.TrimSpace(opts.ReasoningEffort))
 		if err != nil {
 			return &ExecutorResult{ExitCode: -1, Stderr: err.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, err)
 		}
@@ -207,20 +212,25 @@ func buildEnv(opts ExecOptions) []string {
 
 // writeModelPatch writes a temporary cordis patch-list overlay that replaces
 // the `agent-default-model` row with the requested model on the
-// `deepseek-official` provider route. The caller owns the returned cleanup.
-func writeModelPatch(model string) (string, func(), error) {
+// `deepseek-official` provider route, plus an optional reasoning effort
+// level. The caller owns the returned cleanup.
+func writeModelPatch(model string, reasoningEffort string) (string, func(), error) {
 	f, err := os.CreateTemp("", "dsh-model-*.yml")
 	if err != nil {
 		return "", func() {}, err
 	}
 	path := f.Name()
+	cfg := map[string]any{
+		"provider": "deepseek-official",
+		"model":    model,
+	}
+	if reasoningEffort != "" {
+		cfg["reasoningEffort"] = reasoningEffort
+	}
 	patch := []any{
 		map[string]any{
-			"id": "agent-default-model",
-			"config": map[string]any{
-				"provider": "deepseek-official",
-				"model":    model,
-			},
+			"id":     "agent-default-model",
+			"config": cfg,
 		},
 	}
 	if err := yaml.NewEncoder(f).Encode(patch); err != nil {

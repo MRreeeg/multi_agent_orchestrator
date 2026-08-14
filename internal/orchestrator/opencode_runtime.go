@@ -984,6 +984,7 @@ func executeOpencodeRun(ctx context.Context, spec ExecSpec) (*ExecResult, error)
 		Model:     spec.ModelRef,
 		Workspace: spec.Workspace,
 		MaxSteps:  spec.MaxSteps,
+		Variant:   spec.ReasoningEffort,
 		// opencode run has no programmatic permission-reply channel (unlike
 		// mimo ACP / claude SDK), so an ask would hang the one-shot process
 		// forever. Always auto-approve non-denied requests and hard-deny the

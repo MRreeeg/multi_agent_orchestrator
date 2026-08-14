@@ -50,6 +50,9 @@ type ExecOptions struct {
 	PermissionMode     string // bypassPermissions | dontAsk | auto
 	AppendSystemPrompt string // skill/system instructions appended via --append-system-prompt
 	JSON               bool   // --output-format json
+	// Effort is the reasoning effort level ("high" | "medium" | "low"),
+	// passed through as `--effort` (claude -p supports it).
+	Effort string
 }
 
 // ClaudeExecutor executes tasks via the Claude CLI (`claude -p`).
@@ -79,6 +82,9 @@ func (e *ClaudeExecutor) Exec(ctx context.Context, prompt string, opts ExecOptio
 	}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
+	}
+	if strings.TrimSpace(opts.Effort) != "" {
+		args = append(args, "--effort", strings.TrimSpace(opts.Effort))
 	}
 	if mode := permissionModeFlag(opts.PermissionMode); mode != "" {
 		args = append(args, "--permission-mode", mode)

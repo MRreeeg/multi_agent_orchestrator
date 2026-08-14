@@ -60,6 +60,7 @@ func (e *ClaudePipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onS
 		ResumeSessionID:    resumeID,
 		PermissionMode:     claudeclient.PermissionModeForApproval(spec.ApprovalMode),
 		AppendSystemPrompt: spec.SkillContent,
+		Effort:             spec.ReasoningEffort,
 	}
 	result, err := client.Exec(ctx, prompt, opts)
 	if result == nil {

@@ -32,6 +32,31 @@
   --mono:'Cascadia Code',ui-monospace,SFMono-Regular,Consolas,monospace;
   color-scheme:light;
 }
+/* ── 深色主题（右上角 🌙/☀️ 一键切换，localStorage 记忆）── */
+html[data-theme="dark"]{
+  --bg:oklch(18% .012 262);--bg-2:oklch(22% .014 262);
+  --panel:oklch(20% .013 262);--panel-2:oklch(26% .015 262);
+  --card:oklch(24% .014 262);--card-hover:oklch(27% .015 262);
+  --border:oklch(32% .016 262);--border-strong:oklch(42% .02 262);
+  --fg:oklch(92% .012 262);--fg-2:oklch(78% .014 262);
+  --muted:oklch(64% .014 262);--muted-2:oklch(55% .012 262);
+  --accent:oklch(72% .11 178);--accent-soft:oklch(72% .11 178/.16);--accent-strong:oklch(65% .12 176);
+  --success:oklch(74% .11 152);--success-soft:oklch(74% .11 152/.16);
+  --warning:oklch(78% .12 85);--warning-soft:oklch(78% .12 85/.16);
+  --danger:oklch(74% .14 22);--danger-soft:oklch(74% .14 22/.16);
+  --violet:oklch(74% .12 296);--violet-soft:oklch(74% .12 296/.16);
+  --blue:oklch(74% .12 250);--blue-soft:oklch(74% .12 250/.16);
+  --green:oklch(74% .11 158);--green-soft:oklch(74% .11 158/.16);
+  --red:oklch(74% .14 22);--red-soft:oklch(74% .14 22/.16);
+  --shadow-sm:0 1px 2px oklch(0% 0 0/.3);
+  --shadow-md:0 8px 24px -8px oklch(0% 0 0/.45);
+  --shadow-lg:0 24px 60px -16px oklch(0% 0 0/.55);
+  color-scheme:dark;
+}
+html[data-theme="dark"] .rc-events{background:#0d1117;color:#e6edf3;border-color:var(--border)}
+html[data-theme="dark"] .rc-events details.rc-ev{border-bottom:1px solid rgba(255,255,255,.07)}
+html[data-theme="dark"] .rc-events details.rc-ev summary::before{color:#8b949e}
+html[data-theme="dark"] .rc-events details.rc-ev pre{color:#9da7b3;background:rgba(255,255,255,.05)}
 html,body{height:100%;overflow:hidden}
 body{font:14px/1.6 var(--sans);font-weight:500;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -165,7 +190,7 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__ws-btn .chat__ws-edit{color:var(--muted-2);font-family:inherit;font-size:10px;flex-shrink:0}
 .chat__ws-btn:hover .chat__ws-edit{color:var(--accent)}
 .chat__ws-input{height:28px;width:min(420px,55vw);font-family:var(--mono);font-size:11px;border:1px solid var(--accent);border-radius:8px;background:var(--card);color:var(--fg);padding:0 8px;outline:none}
-.chat__ws-confirm,.chat__ws-pick{height:28px;padding:0 10px;font-size:11px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);cursor:pointer;transition:border-color .15s,color .15s}
+.chat__ws-confirm,.chat__ws-pick{height:28px;padding:0 10px;font-size:11px;display:inline-flex;align-items:center;justify-content:center;text-align:center;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg-2);cursor:pointer;transition:border-color .15s,color .15s}
 .chat__ws-confirm:hover{border-color:var(--accent);color:var(--accent)}
 .chat__ws-pick{border-color:var(--accent);color:var(--accent)}
 .chat__ws-pick:hover{background:var(--accent-soft)}
@@ -199,6 +224,12 @@ input,textarea,select{font:inherit;color:inherit}
 .run-dash{border:1px solid var(--accent-soft);border-radius:var(--radius-lg);background:linear-gradient(180deg,var(--panel),var(--bg-2));margin:12px 16px 0;padding:12px 14px;font-size:13px}
 .config .run-dash{margin:12px 12px 0;flex-shrink:0;max-height:min(55vh,440px);overflow-y:auto;min-height:0}
 .run-dash__head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+/* 执行情况可收缩成一行：隐藏内容区，只留头部 + 展开按钮 */
+.run-dash--collapsed .run-dash__iter,.run-dash--collapsed .run-dash__nodes,.run-dash--collapsed .rd-review,.run-dash--collapsed .rd-analysis{display:none!important}
+.run-dash--collapsed .run-dash__head{margin-bottom:0}
+/* 右侧悬浮按钮：config 面板隐藏时显示，点击重新打开右侧卡片 */
+.side-fab{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:60;width:40px;height:40px;border-radius:12px;background:var(--accent);color:oklch(99% 0 0);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-md);transition:transform .15s,background .18s}
+.side-fab:hover{transform:translateY(-50%) scale(1.06);background:var(--accent-strong)}
 .run-dash__badge{font-family:var(--mono);font-size:11.5px;padding:2px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);animation:exec-pulse 1.4s ease-in-out infinite}
 .run-dash__badge--done{background:var(--success-soft);color:var(--success);animation:none}
 .run-dash__badge--err{background:var(--danger-soft);color:var(--danger);animation:none}
@@ -297,6 +328,12 @@ input,textarea,select{font:inherit;color:inherit}
 .rc-events details.rc-ev summary::before{content:"▸";color:#8c959f;font-size:10px;flex-shrink:0}
 .rc-events details.rc-ev[open] summary::before{content:"▾"}
 .rc-events details.rc-ev pre{margin:0 4px 6px 18px;white-space:pre-wrap;color:#57606a;font:11px/1.5 var(--mono);max-height:200px;overflow:auto;background:rgba(15,23,42,.04);padding:6px;border-radius:4px}
+/* Runtime Console 按钮：明确的按钮外观（边框+背景+圆角），不再像纯文本 */
+.rc-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:30px;padding:0 12px;border-radius:8px;font-size:12px;cursor:pointer;transition:all .15s ease}
+.rc-btn--primary{background:var(--accent);color:oklch(99% 0 0);border:1px solid var(--accent)}
+.rc-btn--primary:hover{background:var(--accent-strong)}
+.rc-btn--ghost{background:var(--card);color:var(--fg-2);border:1px solid var(--border-strong)}
+.rc-btn--ghost:hover{border-color:var(--accent);color:var(--accent)}
 .rc-send--confirm{background:var(--danger-soft)!important;color:var(--danger)!important;border-color:var(--danger)!important}
 .node__detail-btn{cursor:pointer;font-size:11px;color:var(--muted-2);margin-left:4px;opacity:0.6;transition:opacity .15s}
 .node:hover .node__detail-btn{opacity:1}
@@ -466,6 +503,10 @@ input,textarea,select{font:inherit;color:inherit}
     <button class="topbar__btn" id="btn-selfcheck" title="一键自检：查看 Agent、模型、Skill 库与执行器可用性">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       自检
+    </button>
+    <button class="topbar__btn" id="btn-theme" title="切换深色 / 浅色主题">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <span id="btn-theme-label">深色</span>
     </button>
     <button class="topbar__btn" id="btn-save-pipeline" title="保存管道">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -650,10 +691,9 @@ input,textarea,select{font:inherit;color:inherit}
         <span class="run-dash__title">Loop 运行看板</span>
         <span class="run-dash__spacer"></span>
         <select class="run-dash__sel" id="rd-executor" title="分析进展使用的执行器"></select>
-        <select class="run-dash__sel" id="rd-model" title="分析进展使用的模型"></select>
-        <select class="run-dash__sel" id="rd-agent" title="分析进展使用的 Agent 人设：dsh 执行器下为本机客制化 agent 预设"></select>
         <button class="run-dash__btn" id="rd-analyze" title="AI 分析当前执行进展">分析进展</button>
         <button class="run-dash__btn" id="rd-stop" title="停止当前 Loop">停止</button>
+        <button class="run-dash__btn" id="rd-collapse" title="把执行情况收缩成一行">收缩</button>
         <button class="run-dash__btn" id="rd-close" title="收起看板">收起</button>
       </div>
       <div class="run-dash__iter" id="rd-iter"></div>
@@ -764,6 +804,11 @@ input,textarea,select{font:inherit;color:inherit}
     </div>
   </aside>
 </div>
+
+<!-- 右侧悬浮按钮：config 面板（含运行看板）隐藏时点击重新打开 -->
+<button class="side-fab" id="side-fab" title="打开右侧面板（节点配置 / 运行看板）" style="display:none">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+</button>
 
 <!-- Requirement confirmation modal -->
 <div class="modal-overlay" id="confirm-modal" style="display:none">
@@ -885,11 +930,15 @@ input,textarea,select{font:inherit;color:inherit}
         <section style="min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px;overflow:hidden">
           <div class="rc-meta" style="padding:11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);font:13px/1.55 var(--mono)"></div>
           <div class="rc-permissions" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
-          <label style="font-size:12.5px;color:var(--muted-2);font-weight:600">人工介入（保留会话上的新 Turn；仅调试，不推进 Loop 或改写 Run/Iteration 历史）</label>
-          <textarea class="rc-input" rows="7" placeholder="输入补充要求、纠正指令或后续任务…" style="width:100%;box-sizing:border-box;resize:vertical;background:var(--bg-2);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius);padding:10px;font:13px/1.5 var(--mono)"></textarea>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn--primary rc-send" type="button">发送新 Turn</button>
-            <button class="btn btn--ghost rc-interrupt" type="button">Interrupt 当前 Turn</button>
+          <label style="font-size:12.5px;color:var(--muted-2);font-weight:600">主动单独对话（Enter 发送，Shift+Enter 换行；不推进 Loop、不改写历史）</label>
+          <textarea class="rc-input" rows="5" placeholder="输入补充要求、纠正指令或后续任务…" style="width:100%;box-sizing:border-box;resize:vertical;background:var(--bg-2);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius);padding:10px;font:13px/1.5 var(--mono)"></textarea>
+          <div class="rc-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="rc-btn rc-btn--primary rc-send" type="button">➤ 发送</button>
+            <button class="rc-btn rc-btn--ghost rc-interrupt" type="button">⏸ 中断当前回合</button>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px">
+            <strong style="font-size:12px;color:var(--muted-2)">输出 / 结果</strong>
+            <button class="rc-btn rc-btn--ghost rc-view-output" type="button" style="font-size:11px">↗ 新窗口查看</button>
           </div>
           <div class="rc-output" style="flex:1;min-height:0;overflow:auto;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;color:var(--fg-2);font:12.5px/1.5 var(--mono);white-space:pre-wrap"></div>
         </section>
@@ -903,6 +952,16 @@ input,textarea,select{font:inherit;color:inherit}
 </template>
 
 <script>
+// ── 主题：尽早应用（防深色模式闪烁），右上角按钮一键切换 ──
+(function () {
+  try {
+    const saved = localStorage.getItem('orch-theme');
+    if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.dataset.theme = 'dark';
+    }
+  } catch (_) {}
+})();
+
 // ── State ──
 const state = {
   activePanel: 'chat',
@@ -1093,7 +1152,7 @@ function syncExecutorOptionsForNode(node) {
   modeSelect.value = node.mode || 'serve';
   modeSelect.disabled = isDsh;
   modeSelect.title = isDsh
-    ? 'DSH：headless 一次性执行（run），无保留 Runtime'
+    ? 'DSH 仅支持 run：headless 一次性执行（DSH 无 serve 协议，这是其能力边界，不是人为限制）'
     : (isCodex
       ? 'Codex：run 使用一次性 exec；serve 使用保留 Runtime（app-server）'
       : (isClaude ? 'Claude：run 使用一次性 claude -p；serve 使用保留 Runtime（stream-json）' : ''));
@@ -1150,16 +1209,28 @@ function syncConfigFieldState(node) {
     }
   }
 
-  // Show/hide ReasoningEffort for Codex
+  // 思考等级：reasonix 不支持（无 effort flag）隐藏；其余执行器显示并落实透传
   const reasoningField = $('#reasoning-effort-field');
   if (reasoningField) {
-    reasoningField.style.display = isCodex ? '' : 'none';
-    if (isCodex && !node.reasoningEffort) {
+    const effortSupported = node?.executor !== 'reasonix';
+    reasoningField.style.display = effortSupported ? '' : 'none';
+    if (effortSupported && !node.reasoningEffort) {
       node.reasoningEffort = 'high';
     }
     if (node.reasoningEffort) {
       $('#cfg-reasoning-effort').value = node.reasoningEffort;
     }
+  }
+
+  // 权限模式：仅 mimo/claude/opencode 的 serve 模式生效（挂起为批准卡片）；
+  // reasonix/dsh/run 由服务端策略控制，前端禁用并说明，避免"选了没用"。
+  const approvalSel = $('#cfg-approval');
+  if (approvalSel) {
+    const approvalSupported = (node?.executor === 'mimo' || node?.executor === 'claude' || node?.executor === 'opencode') && node?.mode === 'serve';
+    approvalSel.disabled = !approvalSupported;
+    approvalSel.title = approvalSupported
+      ? '工具请求将挂起为卡片，由你在 Runtime Console 批准/拒绝'
+      : '当前执行器/模式不支持此选项（reasonix/dsh/run 由服务端策略控制，无需前端选择）';
   }
 
   $('#cfg-executor').disabled = false;
@@ -2076,6 +2147,7 @@ function showConfig(nodeId) {
   $('#app').classList.remove('app--no-config');
   configEmpty.classList.add('hidden');
   configFields.classList.remove('hidden');
+  syncSideFab();
   configTitle.textContent = '节点: ' + node.name;
   $('#cfg-name').value = node.name;
   $('#cfg-type').value = node.type;
@@ -2097,7 +2169,24 @@ function hideConfig() {
   configPanel.classList.add('config--hidden');
   $('#app').classList.add('app--no-config');
   $$('.node').forEach(n => n.classList.remove('node--selected'));
+  syncSideFab();
 }
+
+// 右侧悬浮按钮：面板隐藏时可见，点击重新打开右侧卡片
+function syncSideFab() {
+  const fab = $('#side-fab');
+  if (!fab) return;
+  const hidden = configPanel.classList.contains('config--hidden');
+  fab.style.display = hidden ? 'flex' : 'none';
+  fab.title = hidden ? '打开右侧面板（节点配置 / 运行看板）' : '';
+}
+$('#side-fab').addEventListener('click', () => {
+  configPanel.classList.remove('config--hidden');
+  $('#app').classList.remove('app--no-config');
+  configEmpty.classList.add('hidden');
+  configFields.classList.remove('hidden');
+  syncSideFab();
+});
 
 // ── Narrow-window config panel auto-hide ──
 // The right config panel reserves a fixed 300px grid column. On narrow
@@ -2364,36 +2453,35 @@ function renderNodes() {
       badge.textContent = node.runtime.port ? ':' + node.runtime.port : (node.runtime.executor || 'rt');
       const s = node.runtime.status;
       const isRuntimeConsole = node.runtime.accessMode === 'runtime_console';
-      const isActive = s === 'starting' || s === 'ready' || s === 'idle' || s === 'busy';
+      // 空闲（ready/idle）绿 = 可进入；运行（starting/busy）黄；停止/错误灰。
+      const active = s === 'starting' || s === 'ready' || s === 'idle' || s === 'busy';
+      badge.style.background = (s === 'ready' || s === 'idle') ? 'var(--success)' :
+                               (s === 'busy' || s === 'starting') ? '#e6a800' :
+                               'var(--muted-2)';
       // 入口（固定）：console 类型 → Orchestrator Runtime Console（含已停止的历史）；
       // 浏览器类型 → agent 网页（仅 active 时可用，stopped/error 给提示不打开死链）。
       const hasConsole = isRuntimeConsole && !!node.runtime.runtimeID;
       const hasWeb = !isRuntimeConsole && !!node.runtime.endpoint && node.runtime.executor !== 'mimo';
-      badge.style.background = s === 'ready' ? 'var(--success)' :
-                               s === 'idle' ? '#e6a800' :
-                               s === 'busy' ? 'var(--accent)' :
-                               s === 'starting' ? '#e6a800' :
-                               'var(--muted-2)';
+      const portHint = node.runtime.port ? ' :' + node.runtime.port : '';
+      badge.textContent = '进入';
       if (hasConsole) {
-        badge.title = s === 'stopped' || s === 'error' ? '打开已停止 Runtime 的控制台记录' : '打开 Orchestrator Runtime Console';
+        badge.title = '进入 Runtime Console' + portHint + (s === 'stopped' || s === 'error' ? '（已停止，查看历史）' : '');
         badge.addEventListener('click', (e) => {
           e.stopPropagation();
           openRuntimeConsole(node.runtime.runtimeID);
         });
       } else if (hasWeb) {
-        badge.title = isActive ? '点击打开 agent 页面' : (s === 'stopped' ? 'Runtime 已停止' : 'Runtime 不可用');
-        if (isActive) {
+        badge.title = '进入 agent 页面' + portHint + (active ? '' : (s === 'stopped' ? '（Runtime 已停止）' : '（Runtime 不可用）'));
+        if (active) {
           badge.addEventListener('click', (e) => {
             e.stopPropagation();
-            // Open the agent page in the OS default browser (independent
-            // window) via the server, which handles the platform launcher.
             api('POST', '/runtime/open', { endpoint: node.runtime.endpoint }).catch(() => {
               window.open(node.runtime.endpoint, '_blank');
             });
           });
         }
       } else {
-        badge.title = s === 'stopped' ? 'Runtime 已停止' : 'Runtime 不可用';
+        badge.title = 'Runtime ' + (s === 'stopped' ? '已停止' : '不可用') + portHint;
       }
       el.appendChild(badge);
     }
@@ -3714,15 +3802,15 @@ function updateNodeStatus(nodeId, status, result) {
       if (time && result.duration) time.textContent = formatDuration(result.duration);
     }
   }
-  // Mark edges flowing
+  // Mark edges flowing（节点 id 可能是数字或字符串，统一 String 比较）
   if (status === 'running') {
     state.edges.forEach(e => {
-      if (e.to === nodeId) { e.flowing = true; }
+      if (String(e.to) === String(nodeId)) { e.flowing = true; }
     });
     renderEdges();
   } else if (status === 'done' || status === 'failed' || status === 'interrupted') {
     state.edges.forEach(e => {
-      if (e.to === nodeId) { e.flowing = false; }
+      if (String(e.to) === String(nodeId)) { e.flowing = false; }
     });
     renderEdges();
   }
@@ -3730,7 +3818,7 @@ function updateNodeStatus(nodeId, status, result) {
 
 function animateDataFlow(fromId, toId) {
   state.edges.forEach(e => {
-    if ((e.from === fromId || e.from === fromId) && (e.to === toId || e.to === toId)) {
+    if (String(e.from) === String(fromId) && String(e.to) === String(toId)) {
       e.flowing = true;
       setTimeout(() => { e.flowing = false; renderEdges(); }, 2000);
     }
@@ -3898,6 +3986,13 @@ $('#selfcheck-close-btn').addEventListener('click', () => { $('#selfcheck-modal'
 $('#selfcheck-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) $('#selfcheck-modal').style.display = 'none'; });
 $('#btn-selfcheck').addEventListener('click', () => openSelfCheck());
 $('#selfcheck-refresh').addEventListener('click', () => openSelfCheck());
+$('#btn-theme').addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? '' : 'dark';
+  try { localStorage.setItem('orch-theme', dark ? 'light' : 'dark'); } catch (_) {}
+  const label = $('#btn-theme-label');
+  if (label) label.textContent = dark ? '深色' : '浅色';
+});
 
 const executorLabels = { reasonix: 'reasonix', mimo: 'mimo', codex: 'Codex', claude: 'Claude', opencode: 'opencode', dsh: 'DSH' };
 
@@ -4244,6 +4339,19 @@ async function openRuntimeConsole(runtimeID) {
   modal.querySelector('.rc-close').addEventListener('click', () => closeRuntimeConsole(runtimeID));
   modal.querySelector('.rc-send').addEventListener('click', () => sendRuntimeConsoleMessage(runtimeID));
   modal.querySelector('.rc-interrupt').addEventListener('click', () => interruptRuntime(runtimeID));
+  // 输出/结果：新窗口以 Markdown 原样查看（带预览小窗，这里 rc-output 即预览）
+  const viewBtn = modal.querySelector('.rc-view-output');
+  if (viewBtn) viewBtn.addEventListener('click', () => {
+    const out = modal.querySelector('.rc-output');
+    const text = out ? (out.textContent || '').trim() : '';
+    if (!text) { toast('当前没有可查看的输出', 'error'); return; }
+    const w = window.open('', '_blank');
+    if (!w) { toast('浏览器拦截了新窗口，请允许弹出窗口后重试', 'error'); return; }
+    w.document.write('<!doctype html><meta charset="utf-8"><title>Runtime 输出（Markdown）</title>' +
+      '<style>body{font:13px/1.65 ui-monospace,Consolas,monospace;padding:24px 32px;max-width:980px;margin:0 auto;color:#1f2328;background:#fff}pre{white-space:pre-wrap;word-break:break-word}</style>' +
+      '<body><pre>' + escHtml(text) + '</pre></body>');
+    w.document.close();
+  });
   modal.querySelector('.rc-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
@@ -4289,7 +4397,7 @@ function renderRuntimeConsole(runtimeID, data) {
   const interrupt = modal.querySelector('.rc-interrupt');
   send.disabled = !data.canSend;
   send.title = data.canSend
-    ? '发送新 Turn（Enter 发送，Shift+Enter 换行）'
+    ? '发送（Enter 发送，Shift+Enter 换行）'
     : (rt.status === 'busy' ? 'Runtime 正在执行，完成后可发送' : 'Runtime 不可用（空闲后可发送）');
   interrupt.disabled = !data.canInterrupt;
   interrupt.title = data.canInterrupt ? '中断当前 Turn（保留 Runtime 与会话）' : '当前无活动 Turn 可中断';
@@ -4439,7 +4547,7 @@ async function sendRuntimeConsoleMessage(runtimeID) {
     clearTimeout(modal._sendConfirmTimer);
     modal._sendConfirmTimer = setTimeout(() => {
       modal.dataset.sendConfirm = '';
-      btn.textContent = '发送新 Turn';
+      btn.textContent = '➤ 发送';
       btn.classList.remove('rc-send--confirm');
     }, 4000);
     return;
@@ -4452,11 +4560,11 @@ async function sendRuntimeConsoleMessage(runtimeID) {
     btn.textContent = '发送中…';
     await apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/message', { text });
     input.value = '';
-    btn.textContent = '发送新 Turn';
+    btn.textContent = '➤ 发送';
     toast('已发送到同一保留会话', 'success');
     await refreshRuntimeConsole(runtimeID);
   } catch (err) {
-    btn.textContent = '发送新 Turn';
+    btn.textContent = '➤ 发送';
     toast('发送失败: ' + err.message, 'error');
   }
 }
@@ -5005,8 +5113,8 @@ $('#rd-analyze').addEventListener('click', async () => {
   try {
     const res = await apiPost('/runs/' + encodeURIComponent(runID) + '/analysis', {
       executor: $('#rd-executor').value || '',
-      model: $('#rd-model').value || '',
-      agent: $('#rd-agent').value || ''
+      model: $('#rd-model') ? $('#rd-model').value || '' : '',
+      agent: $('#rd-agent') ? $('#rd-agent').value || '' : ''
     });
     const a = res || {};
     const blocking = (Array.isArray(a.blocking) && a.blocking.length)
@@ -5028,7 +5136,16 @@ $('#rd-stop').addEventListener('click', () => {
 });
 $('#rd-close').addEventListener('click', () => {
   $('#run-dash').classList.add('hidden');
-  runDash.active = false;
+  // 收起运行看板后回到节点配置区
+  configEmpty.classList.add('hidden');
+  configFields.classList.remove('hidden');
+  syncSideFab();
+});
+// 执行情况收缩/展开（保留头部一行，可随时再展开）
+$('#rd-collapse').addEventListener('click', () => {
+  const dash = $('#run-dash');
+  const collapsed = dash.classList.toggle('run-dash--collapsed');
+  $('#rd-collapse').textContent = collapsed ? '展开' : '收缩';
 });
 
 async function cancelOrchRun(runID) {
@@ -5156,6 +5273,8 @@ async function init() {
   try {
     connectSSE();
     console.log('[init] connectSSE called');
+    // 启动即后台自检一次（程序化探测缓存 60s）：打开自检面板时秒出结果。
+    apiGet('/selfcheck').catch(() => {});
     try { await loadPresets(); } catch (e) { console.error('[init] loadPresets failed:', e); }
     try { await loadNodeTypes(); } catch (e) { console.error('[init] loadNodeTypes failed:', e); }
     // Try to load orchestration session from URL or localStorage
@@ -5182,6 +5301,7 @@ async function init() {
     if (configPanel.classList.contains('config--hidden')) {
       $('#app').classList.add('app--no-config');
     }
+    syncSideFab();
     console.log('[init] done');
   } finally {
     // 加载完成才揭掉遮罩：欢迎页/输入栏/历史会话的显示状态此时已就位，

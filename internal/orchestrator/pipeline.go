@@ -1361,6 +1361,10 @@ func buildMimoRunArgs(spec ExecSpec, attachEndpoint string) ([]string, func(), e
 	if mimoModelArg(spec.ModelRef) != "" {
 		args = append(args, "--model", mimoModelArg(spec.ModelRef))
 	}
+	// 思考等级：mimo run 通过 --variant 指定（high/medium/low 等 provider 特定档位）。
+	if spec.ReasoningEffort != "" {
+		args = append(args, "--variant", spec.ReasoningEffort)
+	}
 	// Orchestrator nodes are non-interactive by definition. Never leave Mimo
 	// waiting for a human permission prompt: that is the source of the
 	// external_directory auto-reject loop seen in Reviewer runs.

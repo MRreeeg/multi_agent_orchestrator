@@ -173,7 +173,7 @@ func TestBuildEnvPermissionMapping(t *testing.T) {
 }
 
 func TestWriteModelPatchContent(t *testing.T) {
-	path, cleanup, err := writeModelPatch("deepseek-v4-flash")
+	path, cleanup, err := writeModelPatch("deepseek-v4-flash", "")
 	if err != nil {
 		t.Fatalf("writeModelPatch() error = %v", err)
 	}
@@ -187,6 +187,23 @@ func TestWriteModelPatchContent(t *testing.T) {
 		if !strings.Contains(s, want) {
 			t.Errorf("patch content missing %q:\n%s", want, s)
 		}
+	}
+	if strings.Contains(s, "reasoningEffort") {
+		t.Errorf("empty effort must not appear in patch:\n%s", s)
+	}
+
+	// 思考等级应写入 patch（reasoningEffort 字段）
+	path2, cleanup2, err := writeModelPatch("deepseek-v4-pro", "high")
+	if err != nil {
+		t.Fatalf("writeModelPatch(effort) error = %v", err)
+	}
+	defer cleanup2()
+	data2, err := os.ReadFile(path2)
+	if err != nil {
+		t.Fatalf("read patch 2: %v", err)
+	}
+	if !strings.Contains(string(data2), "reasoningEffort") || !strings.Contains(string(data2), "high") {
+		t.Errorf("effort patch missing reasoningEffort/high:\n%s", string(data2))
 	}
 }
 

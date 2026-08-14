@@ -55,6 +55,9 @@ type ExecOptions struct {
 	// "question" tool, whose whole purpose is to wait for a human answer that
 	// a one-shot subprocess can never receive.
 	PermissionConfig string
+	// Variant is the model variant (provider-specific reasoning effort,
+	// e.g. high / medium / low / max / minimal), passed as `--variant`.
+	Variant string
 }
 
 // Executor executes tasks via the opencode CLI (`opencode run`).
@@ -139,6 +142,9 @@ func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string)
 	}
 	if opts.AutoApprove {
 		args = append(args, "--auto")
+	}
+	if strings.TrimSpace(opts.Variant) != "" {
+		args = append(args, "--variant", strings.TrimSpace(opts.Variant))
 	}
 	args = append(args, "--format", "json", prompt)
 
