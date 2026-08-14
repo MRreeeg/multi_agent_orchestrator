@@ -1,4 +1,4 @@
-# dsh-agent-pack 安装器
+﻿# dsh-agent-pack 安装器
 # 用法：
 #   .\install.ps1 -Mode user                # 用户级：skills + persona + 客制化 agent 预设 → $DSH_HOME + Reasonix 技能根
 #   .\install.ps1 -Mode user -SkillDirs "C:\Users\x\.codex\skills;C:\Users\x\.local\share\mimocode\builtin_skills\0.1.9\skills"

@@ -1,4 +1,4 @@
-# start-desktop.ps1 — 构建并启动「多智能体管家」桌面应用（WebView2）
+﻿# start-desktop.ps1 — 构建并启动「多智能体管家」桌面应用（WebView2）
 # 双击运行，或 PowerShell: .\scripts\start-desktop.ps1
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot

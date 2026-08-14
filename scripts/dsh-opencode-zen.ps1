@@ -1,4 +1,4 @@
-# dsh-opencode-zen.ps1 —— 把 OpenCode 的模型接入 DSH（模型选择器可选用）
+﻿# dsh-opencode-zen.ps1 —— 把 OpenCode 的模型接入 DSH（模型选择器可选用）
 #
 # 原理：OpenCode 的免费/付费模型走官方 Zen 网关（OpenAI 兼容）：
 #   baseURL = https://opencode.ai/zen/v1 ，端点 /zen/v1/chat/completions
