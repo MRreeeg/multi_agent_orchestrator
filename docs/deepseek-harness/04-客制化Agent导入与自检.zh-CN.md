@@ -50,7 +50,9 @@
 
 ## 6. 换电脑复用（git clone 后最快上手）
 
-自检只负责**导入展示**已安装的预设；安装动作由安装器完成。别人电脑上：
+**自检自动安装**：新机器上克隆/拉取仓库后，无需手动跑安装器——`/selfcheck` 和 `/dsh-presets` 会检测仓库内的 `docs/deepseek-harness/dsh-agent-pack`（也可用 `REASONIX_DSH_PACK_DIR` 覆盖其位置），并**幂等自动安装**：把 4 个预设复制到 `$DSH_HOME/.agent-presets/`、skills 复制到 DSH 与 Reasonix 技能根、persona 覆盖层合并进 `$DSH_HOME/cordis.patch.yml`。自检面板显示"已自动安装预设"；本地已存在同名预设时跳过、不覆盖用户自定义。自检完成后前端自动刷新「客制化 Agent」下拉与节点标注，无需退出重进。
+
+需要完整/可定制安装（如复用其他 agent 已下载的 skill）时仍可用安装器：
 
 ```powershell
 git clone <本仓库> && cd <仓库>
@@ -77,10 +79,13 @@ DSH 通过 `skill-filesystem.customSkillDirs` 直接指向其他 agent 已下载
 - 改 persona/职责时，`agent.cordis.yml` 与 `headless.patch.yml` **两份文件同步改**（后者是前者的 headless 翻译）。
 - `headless.patch.yml` 里 `disabled: true` 的每一行都对应"预设组合里没有该工具行"：加工具行到组合时，记得从补丁里移除对应禁用。
 - 新增角色预设时：`presets/<id>/` 三件套 + 自检自动出现，无需改后端代码。
+- 自动安装定位：`internal/executor/dsh/install.go` 的 `FindAgentPackDir`（env `REASONIX_DSH_PACK_DIR` → cwd → exe 向上 4 层找 `docs/deepseek-harness/dsh-agent-pack`）。复制预设时以 `preset.yml` 存在性判断"已装"，不覆盖用户改动；persona 覆盖层以 `# dsh-agent-pack` 注释标记去重。
 
 ## 8. 验收清单
 
 - [ ] `$DSH_HOME/.agent-presets/` 下存在 4 个预设目录，每个都有 `agent.cordis.yml` + `preset.yml` + `headless.patch.yml`
+- [ ] **首次自检自动安装**：新克隆后打开控制台 `/selfcheck`，「内置 DSH 客制化包」区显示"已自动安装预设：architect · executor · frontend-analyst · reviewer"，`$DSH_HOME/.agent-presets/` 自动出现 4 个预设
+- [ ] 自检后 dsh 节点配置面板「客制化 Agent」下拉无需退出重进即可看到/刷新预设
 - [ ] 控制台 `/selfcheck` 的「客制化 DSH Agent」区列出 4 个预设，均可用于节点
 - [ ] dsh 节点配置面板「客制化 Agent」下拉可选 4 个预设，卡片显示「客制化 Agent：xxx」
 - [ ] 未选预设的 dsh 节点卡片显示「Prompt 式：内置 persona」；reasonix 节点显示「Prompt 式：Skill 注入 …」

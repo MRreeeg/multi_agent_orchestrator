@@ -26,16 +26,19 @@ type ExecutorHealth struct {
 // SelfCheck is the one-click self-check report: agent catalog, live runtime
 // states, skill catalog with search roots, executor binary probes, the
 // programmatically probed agents/models (no AI involved), and the locally
-// authored DSH agent presets imported from $DSH_HOME/.agent-presets.
+// authored DSH agent presets imported from $DSH_HOME/.agent-presets. It also
+// carries the outcome of auto-installing the bundled dsh-agent-pack, so the
+// frontend can reflect "installed automatically" without a manual run.
 type SelfCheck struct {
-	Agents     []NodeTypeInfo              `json:"agents"`
-	Runtimes   []RuntimeState              `json:"runtimes"`
-	Skills     []SkillInfo                 `json:"skills"`
-	SkillRoots []string                    `json:"skillRoots"`
-	Health     []ExecutorHealth            `json:"health"`
-	DshPresets []dshclient.AgentPresetInfo `json:"dshPresets"`
-	Probes     ProbeReport                 `json:"probes"`
-	CheckedAt  time.Time                   `json:"checkedAt"`
+	Agents      []NodeTypeInfo              `json:"agents"`
+	Runtimes    []RuntimeState              `json:"runtimes"`
+	Skills      []SkillInfo                 `json:"skills"`
+	SkillRoots  []string                    `json:"skillRoots"`
+	Health      []ExecutorHealth            `json:"health"`
+	DshPresets  []dshclient.AgentPresetInfo `json:"dshPresets"`
+	Probes      ProbeReport                 `json:"probes"`
+	PackInstall dshclient.PackInstallReport `json:"packInstall"`
+	CheckedAt   time.Time                   `json:"checkedAt"`
 }
 
 // CheckExecutors probes each supported executor binary in this build:
@@ -148,17 +151,22 @@ func probeVersion(ctx context.Context, bin string, prefix []string) (string, err
 // SelfCheckSnapshot assembles a one-click self-check report from already
 // computed state (node types, live runtimes, skill catalog with roots) plus a
 // fresh executor binary probe, the programmatically probed agents/models, and
-// the locally authored DSH agent presets.
+// the locally authored DSH agent presets. Before listing presets it runs the
+// bundled dsh-agent-pack auto-installer (idempotent, no-op when the pack is
+// absent), so a fresh clone's self-check both installs the customization and
+// reports it in one step.
 func SelfCheckSnapshot(ctx context.Context) SelfCheck {
+	pack := dshclient.EnsureAgentPackInstalled()
 	return SelfCheck{
-		Agents:     NodeTypeCatalog(),
-		Runtimes:   AllRuntimes(),
-		Skills:     ListAvailableSkills(),
-		SkillRoots: skillSearchRoots(),
-		Health:     CheckExecutors(ctx),
-		DshPresets: dshclient.ListAgentPresets(),
-		Probes:     ProbeModels(ctx),
-		CheckedAt:  time.Now(),
+		Agents:      NodeTypeCatalog(),
+		Runtimes:    AllRuntimes(),
+		Skills:      ListAvailableSkills(),
+		SkillRoots:  skillSearchRoots(),
+		Health:      CheckExecutors(ctx),
+		DshPresets:  dshclient.ListAgentPresets(),
+		Probes:      ProbeModels(ctx),
+		PackInstall: pack,
+		CheckedAt:   time.Now(),
 	}
 }
 

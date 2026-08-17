@@ -1044,6 +1044,7 @@ const I18N = {
     'sc.col.executor': '执行器', 'sc.col.status': '状态', 'sc.col.bin': '二进制', 'sc.col.version': '版本',
     'sc.available': '可用', 'sc.unavailable': '不可用', 'sc.models': '模型：', 'sc.agents': 'Agent：', 'sc.notInstalled': '未安装（不可用）', 'sc.cached': ' · 缓存', 'sc.initProbe': ' · 已按本机实际能力完成初始化探测', 'sc.probedAt': '探测于 ',
     'sc.count': '共 ', 'sc.usable': '可用于节点', 'sc.noPatch': '无 headless 补丁', 'sc.emptyHint': '未发现本地客制化 agent。克隆/拉取仓库后一键安装：',
+    'sc.packTitle': '内置 DSH 客制化包（自动安装）', 'sc.packInstalled': '已自动安装预设：', 'sc.packReady': '预设已就绪（未重复安装）', 'sc.packSkipped': '本地已存在，跳过：', 'sc.packPersona': 'persona 覆盖层已合并',
     'sc.searchPh': '搜索 skill 名称 / 说明…', 'sc.expand': '展开全部', 'sc.collapse': '收起', 'sc.colName': '名称', 'sc.colDesc': '说明', 'sc.colPath': '路径', 'sc.searchRoots': 'Skill 搜索目录: ',
     'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情', 'skill.none': '无',
     'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
@@ -1074,6 +1075,7 @@ const I18N = {
     'sc.col.executor': 'Executor', 'sc.col.status': 'Status', 'sc.col.bin': 'Binary', 'sc.col.version': 'Version',
     'sc.available': 'Available', 'sc.unavailable': 'Unavailable', 'sc.models': 'Models: ', 'sc.agents': 'Agents: ', 'sc.notInstalled': 'Not installed', 'sc.cached': ' · cached', 'sc.initProbe': ' · initial probe done for this machine', 'sc.probedAt': 'probed at ',
     'sc.count': '', 'sc.usable': 'usable', 'sc.noPatch': 'no headless patch', 'sc.emptyHint': 'No custom DSH agents found. Clone/pull the repo and install:',
+    'sc.packTitle': 'Bundled DSH pack (auto-install)', 'sc.packInstalled': 'Auto-installed presets: ', 'sc.packReady': 'Presets ready (not reinstalled)', 'sc.packSkipped': 'Already present, skipped: ', 'sc.packPersona': 'persona overlay merged',
     'sc.searchPh': 'Search skill name / description…', 'sc.expand': 'Expand all', 'sc.collapse': 'Collapse', 'sc.colName': 'Name', 'sc.colDesc': 'Description', 'sc.colPath': 'Path', 'sc.searchRoots': 'Skill search roots: ',
     'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details', 'skill.none': 'None',
     'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
@@ -4385,9 +4387,25 @@ async function openSelfCheck(useCache) {
     const d = await apiGet('/selfcheck');
     selfcheckCache = d;
     renderSelfCheck(d);
+    refreshDshPresetsFrom(d);
   } catch (err) {
     body.innerHTML = '<div style="color:var(--red);padding:20px;text-align:center;font-size:13px">自检失败: ' + escHtml(err.message || err) + '</div>';
   }
+}
+
+// 自检后把 /selfcheck 返回的客制化 DSH 预设写回 state，并重新填充配置面板的
+// 客制化 Agent 下拉与节点卡片标注——用户刚导入/刚被 pack 自动安装的预设
+// 立刻可见，不必退出重进页面。
+function refreshDshPresetsFrom(d) {
+  if (!d || !Array.isArray(d.dshPresets)) return;
+  const before = (state.dshPresets || []).map(p => p.id).join(',');
+  state.dshPresets = d.dshPresets;
+  const after = d.dshPresets.map(p => p.id).join(',');
+  if (before === after) return;
+  const activeNode = state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null;
+  if (typeof populateDshPresetSelect === 'function') populateDshPresetSelect(activeNode);
+  if (typeof renderNodes === 'function' && state.nodes.length) renderNodes();
+  if (typeof renderEdges === 'function' && state.nodes.length) renderEdges();
 }
 function renderSelfCheck(d) {
   const body = $('#selfcheck-body');
@@ -4434,6 +4452,21 @@ function renderSelfCheck(d) {
       html += '</div>';
     }
     html += '<div style="font-size:11.5px;color:var(--muted-2);margin-bottom:12px">' + T('sc.probeNote') + '</div>';
+
+    // 2.5 内置 dsh-agent-pack 自动安装状态（自检时幂等安装；无包则为提示）
+    const pi = d.packInstall || {};
+    if (pi.found) {
+      const presets = (pi.installedPresets || []).length ? T('sc.packInstalled') + (pi.installedPresets || []).map(escHtml).join(' · ') : T('sc.packReady');
+      const skipped = (pi.skippedPresets || []).length ? ' &nbsp;' + T('sc.packSkipped') + (pi.skippedPresets || []).map(escHtml).join(' · ') : '';
+      const persona = pi.personaMerged ? ' &nbsp;' + T('sc.packPersona') : '';
+      const errors = (pi.errors || []).length ? '<div style="font-size:11px;color:var(--danger);font-family:var(--mono)">' + (pi.errors || []).map(escHtml).join('<br>') + '</div>' : '';
+      html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.packTitle') + '</div>' +
+        '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:12px;background:var(--card)">' +
+        '<div style="font-size:12.5px;color:var(--fg-2)">' + presets + skipped + persona + '</div>' +
+        (pi.packDir ? '<div style="font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:4px">' + escHtml(pi.packDir) + '</div>' : '') +
+        errors +
+        '</div>';
+    }
 
     // 3. 客制化 DSH Agent（本地自动导入 $DSH_HOME/.agent-presets）
     const dshPresets = d.dshPresets || [];

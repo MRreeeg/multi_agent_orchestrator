@@ -860,7 +860,10 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, r *http.Request) 
 
 // dshPresets returns the locally authored DSH agent presets
 // ($DSH_HOME/.agent-presets) so the config panel can offer them on dsh nodes.
+// It runs the bundled-pack auto-installer first (idempotent, no-op when no
+// pack is present) so a fresh clone's config panel shows presets immediately.
 func (h *orchestratorHandler) dshPresets(w http.ResponseWriter, _ *http.Request) {
+	dshclient.EnsureAgentPackInstalled()
 	presets := dshclient.ListAgentPresets()
 	if presets == nil {
 		presets = []dshclient.AgentPresetInfo{}
@@ -878,15 +881,16 @@ func (h *orchestratorHandler) selfcheck(w http.ResponseWriter, r *http.Request) 
 		running = []orchestrator.AgentInstance{}
 	}
 	writeJSON(w, map[string]interface{}{
-		"checkedAt":  report.CheckedAt,
-		"agents":     report.Agents,
-		"running":    running,
-		"runtimes":   report.Runtimes,
-		"skills":     report.Skills,
-		"skillRoots": report.SkillRoots,
-		"health":     report.Health,
-		"dshPresets": report.DshPresets,
-		"probes":     report.Probes,
+		"checkedAt":   report.CheckedAt,
+		"agents":      report.Agents,
+		"running":     running,
+		"runtimes":    report.Runtimes,
+		"skills":      report.Skills,
+		"skillRoots":  report.SkillRoots,
+		"health":      report.Health,
+		"dshPresets":  report.DshPresets,
+		"probes":      report.Probes,
+		"packInstall": report.PackInstall,
 	})
 }
 
