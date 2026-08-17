@@ -596,7 +596,7 @@ input,textarea,select{font:inherit;color:inherit}
           <span class="chat__opt-label">分析模型</span>
           <select class="chat__opt" id="chat-model" title="需求分析使用的模型"></select>
           <span class="chat__opt-label">分析人设</span>
-          <select class="chat__opt" id="chat-agent" title="需求分析使用的 Agent 人设：dsh 执行器下为本机客制化 agent 预设（自检自动导入）"></select>
+          <select class="chat__opt" id="chat-agent" title="需求分析使用的 Agent 人设：deepseek-harness 执行器下为本机客制化 agent 预设（可手动导入）"></select>
         </div>
         <div class="chat__input-bar" id="chat-input-bar">
           <div class="chat__composer">
@@ -755,13 +755,13 @@ input,textarea,select{font:inherit;color:inherit}
           </select>
         </div>
         <div class="field">
-          <label class="field__label" title="驱动本节点的 Agent 引擎（reasonix / mimo / codex / claude / opencode / dsh）">Agent</label>
-          <select class="field__select" id="cfg-executor" title="驱动本节点的 Agent 引擎（reasonix / mimo / codex / claude / opencode / dsh）">
+          <label class="field__label" title="驱动本节点的 Agent 引擎（reasonix / mimo / codex / claude / opencode / deepseek-harness）">Agent</label>
+          <select class="field__select" id="cfg-executor" title="驱动本节点的 Agent 引擎（reasonix / mimo / codex / claude / opencode / deepseek-harness）">
           </select>
         </div>
         <div class="field" id="dsh-preset-field" style="display:none">
-          <label class="field__label">客制化 Agent（DSH 预设）</label>
-          <select class="field__select" id="cfg-dsh-preset" title="本地客制化的 DSH agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 DSH 内置 persona（Prompt 式）。">
+          <label class="field__label">客制化 Agent（deepseek-harness 预设）</label>
+          <select class="field__select" id="cfg-dsh-preset" title="本地客制化的 deepseek-harness agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 deepseek-harness 内置 persona（Prompt 式）。">
             <option value="">默认（内置 persona，Prompt 式）</option>
           </select>
         </div>
@@ -1037,21 +1037,21 @@ const I18N = {
     'run.title': 'Loop 运行看板', 'run.analyze': '分析进展', 'run.stop': '停止', 'run.collapse': '收缩', 'run.expand': '展开', 'run.close': '收起',
     'history.title': '历史会话', 'history.empty': '暂无历史会话', 'hist.rename': '编辑名称', 'hist.renamed': '会话已重命名:', 'hist.renameFailed': '重命名失败:', 'hist.delete': '删除', 'hist.loading': '加载中...',
     'runs.empty': '暂无执行记录', 'runs.title': '执行记录', 'stats.title': '节点类型统计', 'run.records': '执行记录：', 'runs.cleanup': '清理旧 Runtime', 'runs.cleanupTitle': '清理旧 Runtime 工作目录（每个可能占用 50MB+ 磁盘，保留最近 2 个）', 'runs.cleanupMsg': '清理旧的 Runtime 工作目录？将删除历史 run 的运行时副本（每个 50MB+），保留最近 2 个活跃 Runtime。执行记录文本不受影响。', 'runs.cleanupDone': '已清理 {n} 个旧 Runtime，释放 {mb} MB', 'runs.cleanupNone': '没有可清理的旧 Runtime', 'runs.cleanupFail': '清理失败: ',
-    'sc.executors': '执行器可用性', 'sc.probe': '本机探测的 Agent 与模型（程序化）', 'sc.custom': '客制化 DSH Agent（本地自动导入）', 'sc.skills': 'Skill 库',
+    'sc.executors': '执行器可用性', 'sc.probe': '本机探测的 Agent 与模型（程序化）', 'sc.custom': '客制化 deepseek-harness Agent（可一键导入）', 'sc.skills': 'Skill 库',
     'node.architect': '架构师', 'node.executor': '执行者', 'node.reviewer': '审查者',
     'sse.connected': '已连接', 'sse.disconnected': '未连接',
-    'sc.title': '一键自检', 'sc.refresh': '重新检查', 'sc.checking': '正在检查…',
+    'sc.title': '一键自检', 'sc.refresh': '重新检查', 'sc.checking': '正在检查…', 'sc.checkFailed': '导入失败: ',
     'sc.col.executor': '执行器', 'sc.col.status': '状态', 'sc.col.bin': '二进制', 'sc.col.version': '版本',
     'sc.available': '可用', 'sc.unavailable': '不可用', 'sc.models': '模型：', 'sc.agents': 'Agent：', 'sc.notInstalled': '未安装（不可用）', 'sc.cached': ' · 缓存', 'sc.initProbe': ' · 已按本机实际能力完成初始化探测', 'sc.probedAt': '探测于 ',
-    'sc.count': '共 ', 'sc.usable': '可用于节点', 'sc.noPatch': '无 headless 补丁', 'sc.emptyHint': '未发现本地客制化 agent。克隆/拉取仓库后一键安装：',
-    'sc.packTitle': '内置 DSH 客制化包（自动安装）', 'sc.packInstalled': '已自动安装预设：', 'sc.packReady': '预设已就绪（未重复安装）', 'sc.packSkipped': '本地已存在，跳过：', 'sc.packPersona': 'persona 覆盖层已合并',
+    'sc.count': '共 ', 'sc.usable': '可用于节点', 'sc.noPatch': '无 headless 补丁', 'sc.emptyHint': '未发现本地客制化 agent。可用上方「一键导入」安装内置包，或克隆/拉取仓库后执行：',
+    'sc.packTitle': '内置 deepseek-harness 客制化包（未导入，点击下方按钮导入）', 'sc.packImport': '一键导入', 'sc.packImporting': '导入中…', 'sc.packImported': '导入完成', 'sc.packInstalled': '已导入预设：', 'sc.packReady': '预设已就绪（未重复安装）', 'sc.packSkipped': '本地已存在，跳过：', 'sc.packPersona': 'persona 覆盖层已合并',
     'sc.searchPh': '搜索 skill 名称 / 说明…', 'sc.expand': '展开全部', 'sc.collapse': '收起', 'sc.colName': '名称', 'sc.colDesc': '说明', 'sc.colPath': '路径', 'sc.searchRoots': 'Skill 搜索目录: ',
     'node.noModel': '未选择模型', 'node.defaultAgent': '默认 Agent', 'node.noSkill': '无 Skill', 'node.detail': '查看详情', 'skill.none': '无',
     'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
     'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.agent': 'Agent：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：', 'nd.unset': '未设置', 'nd.port': '端口：', 'nd.endpoint': '端点：', 'nd.policy': '策略：', 'nd.retained': 'retained（保留至手动停止）', 'nd.access': '访问方式：', 'nd.accessLocal': '本地历史会话', 'nd.accessConsole': 'Orchestrator Runtime Console', 'nd.accessBrowser': '浏览器', 'nd.enterConsole': '进入控制台', 'nd.noWeb': '无网页入口 — 使用本地 mimo 历史会话', 'nd.interrupt': 'Interrupt（保留 runtime）', 'nd.soon': '后续版本支持', 'nd.noRuntime': '无运行时实例（一次性执行，已结束）', 'nd.output': '输出内容', 'nd.errorTitle': '错误信息', 'nd.logs': '思考/工具日志', 'nd.emptyTitle': '⚠️ 执行完成但没有返回正文', 'nd.emptyHint': '这通常表示执行器没有真正产出内容，或输出被吞掉了。请优先查看下方日志。', 'nd.pendingTitle': '⏳ 尚未执行', 'nd.pendingHint': '执行流水线后，此节点的输出将显示在这里', 'nd.rtRunning': '🟢 运行中', 'nd.rtIdle': '🟡 空闲（可进入）', 'nd.rtBusy': '🔵 忙碌中', 'nd.rtStopped': '⚫ 已停止', 'nd.rtUnknown': '未知',
     'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…', 'rd.iter': '第 {cur} 轮 / 共 {max} 轮', 'rd.noRun': '没有可分析的 Run', 'rd.analyzing': '⏳ 正在分析执行进展…', 'rd.blocking': '卡点：', 'rd.noBlocking': '暂无卡点', 'rd.suggest': '建议：', 'rd.analysisTitle': '📊 执行进展分析', 'rd.analysisFail': '分析失败: ', 'rd.failedParen': '（失败 {n}）', 'toast.noLoop': '没有正在运行的 Loop', 'toast.stopReq': '已请求停止当前 Loop', 'toast.stopFail': '停止 Loop 失败: ',
     'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
-    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.assist': '辅助手', 'cfg.preset': '客制化 Agent（DSH 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'cfg.rolePh': '描述该节点的职责...（点击打开大窗口）', 'cfg.execTitle': '驱动本节点的 Agent 引擎', 'cfg.execTitleCodex': 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）', 'cfg.skillTitle': '默认执行器可使用 skill', 'cfg.skillTitleCodex': 'Codex 通过 Prompt 注入 Skill 内容', 'cfg.skillTitleMimo': 'mimo executor 当前不会使用 skill，但可保留配置', 'cfg.dshTitle': '本地客制化的 DSH agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 DSH 内置 persona（Prompt 式）。', 'cfg.dshDefault': '默认（内置 persona，Prompt 式）', 'cfg.dshNoPatch': ' · 无 headless 补丁，不可用于节点', 'loop.off': '关闭', 'loop.on': '开启', 'loop.modeReview': '审查者决定', 'loop.modeFixed': '固定次数', 'loop.pickReviewer': '选择审查节点...', 'loop.overlay': 'Loop 运行时回到执行者 · {mode} · {max} 轮', 'loop.feedbackHint': '已识别反馈连线：Loop 采用运行时循环（虚线框），无需物理回边——已在右侧开启 Loop 并选择审查节点', 'loop.autoReviewer': '已自动选择审查节点：', 'loop.needReviewer': 'Loop 需要审查节点：请先添加一个审查者节点', 'assist.on': '开启', 'assist.off': '关闭', 'assist.model': '辅助模型', 'assist.driver': '驱动', 'assist.role': '职责', 'assist.rolePh': '例如：识图——描述截图/设计稿/报错图，或完成交给你的独立小任务', 'assist.enabledTitle': '节点的专属辅助 agent：可把识图等小任务交给它（默认 mimo 视觉），失败不阻塞主流程', 'assist.modelTitle': '辅助 agent 使用的视觉/对话模型', 'assist.driverTitle': '辅助请求走的模型路由：opencode（OpenAI 兼容 zen/go）或 claude（Anthropic 兼容 zen）', 'assist.driverOpenCode': 'opencode（zen/go）', 'assist.driverClaude': 'claude（zen anthropic）', 'assist.modelVision': 'mimo-v2.5（视觉 ✓）', 'assist.badgeTitle': '辅助手：识图等小任务', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ 自定义模型…', 'model.promptTitle': '输入模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
+    'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.assist': '辅助手', 'cfg.preset': '客制化 Agent（deepseek-harness 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'cfg.rolePh': '描述该节点的职责...（点击打开大窗口）', 'cfg.execTitle': '驱动本节点的 Agent 引擎', 'cfg.execTitleCodex': 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）', 'cfg.skillTitle': '默认执行器可使用 skill', 'cfg.skillTitleCodex': 'Codex 通过 Prompt 注入 Skill 内容', 'cfg.skillTitleMimo': 'mimo executor 当前不会使用 skill，但可保留配置', 'cfg.dshTitle': '本地客制化的 deepseek-harness agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 deepseek-harness 内置 persona（Prompt 式）。', 'cfg.dshDefault': '默认（内置 persona，Prompt 式）', 'cfg.dshNoPatch': ' · 无 headless 补丁，不可用于节点', 'loop.off': '关闭', 'loop.on': '开启', 'loop.modeReview': '审查者决定', 'loop.modeFixed': '固定次数', 'loop.pickReviewer': '选择审查节点...', 'loop.overlay': 'Loop 运行时回到执行者 · {mode} · {max} 轮', 'loop.feedbackHint': '已识别反馈连线：Loop 采用运行时循环（虚线框），无需物理回边——已在右侧开启 Loop 并选择审查节点', 'loop.autoReviewer': '已自动选择审查节点：', 'loop.needReviewer': 'Loop 需要审查节点：请先添加一个审查者节点', 'assist.on': '开启', 'assist.off': '关闭', 'assist.model': '辅助模型', 'assist.driver': '驱动', 'assist.role': '职责', 'assist.rolePh': '例如：识图——描述截图/设计稿/报错图，或完成交给你的独立小任务', 'assist.enabledTitle': '节点的专属辅助 agent：可把识图等小任务交给它（默认 mimo 视觉），失败不阻塞主流程', 'assist.modelTitle': '辅助 agent 使用的视觉/对话模型', 'assist.driverTitle': '辅助请求走的模型路由：opencode（OpenAI 兼容 zen/go）或 claude（Anthropic 兼容 zen）', 'assist.driverOpenCode': 'opencode（zen/go）', 'assist.driverClaude': 'claude（zen anthropic）', 'assist.modelVision': 'mimo-v2.5（视觉 ✓）', 'assist.badgeTitle': '辅助手：识图等小任务', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ openroute…', 'model.promptTitle': 'openroute 模型名', 'model.promptPh': '模型名（openroute 路由：ccs/ccswitch 走 ccswitch；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消', 'dlg.newSession': '新建会话', 'dlg.newSessionDefault': '新编排会话', 'dlg.sessionNamePh': '会话名称',
     'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）', 'rd.title': '执行详情', 'rd.loading': '加载中…', 'rd.status': '状态：', 'rd.trigger': '触发：', 'rd.nodes': '节点：', 'rd.loop': 'Loop 循环', 'rd.loopProgress': '进度：', 'rd.mode': '模式：', 'rd.termination': '终止：', 'rd.review': '审查：', 'rd.agents': '各 Agent 执行情况',
   },
@@ -1068,21 +1068,21 @@ const I18N = {
     'run.title': 'Loop Dashboard', 'run.analyze': 'Analyze', 'run.stop': 'Stop', 'run.collapse': 'Collapse', 'run.expand': 'Expand', 'run.close': 'Close',
     'history.title': 'History', 'history.empty': 'No sessions yet', 'hist.rename': 'Rename', 'hist.renamed': 'Session renamed:', 'hist.renameFailed': 'Rename failed:', 'hist.delete': 'Delete', 'hist.loading': 'Loading...',
     'runs.empty': 'No runs yet', 'runs.title': 'Run History', 'stats.title': 'Node Type Stats', 'run.records': 'Run history: ', 'runs.cleanup': 'Clean old runtimes', 'runs.cleanupTitle': 'Clean old runtime working dirs (each can hold 50MB+ on disk; keeps the 2 most recent)', 'runs.cleanupMsg': 'Clean old runtime working directories? Historical run copies (50MB+ each) will be deleted; the 2 most recent active runtimes are kept. Run history text is unaffected.', 'runs.cleanupDone': 'Cleaned {n} old runtimes, freed {mb} MB', 'runs.cleanupNone': 'Nothing to clean', 'runs.cleanupFail': 'Cleanup failed: ',
-    'sc.executors': 'Executors', 'sc.probe': 'Probed Agents & Models (programmatic)', 'sc.custom': 'Custom DSH Agents (auto-imported)', 'sc.skills': 'Skills',
+    'sc.executors': 'Executors', 'sc.probe': 'Probed Agents & Models (programmatic)', 'sc.custom': 'Custom deepseek-harness Agents (importable)', 'sc.skills': 'Skills',
     'node.architect': 'Architect', 'node.executor': 'Executor', 'node.reviewer': 'Reviewer',
     'sse.connected': 'Connected', 'sse.disconnected': 'Disconnected',
-    'sc.title': 'Self-check', 'sc.refresh': 'Re-check', 'sc.checking': 'Checking…',
+    'sc.title': 'Self-check', 'sc.refresh': 'Re-check', 'sc.checking': 'Checking…', 'sc.checkFailed': 'Import failed: ',
     'sc.col.executor': 'Executor', 'sc.col.status': 'Status', 'sc.col.bin': 'Binary', 'sc.col.version': 'Version',
     'sc.available': 'Available', 'sc.unavailable': 'Unavailable', 'sc.models': 'Models: ', 'sc.agents': 'Agents: ', 'sc.notInstalled': 'Not installed', 'sc.cached': ' · cached', 'sc.initProbe': ' · initial probe done for this machine', 'sc.probedAt': 'probed at ',
-    'sc.count': '', 'sc.usable': 'usable', 'sc.noPatch': 'no headless patch', 'sc.emptyHint': 'No custom DSH agents found. Clone/pull the repo and install:',
-    'sc.packTitle': 'Bundled DSH pack (auto-install)', 'sc.packInstalled': 'Auto-installed presets: ', 'sc.packReady': 'Presets ready (not reinstalled)', 'sc.packSkipped': 'Already present, skipped: ', 'sc.packPersona': 'persona overlay merged',
+    'sc.count': '', 'sc.usable': 'usable', 'sc.noPatch': 'no headless patch', 'sc.emptyHint': 'No custom agents found. Use the import button above to install the bundled pack, or clone/pull the repo and run:',
+    'sc.packTitle': 'Bundled deepseek-harness pack (not imported — use the button)', 'sc.packImport': 'Import', 'sc.packImporting': 'Importing…', 'sc.packImported': 'Import complete', 'sc.packInstalled': 'Imported presets: ', 'sc.packReady': 'Presets ready (not reinstalled)', 'sc.packSkipped': 'Already present, skipped: ', 'sc.packPersona': 'persona overlay merged',
     'sc.searchPh': 'Search skill name / description…', 'sc.expand': 'Expand all', 'sc.collapse': 'Collapse', 'sc.colName': 'Name', 'sc.colDesc': 'Description', 'sc.colPath': 'Path', 'sc.searchRoots': 'Skill search roots: ',
     'node.noModel': 'No model selected', 'node.defaultAgent': 'Default Agent', 'node.noSkill': 'No Skill', 'node.detail': 'Details', 'skill.none': 'None',
     'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
     'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.agent': 'Agent: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ', 'nd.unset': 'Not set', 'nd.port': 'Port: ', 'nd.endpoint': 'Endpoint: ', 'nd.policy': 'Policy: ', 'nd.retained': 'retained (until manually stopped)', 'nd.access': 'Access: ', 'nd.accessLocal': 'Local history', 'nd.accessConsole': 'Orchestrator Runtime Console', 'nd.accessBrowser': 'Browser', 'nd.enterConsole': 'Open console', 'nd.noWeb': 'No web entry — use local mimo history', 'nd.interrupt': 'Interrupt (keep runtime)', 'nd.soon': 'Coming soon', 'nd.noRuntime': 'No runtime instance (one-shot execution, finished)', 'nd.output': 'Output', 'nd.errorTitle': 'Error', 'nd.logs': 'Reasoning / tool logs', 'nd.emptyTitle': '⚠️ Finished but returned no content', 'nd.emptyHint': 'Usually means the executor produced nothing or output was swallowed. Check the logs below.', 'nd.pendingTitle': '⏳ Not executed yet', 'nd.pendingHint': 'This node output will appear here after the pipeline runs', 'nd.rtRunning': '🟢 Running', 'nd.rtIdle': '🟡 Idle (enterable)', 'nd.rtBusy': '🔵 Busy', 'nd.rtStopped': '⚫ Stopped', 'nd.rtUnknown': 'Unknown',
     'rd.running': '● Running', 'rd.runningEllipsis': 'Running…', 'rd.iter': 'Round {cur} / {max}', 'rd.noRun': 'No run to analyze', 'rd.analyzing': '⏳ Analyzing run progress...', 'rd.blocking': 'Blockers: ', 'rd.noBlocking': 'No blockers', 'rd.suggest': 'Suggestions: ', 'rd.analysisTitle': '📊 Run Progress Analysis', 'rd.analysisFail': 'Analysis failed: ', 'rd.failedParen': ' (failed {n})', 'toast.noLoop': 'No Loop is running', 'toast.stopReq': 'Stop requested for current Loop', 'toast.stopFail': 'Failed to stop Loop: ',
     'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
-    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.assist': 'Helper agent', 'cfg.preset': 'Custom Agent (DSH preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'cfg.rolePh': 'Describe this node role... (click to open large editor)', 'cfg.execTitle': 'Agent engine driving this node', 'cfg.execTitleCodex': 'Codex: run = one-shot exec; serve = retained Runtime (app-server)', 'cfg.skillTitle': 'Default executors can use skill', 'cfg.skillTitleCodex': 'Codex injects Skill via prompt', 'cfg.skillTitleMimo': 'mimo executor does not use skill; kept for compatibility', 'cfg.dshTitle': 'Locally customized DSH agent ($DSH_HOME/.agent-presets). Selected node runs with that agent persona and toolset (custom); empty uses DSH built-in persona (prompt-based).', 'cfg.dshDefault': 'Default (built-in persona, prompt-based)', 'cfg.dshNoPatch': ' · no headless patch, not usable for nodes', 'loop.off': 'Off', 'loop.on': 'On', 'loop.modeReview': 'Review decides', 'loop.modeFixed': 'Fixed rounds', 'loop.pickReviewer': 'Select review node...', 'loop.overlay': 'Loop returns to executor · {mode} · {max} rounds', 'loop.feedbackHint': 'Feedback edge detected: Loop runs as a runtime cycle (dashed box), no physical back-edge needed — Loop switched on and reviewer selected', 'loop.autoReviewer': 'Auto-selected review node: ', 'loop.needReviewer': 'Loop needs a reviewer: add a reviewer node first', 'assist.on': 'On', 'assist.off': 'Off', 'assist.model': 'Helper model', 'assist.driver': 'Driver', 'assist.role': 'Duty', 'assist.rolePh': 'e.g. vision — describe screenshots/designs/error images, or handle small side tasks', 'assist.enabledTitle': "Node's dedicated helper agent: delegate vision/small tasks (default mimo); failures never block", 'assist.modelTitle': 'Vision/chat model used by the helper agent', 'assist.driverTitle': 'Route for assist requests: opencode (OpenAI-compatible zen/go) or claude (Anthropic-compatible zen)', 'assist.driverOpenCode': 'opencode (zen/go)', 'assist.driverClaude': 'claude (zen anthropic)', 'assist.modelVision': 'mimo-v2.5 (Vision ✓)', 'assist.badgeTitle': 'Helper: vision & small tasks', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ Custom model…', 'model.promptTitle': 'Enter model name', 'model.promptPh': 'Model name (ccs/ccswitch routes via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
+    'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.assist': 'Helper agent', 'cfg.preset': 'Custom Agent (deepseek-harness preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'cfg.rolePh': 'Describe this node role... (click to open large editor)', 'cfg.execTitle': 'Agent engine driving this node', 'cfg.execTitleCodex': 'Codex: run = one-shot exec; serve = retained Runtime (app-server)', 'cfg.skillTitle': 'Default executors can use skill', 'cfg.skillTitleCodex': 'Codex injects Skill via prompt', 'cfg.skillTitleMimo': 'mimo executor does not use skill; kept for compatibility', 'cfg.dshTitle': 'Locally customized deepseek-harness agent ($DSH_HOME/.agent-presets). Selected node runs with that agent persona and toolset (custom); empty uses deepseek-harness built-in persona (prompt-based).', 'cfg.dshDefault': 'Default (built-in persona, prompt-based)', 'cfg.dshNoPatch': ' · no headless patch, not usable for nodes', 'loop.off': 'Off', 'loop.on': 'On', 'loop.modeReview': 'Review decides', 'loop.modeFixed': 'Fixed rounds', 'loop.pickReviewer': 'Select review node...', 'loop.overlay': 'Loop returns to executor · {mode} · {max} rounds', 'loop.feedbackHint': 'Feedback edge detected: Loop runs as a runtime cycle (dashed box), no physical back-edge needed — Loop switched on and reviewer selected', 'loop.autoReviewer': 'Auto-selected review node: ', 'loop.needReviewer': 'Loop needs a reviewer: add a reviewer node first', 'assist.on': 'On', 'assist.off': 'Off', 'assist.model': 'Helper model', 'assist.driver': 'Driver', 'assist.role': 'Duty', 'assist.rolePh': 'e.g. vision — describe screenshots/designs/error images, or handle small side tasks', 'assist.enabledTitle': "Node's dedicated helper agent: delegate vision/small tasks (default mimo); failures never block", 'assist.modelTitle': 'Vision/chat model used by the helper agent', 'assist.driverTitle': 'Route for assist requests: opencode (OpenAI-compatible zen/go) or claude (Anthropic-compatible zen)', 'assist.driverOpenCode': 'opencode (zen/go)', 'assist.driverClaude': 'claude (zen anthropic)', 'assist.modelVision': 'mimo-v2.5 (Vision ✓)', 'assist.badgeTitle': 'Helper: vision & small tasks', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ openroute…', 'model.promptTitle': 'openroute model name', 'model.promptPh': 'Model name (openroute routing: ccs/ccswitch go via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel', 'dlg.newSession': 'New Session', 'dlg.newSessionDefault': 'New orchestration session', 'dlg.sessionNamePh': 'Session name',
     'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)', 'rd.title': 'Run Details', 'rd.loading': 'Loading…', 'rd.status': 'Status: ', 'rd.trigger': 'Trigger: ', 'rd.nodes': 'Nodes: ', 'rd.loop': 'Loop', 'rd.loopProgress': 'Progress: ', 'rd.mode': 'Mode: ', 'rd.termination': 'Termination: ', 'rd.review': 'Review: ', 'rd.agents': 'Agent breakdown',
   },
@@ -1300,7 +1300,7 @@ const state = {
   models: [],
   skills: [],
   skillCatalog: [],
-  dshPresets: [], // 本地客制化 DSH agent（/dsh-presets，自检时自动导入）
+  dshPresets: [], // 本地客制化 DSH agent（/dsh-presets，只读；导入走自检面板一键导入）
   presets: [],
   stats: null,
   runs: [],
@@ -1330,6 +1330,7 @@ function normalizeNode(raw) {
     mode: raw.mode || 'serve',
     executor: raw.executor || 'reasonix',
     role: raw.role || '',
+    assist: raw.assist || { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' },
     x: raw.x || 60,
     y: raw.y || 60,
     status: raw.status || 'idle',
@@ -1418,6 +1419,13 @@ function firstCompatibleModelForNode(node, executorOverride) {
   return models[0] || '';
 }
 
+// 执行器显示名：dsh 对外展示原名 deepseek-harness（内部 id 仍是 dsh）。
+// 名字较长时配合 title 提示保留完整信息，避免撑破布局。
+function executorDisplayName(executor) {
+  if (executor === 'dsh') return 'deepseek-harness';
+  return executor;
+}
+
 function syncExecutorOptionsForNode(node) {
   const sel = $('#cfg-executor');
   const options = Array.from(sel.options);
@@ -1451,7 +1459,7 @@ function syncExecutorOptionsForNode(node) {
   modeSelect.value = node.mode || 'serve';
   modeSelect.disabled = isDsh;
   modeSelect.title = isDsh
-    ? 'DSH 仅支持 run：headless 一次性执行（DSH 无 serve 协议，这是其能力边界，不是人为限制）'
+    ? 'deepseek-harness 仅支持 run：headless 一次性执行（deepseek-harness 无 serve 协议，这是其能力边界，不是人为限制）'
     : (isCodex
       ? 'Codex：run 使用一次性 exec；serve 使用保留 Runtime（app-server）'
       : (isClaude ? 'Claude：run 使用一次性 claude -p；serve 使用保留 Runtime（stream-json）' : ''));
@@ -1784,7 +1792,8 @@ async function loadAnalysisOptions() {
     // 默认 dsh（客制化 agent 分析）；后端未把 dsh 排第一时也显式选中
     const defaultExec = executors.includes('dsh') ? 'dsh' : (executors[0] || 'reasonix');
     execSel.innerHTML = executors.map(e =>
-      '<option value="' + escHtml(e) + '"' + (e === defaultExec ? ' selected' : '') + '>' + escHtml(e) + '</option>'
+      '<option value="' + escHtml(e) + '"' + (e === defaultExec ? ' selected' : '') + (e === 'dsh' ? ' title="deepseek-harness：本地客制化 DSH agent（reasonix dsh 节点专用执行器）"' : '') + '>' +
+      escHtml(executorDisplayName(e)) + '</option>'
     ).join('');
     execSel.addEventListener('change', () => {
       fillModels(execSel.value, modelSel);
@@ -2567,7 +2576,12 @@ $('#config-close').addEventListener('click', hideConfig);
         node.model = 'ccs';
         node.providerRoute = 'ccswitch';
       }
-      if (!modelSupportsExecutor(node.model, el.value)) {
+      // 切换执行器时严格按新执行器的模型列表校准：避免残留上一执行器的模型
+      // （如 opencode 模型配 dsh 执行器）导致执行直接报错。ccs/ccswitch 路由模型
+      // 与执行器无关，保留原值。
+      const isRouteModel = ['ccs', 'ccswitch'].includes(String(node.model || '').toLowerCase());
+      const allowed = compatibleModelsForNode(node, el.value);
+      if (allowed.length > 0 && !isRouteModel && !allowed.includes(node.model)) {
         const nextModel = firstCompatibleModelForNode(node, el.value);
         if (!nextModel) {
           toast('当前节点类型没有可用于该执行器的模型', 'error');
@@ -2575,6 +2589,7 @@ $('#config-close').addEventListener('click', hideConfig);
           return;
         }
         node.model = nextModel;
+        node.providerRoute = (node.executor === 'codex' || node.executor === 'claude') && node.model === 'ccs' ? 'ccswitch' : '';
       }
     }
     if (id === 'cfg-mode') node.mode = el.value;
@@ -2696,7 +2711,7 @@ function renderNodes() {
         <div class="node__model">${escHtml(node.model || T('node.noModel'))}</div>
         <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || T('node.defaultAgent')) : (node.skill || T('node.noSkill')))}</div>
         <div class="${agentSourceClass(node)}">${agentSourceLine(node)}</div>
-        ${node.assist && node.assist.enabled !== false ? `<div class="node__assist" title="${escHtml(node.assist.role || T('assist.badgeTitle'))}" style="font-size:10.5px;color:var(--muted-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🤝 ${escHtml(node.assist.model || 'mimo-v2.5')}</div>` : ''}
+        ${(!node.assist || node.assist.enabled !== false) ? `<div class="node__assist" title="${escHtml(node.assist && node.assist.role ? node.assist.role : T('assist.badgeTitle'))}" style="font-size:10.5px;color:var(--muted-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🤝 ${escHtml((node.assist && node.assist.model) || 'mimo-v2.5')}</div>` : ''}
         ${node.runtime && node.runtime.output ? `<div class="node__output">${escHtml(node.runtime.output)}</div>` : ''}
       </div>
     `;
@@ -2826,8 +2841,9 @@ document.addEventListener('mousemove', e => {
     const fromNode = state.nodes.find(n => n.id === state.connectingFrom);
     if (!fromNode) return;
     const wrapRect = canvasWrap.getBoundingClientRect();
-    const x1 = fromNode.x + 180;
-    const y1 = fromNode.y + 40;
+    const fromPos = portCenter(state.connectingFrom, 'out');
+    const x1 = fromPos.x;
+    const y1 = fromPos.y;
     const x2 = e.clientX - wrapRect.left + canvasWrap.scrollLeft;
     const y2 = e.clientY - wrapRect.top + canvasWrap.scrollTop;
     const temp = document.getElementById('temp-edge');
@@ -2912,6 +2928,38 @@ canvasWrap.addEventListener('click', e => {
 });
 
 // ── Edge rendering ──
+// 端口实际位置（DOM 为准）：节点高度随内容变化，硬编码 y+40 / x+180 会与端口错位。
+// 返回 canvas 坐标系下的端口中心；DOM 不可用时回退到近似值。
+function portCenter(nodeId, which) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (!node) return { x: 0, y: 0 };
+  const el = document.getElementById('node-' + nodeId);
+  if (el) {
+    const port = el.querySelector('.node__port--' + which);
+    if (port) {
+      const wrapRect = canvasWrap.getBoundingClientRect();
+      const r = port.getBoundingClientRect();
+      return {
+        x: r.left - wrapRect.left + canvasWrap.scrollLeft + r.width / 2,
+        y: r.top - wrapRect.top + canvasWrap.scrollTop + r.height / 2,
+      };
+    }
+    const r = el.getBoundingClientRect();
+    return {
+      x: node.x + (which === 'out' ? 181 : -1),
+      y: node.y + r.height / 2,
+    };
+  }
+  return which === 'out'
+    ? { x: node.x + 181, y: node.y + 40 }
+    : { x: node.x - 1, y: node.y + 40 };
+}
+
+function nodeHeight(node) {
+  const el = document.getElementById('node-' + node.id);
+  return el ? el.offsetHeight : 80;
+}
+
 function calcEdgePath(x1, y1, x2, y2) {
   const dx = Math.abs(x2 - x1) * 0.5;
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
@@ -2924,10 +2972,12 @@ function renderEdges() {
     const fromNode = state.nodes.find(n => n.id === edge.from);
     const toNode = state.nodes.find(n => n.id === edge.to);
     if (!fromNode || !toNode) return;
-    const x1 = fromNode.x + 180;
-    const y1 = fromNode.y + 40;
-    const x2 = toNode.x;
-    const y2 = toNode.y + 40;
+    const fromPos = portCenter(edge.from, 'out');
+    const toPos = portCenter(edge.to, 'in');
+    const x1 = fromPos.x;
+    const y1 = fromPos.y;
+    const x2 = toPos.x;
+    const y2 = toPos.y;
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.classList.add('edge-group');
     g.dataset.edgeIdx = i;
@@ -2981,7 +3031,7 @@ function renderLoopOverlay() {
   const minX = Math.min(...state.nodes.map(n => n.x)) - pad;
   const minY = Math.min(...state.nodes.map(n => n.y)) - pad;
   const maxX = Math.max(...state.nodes.map(n => n.x + 180)) + pad;
-  const maxY = Math.max(...state.nodes.map(n => n.y + 80)) + pad;
+  const maxY = Math.max(...state.nodes.map(n => n.y + nodeHeight(n))) + pad;
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.classList.add('loop-overlay');
 
@@ -2994,10 +3044,12 @@ function renderLoopOverlay() {
   rect.setAttribute('rx', 12);
   g.appendChild(rect);
 
-  const startX = reviewer.x + 90;
-  const startY = reviewer.y + 80;
-  const endX = target.x + 90;
-  const endY = target.y;
+  const rvStart = portCenter(reviewer.id, 'out');
+  const tgEnd = portCenter(target.id, 'in');
+  const startX = rvStart.x;
+  const startY = rvStart.y;
+  const endX = tgEnd.x;
+  const endY = tgEnd.y;
   const loopY = maxY + 28;
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   path.classList.add('loopback');
@@ -4370,7 +4422,7 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.session-card__menu').forEach(m => { m.style.display = 'none'; });
 });
 
-const executorLabels = { reasonix: 'reasonix', mimo: 'mimo', codex: 'Codex', claude: 'Claude', opencode: 'opencode', dsh: 'DSH' };
+const executorLabels = { reasonix: 'reasonix', mimo: 'mimo', codex: 'Codex', claude: 'Claude', opencode: 'opencode', dsh: 'deepseek-harness' };
 
 function selfcheckBadge(ok, text) {
   const cls = ok ? 'run-dash__badge run-dash__badge--done' : 'run-dash__badge run-dash__badge--err';
@@ -4394,8 +4446,7 @@ async function openSelfCheck(useCache) {
 }
 
 // 自检后把 /selfcheck 返回的客制化 DSH 预设写回 state，并重新填充配置面板的
-// 客制化 Agent 下拉与节点卡片标注——用户刚导入/刚被 pack 自动安装的预设
-// 立刻可见，不必退出重进页面。
+// 客制化 Agent 下拉与节点卡片标注——用户刚导入的预设立刻可见，不必退出重进页面。
 function refreshDshPresetsFrom(d) {
   if (!d || !Array.isArray(d.dshPresets)) return;
   const before = (state.dshPresets || []).map(p => p.id).join(',');
@@ -4453,22 +4504,19 @@ function renderSelfCheck(d) {
     }
     html += '<div style="font-size:11.5px;color:var(--muted-2);margin-bottom:12px">' + T('sc.probeNote') + '</div>';
 
-    // 2.5 内置 dsh-agent-pack 自动安装状态（自检时幂等安装；无包则为提示）
+    // 2.5 内置 deepseek-harness 客制化包：自检只探测不导入，由「一键导入」按钮
+    // 显式触发 POST /dsh-presets/install（幂等：已存在的预设跳过）。
     const pi = d.packInstall || {};
     if (pi.found) {
-      const presets = (pi.installedPresets || []).length ? T('sc.packInstalled') + (pi.installedPresets || []).map(escHtml).join(' · ') : T('sc.packReady');
-      const skipped = (pi.skippedPresets || []).length ? ' &nbsp;' + T('sc.packSkipped') + (pi.skippedPresets || []).map(escHtml).join(' · ') : '';
-      const persona = pi.personaMerged ? ' &nbsp;' + T('sc.packPersona') : '';
-      const errors = (pi.errors || []).length ? '<div style="font-size:11px;color:var(--danger);font-family:var(--mono)">' + (pi.errors || []).map(escHtml).join('<br>') + '</div>' : '';
       html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.packTitle') + '</div>' +
         '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:12px;background:var(--card)">' +
-        '<div style="font-size:12.5px;color:var(--fg-2)">' + presets + skipped + persona + '</div>' +
-        (pi.packDir ? '<div style="font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:4px">' + escHtml(pi.packDir) + '</div>' : '') +
-        errors +
+        (pi.packDir ? '<div style="font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-bottom:8px">' + escHtml(pi.packDir) + '</div>' : '') +
+        '<button id="pack-import-btn" class="chat__ws-confirm" style="display:inline-flex" title="' + T('sc.packTitle') + '">' + T('sc.packImport') + '</button>' +
+        '<span id="pack-import-result" style="font-size:12px;color:var(--fg-2);margin-left:10px;vertical-align:middle"></span>' +
         '</div>';
     }
 
-    // 3. 客制化 DSH Agent（本地自动导入 $DSH_HOME/.agent-presets）
+    // 3. 客制化 DSH Agent（$DSH_HOME/.agent-presets 本地预设；导入走上方按钮）
     const dshPresets = d.dshPresets || [];
     html += '<div style="font-size:13px;font-weight:600;margin:2px 0 8px">' + T('sc.custom') + ' <span style="font-weight:400;color:var(--muted-2);font-size:12px">' + T('sc.count') + dshPresets.length + T('sc.countSuffix') + '</span></div>';
     dshPresets.forEach(p => {
@@ -4510,6 +4558,47 @@ function renderSelfCheck(d) {
     }
 
     body.innerHTML = html;
+
+    // 一键导入内置 deepseek-harness 客制化包：POST /dsh-presets/install →
+    // 导入完成后重新拉取自检报告与预设，刷新面板与配置面板下拉。
+    const packImportBtn = $('#pack-import-btn');
+    if (packImportBtn) {
+      packImportBtn.addEventListener('click', async () => {
+        const result = $('#pack-import-result');
+        packImportBtn.disabled = true;
+        packImportBtn.textContent = T('sc.packImporting');
+        if (result) result.textContent = '';
+        try {
+          const rep = await apiPost('/dsh-presets/install', {});
+          const installed = (rep && rep.installedPresets && rep.installedPresets.length)
+            ? T('sc.packInstalled') + rep.installedPresets.map(escHtml).join(' · ')
+            : T('sc.packReady');
+          const skipped = (rep && rep.skippedPresets && rep.skippedPresets.length)
+            ? ' &nbsp;' + T('sc.packSkipped') + rep.skippedPresets.map(escHtml).join(' · ') : '';
+          const persona = (rep && rep.personaMerged) ? ' &nbsp;' + T('sc.packPersona') : '';
+          const errors = (rep && rep.errors && rep.errors.length)
+            ? '<div style="font-size:11px;color:var(--danger);font-family:var(--mono);margin-top:6px">' + rep.errors.map(escHtml).join('<br>') + '</div>' : '';
+          if (result) {
+            result.innerHTML = installed + skipped + persona + errors;
+            result.style.color = (rep && rep.errors && rep.errors.length) ? 'var(--danger)' : 'var(--success)';
+          }
+          const fresh = await apiGet('/selfcheck');
+          selfcheckCache = fresh;
+          renderSelfCheck(fresh);
+          refreshDshPresetsFrom(fresh);
+          if (typeof populateDshPresetSelect === 'function') {
+            populateDshPresetSelect(state.selectedNode ? state.nodes.find(n => n.id === state.selectedNode) : null);
+          }
+          toast(T('sc.packImported'), 'success');
+        } catch (err) {
+          if (result) {
+            result.textContent = T('sc.checkFailed') + (err.message || err);
+            result.style.color = 'var(--danger)';
+          }
+          toast(T('sc.checkFailed') + (err.message || err), 'error');
+        }
+      });
+    }
 
     // Skill 搜索与展开/收起交互
     const skillSearch = $('#skill-search');
@@ -5472,7 +5561,7 @@ async function loadNodeTypes() {
     } catch (_) {
       state.skillCatalog = [];
     }
-    // 本地客制化 DSH agent（自检时同样会导入；这里让节点配置面板立即可选）
+    // 本地客制化 DSH agent（只读列表；导入由自检面板「一键导入」按钮触发）
     try {
       const dshPresets = await apiGet('/dsh-presets');
       state.dshPresets = Array.isArray(dshPresets) ? dshPresets : [];
@@ -5489,7 +5578,8 @@ async function loadNodeTypes() {
     allExecutors.forEach(ex => {
       const opt = document.createElement('option');
       opt.value = ex;
-      opt.textContent = ex;
+      opt.textContent = executorDisplayName(ex);
+      opt.title = ex === 'dsh' ? 'deepseek-harness：本地客制化 DSH agent（reasonix dsh 节点专用执行器）' : '';
       execSel.appendChild(opt);
     });
     if (prevVal && allExecutors.includes(prevVal)) execSel.value = prevVal;
@@ -5541,7 +5631,7 @@ function populateSkillSelect(node) {
   }
 }
 
-// 客制化 DSH agent 下拉：来自 /dsh-presets（自检时自动导入 $DSH_HOME/.agent-presets）。
+// 客制化 DSH agent 下拉：来自 /dsh-presets（只读；导入由自检面板「一键导入」按钮触发）。
 // 只有带 headless.patch.yml 的预设可选；无补丁的仅展示在自检面板。
 function populateDshPresetSelect(node) {
   const sel = $('#cfg-dsh-preset');

@@ -268,6 +268,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.nodeTypes(w, r)
 	case path == "/dsh-presets" && r.Method == http.MethodGet:
 		h.dshPresets(w, r)
+	case path == "/dsh-presets/install" && r.Method == http.MethodPost:
+		h.dshPresetsInstall(w, r)
 	case path == "/selfcheck" && r.Method == http.MethodGet:
 		h.selfcheck(w, r)
 	case path == "/presets" && r.Method == http.MethodGet:
@@ -860,15 +862,22 @@ func (h *orchestratorHandler) nodeTypes(w http.ResponseWriter, r *http.Request) 
 
 // dshPresets returns the locally authored DSH agent presets
 // ($DSH_HOME/.agent-presets) so the config panel can offer them on dsh nodes.
-// It runs the bundled-pack auto-installer first (idempotent, no-op when no
-// pack is present) so a fresh clone's config panel shows presets immediately.
+// Read-only: importing the bundled pack is an explicit user action via
+// POST /dsh-presets/install (the "一键导入" button).
 func (h *orchestratorHandler) dshPresets(w http.ResponseWriter, _ *http.Request) {
-	dshclient.EnsureAgentPackInstalled()
 	presets := dshclient.ListAgentPresets()
 	if presets == nil {
 		presets = []dshclient.AgentPresetInfo{}
 	}
 	writeJSON(w, presets)
+}
+
+// dshPresetsInstall runs the bundled dsh-agent-pack installer on demand
+// (button-triggered). Idempotent: presets already present are skipped, so a
+// repeated click only fills the gaps. Returns the install report so the
+// frontend can show what was imported.
+func (h *orchestratorHandler) dshPresetsInstall(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, orchestrator.InstallAgentPack())
 }
 
 // selfcheck returns the one-click self-check report: agent catalog, live

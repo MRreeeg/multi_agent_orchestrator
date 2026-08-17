@@ -533,6 +533,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /orchestrator/api/agents", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/nodes/types", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/dsh-presets", s.orchestratorAPI)
+	mux.HandleFunc("POST /orchestrator/api/dsh-presets/install", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/pipelines", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/pipelines", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/pipelines/", s.orchestratorAPI)

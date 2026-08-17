@@ -8,9 +8,9 @@ import (
 	"sync"
 )
 
-// installMu serializes EnsureAgentPackInstalled: /selfcheck and /dsh-presets
-// can fire concurrently at startup, and the copy steps must not race on the
-// same destination directories.
+// installMu serializes EnsureAgentPackInstalled: the import button and other
+// callers can fire concurrently, and the copy steps must not race on the same
+// destination directories.
 var installMu sync.Mutex
 
 // PackInstallReport describes the outcome of auto-installing the bundled
@@ -96,6 +96,23 @@ func isAgentPackDir(dir string) bool {
 		}
 	}
 	return true
+}
+
+// ProbeAgentPack reports whether a bundled dsh-agent-pack exists on this
+// machine without installing anything. It is read-only and used by the
+// self-check panel to offer the "一键导入" action only when a pack is present.
+func ProbeAgentPack() PackInstallReport {
+	report := PackInstallReport{}
+	packDir := FindAgentPackDir()
+	if packDir == "" {
+		return report
+	}
+	report.Found = true
+	report.PackDir = packDir
+	if home := DshHome(); home != "" {
+		report.DshHome = home
+	}
+	return report
 }
 
 // EnsureAgentPackInstalled idempotently installs the bundled dsh-agent-pack

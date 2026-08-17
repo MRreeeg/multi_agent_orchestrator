@@ -27,8 +27,8 @@ type ExecutorHealth struct {
 // states, skill catalog with search roots, executor binary probes, the
 // programmatically probed agents/models (no AI involved), and the locally
 // authored DSH agent presets imported from $DSH_HOME/.agent-presets. It also
-// carries the outcome of auto-installing the bundled dsh-agent-pack, so the
-// frontend can reflect "installed automatically" without a manual run.
+// carries whether the bundled dsh-agent-pack is present, so the frontend can
+// offer an explicit "一键导入" action instead of installing on every check.
 type SelfCheck struct {
 	Agents      []NodeTypeInfo              `json:"agents"`
 	Runtimes    []RuntimeState              `json:"runtimes"`
@@ -151,12 +151,11 @@ func probeVersion(ctx context.Context, bin string, prefix []string) (string, err
 // SelfCheckSnapshot assembles a one-click self-check report from already
 // computed state (node types, live runtimes, skill catalog with roots) plus a
 // fresh executor binary probe, the programmatically probed agents/models, and
-// the locally authored DSH agent presets. Before listing presets it runs the
-// bundled dsh-agent-pack auto-installer (idempotent, no-op when the pack is
-// absent), so a fresh clone's self-check both installs the customization and
-// reports it in one step.
+// the locally authored DSH agent presets. It only probes whether the bundled
+// dsh-agent-pack exists on this machine; installation is a separate explicit
+// action (the "一键导入" button → /dsh-presets/install), so a self-check never
+// mutates $DSH_HOME behind the user's back.
 func SelfCheckSnapshot(ctx context.Context) SelfCheck {
-	pack := dshclient.EnsureAgentPackInstalled()
 	return SelfCheck{
 		Agents:      NodeTypeCatalog(),
 		Runtimes:    AllRuntimes(),
@@ -165,9 +164,15 @@ func SelfCheckSnapshot(ctx context.Context) SelfCheck {
 		Health:      CheckExecutors(ctx),
 		DshPresets:  dshclient.ListAgentPresets(),
 		Probes:      ProbeModels(ctx),
-		PackInstall: pack,
+		PackInstall: dshclient.ProbeAgentPack(),
 		CheckedAt:   time.Now(),
 	}
+}
+
+// InstallAgentPack runs the bundled dsh-agent-pack installer explicitly
+// (button-triggered). It is idempotent and safe to call repeatedly.
+func InstallAgentPack() dshclient.PackInstallReport {
+	return dshclient.EnsureAgentPackInstalled()
 }
 
 // AllRuntimes merges the live runtime state of every executor manager.

@@ -1,6 +1,6 @@
 # 客制化 Agent 导入与自检（Reasonix × DSH 预设集成）
 
-> 版本：2026-08-14 ｜ 适用：想让 Reasonix 编排控制台的 dsh 节点直接用上本地客制化的 DSH agent，并在自检时自动导入的人
+> 版本：2026-08-17 ｜ 适用：想让 Reasonix 编排控制台的 dsh 节点直接用上本地客制化的 DSH agent，并一键导入内置客制化包的人
 > 关联：[[00-创造模式配置交接文档.zh-CN.md]]、[[03-自定义Agent打包与跨电脑复用.zh-CN.md]]、[[02-DSH执行器接入与配置.zh-CN.md]]
 > 代码：`internal/executor/dsh/presets.go`、`internal/orchestrator/health.go`、`internal/serve/orchestrator.go`、`internal/serve/orchestrator_frontend/index.html`
 
@@ -8,7 +8,7 @@
 
 ## 1. 一句话方案
 
-**本地客制化 agent = `$DSH_HOME/.agent-presets/<id>/` 目录**（`agent.cordis.yml` + `preset.yml`，可选 `headless.patch.yml`）。Reasonix 在**自检时自动扫描并导入**这些目录：自检面板列出它们，dsh 节点配置面板出现「客制化 Agent」下拉；节点选中后，执行器把该预设的 `headless.patch.yml` 作为 `--patch` 覆盖层传给 `dsh --profile headless`。
+**本地客制化 agent = `$DSH_HOME/.agent-presets/<id>/` 目录**（`agent.cordis.yml` + `preset.yml`，可选 `headless.patch.yml`）。Reasonix 在**自检时扫描**这些目录（自检面板列出它们，并可一键导入仓库内置的 4 个预设），dsh 节点配置面板出现「客制化 Agent」下拉；节点选中后，执行器把该预设的 `headless.patch.yml` 作为 `--patch` 覆盖层传给 `dsh --profile headless`。
 
 ## 2. 两个机制，各司其职
 
@@ -19,9 +19,9 @@
 
 为什么节点不用 preset 本体：`dsh --profile headless` 的 one-shot runner 不挂载 preset 花名册（无 Web 的 agent-presets 行），实测预设组合无法生效；而 `--patch` 的 persona 覆盖是交接文档 §4 已验证的机制。`headless.patch.yml` 把同一个职责"翻译"成 headless 能吃的形式，两份文件一起分发、一起维护。
 
-## 3. 自检自动导入（/selfcheck）
+## 3. 自检探测与一键导入（/selfcheck + /dsh-presets/install）
 
-`GET /orchestrator/api/selfcheck` 新增 `dshPresets` 字段：`DiscoverDshPresets()` 扫描 `$DSH_HOME/.agent-presets/*/`，读取 `preset.yml` 的 `name`/`description`，并检查 `headless.patch.yml` 是否存在（`hasPatch`）。前端自检面板新增「客制化 DSH Agent（本地自动导入）」区，逐条显示名称、id、描述、目录与"可用于节点 / 无 headless 补丁"徽章。
+`GET /orchestrator/api/selfcheck` 返回 `dshPresets` 与 `packInstall` 字段：`ListAgentPresets()` 扫描 `$DSH_HOME/.agent-presets/*/`，读取 `preset.yml` 的 `name`/`description`，并检查 `headless.patch.yml` 是否存在（`hasPatch`）；`packInstall` 只探测仓库内是否有内置包（`ProbeAgentPack`，只读不写）。前端自检面板新增「客制化 DSH Agent」区，逐条显示名称、id、描述、目录与"可用于节点 / 无 headless 补丁"徽章；检测到内置包时显示「一键导入」按钮，点击触发 `POST /orchestrator/api/dsh-presets/install` 执行幂等安装。
 
 节点配置面板的专用端点 `GET /orchestrator/api/dsh-presets` 返回同一份数据（初始化时加载，不必等自检）。
 
@@ -50,7 +50,7 @@
 
 ## 6. 换电脑复用（git clone 后最快上手）
 
-**自检自动安装**：新机器上克隆/拉取仓库后，无需手动跑安装器——`/selfcheck` 和 `/dsh-presets` 会检测仓库内的 `docs/deepseek-harness/dsh-agent-pack`（也可用 `REASONIX_DSH_PACK_DIR` 覆盖其位置），并**幂等自动安装**：把 4 个预设复制到 `$DSH_HOME/.agent-presets/`、skills 复制到 DSH 与 Reasonix 技能根、persona 覆盖层合并进 `$DSH_HOME/cordis.patch.yml`。自检面板显示"已自动安装预设"；本地已存在同名预设时跳过、不覆盖用户自定义。自检完成后前端自动刷新「客制化 Agent」下拉与节点标注，无需退出重进。
+**自检只探测、导入显式触发**：新机器上克隆/拉取仓库后，打开控制台 `/selfcheck`——「内置 deepseek-harness 客制化包」区会**只检测**仓库内的 `docs/deepseek-harness/dsh-agent-pack`（也可用 `REASONIX_DSH_PACK_DIR` 覆盖其位置），不自动写入任何文件；点击「一键导入」按钮才执行幂等安装：把 4 个预设复制到 `$DSH_HOME/.agent-presets/`、skills 复制到 DSH 与 Reasonix 技能根、persona 覆盖层合并进 `$DSH_HOME/cordis.patch.yml`。按钮下方直接显示导入结果（已导入/已存在跳过/persona 合并/错误）；导入完成后前端自动刷新「客制化 Agent」下拉与节点标注，无需退出重进。本地已存在同名预设时跳过、不覆盖用户自定义。
 
 需要完整/可定制安装（如复用其他 agent 已下载的 skill）时仍可用安装器：
 
@@ -62,7 +62,7 @@ cd docs\deepseek-harness\dsh-agent-pack
 .\install.ps1 -Mode user -SkillDirs "C:\Users\xxx\.codex\skills;C:\Users\xxx\.local\share\mimocode\builtin_skills\0.1.9\skills"
 ```
 
-然后启动控制台 → `/selfcheck` 的「客制化 DSH Agent」区自动导入 4 个预设；dsh 节点「客制化 Agent」下拉即可选择。预设目录零依赖（纯 YAML + SKILL.md），复制即用。
+然后启动控制台 → 自检面板点「一键导入」把 4 个预设装进 `$DSH_HOME/.agent-presets/`；dsh 节点「客制化 Agent」下拉即可选择。预设目录零依赖（纯 YAML + SKILL.md），复制即用。
 
 ### 6.1 共用已有 skill（不重复下载）
 
@@ -79,12 +79,12 @@ DSH 通过 `skill-filesystem.customSkillDirs` 直接指向其他 agent 已下载
 - 改 persona/职责时，`agent.cordis.yml` 与 `headless.patch.yml` **两份文件同步改**（后者是前者的 headless 翻译）。
 - `headless.patch.yml` 里 `disabled: true` 的每一行都对应"预设组合里没有该工具行"：加工具行到组合时，记得从补丁里移除对应禁用。
 - 新增角色预设时：`presets/<id>/` 三件套 + 自检自动出现，无需改后端代码。
-- 自动安装定位：`internal/executor/dsh/install.go` 的 `FindAgentPackDir`（env `REASONIX_DSH_PACK_DIR` → cwd → exe 向上 4 层找 `docs/deepseek-harness/dsh-agent-pack`）。复制预设时以 `preset.yml` 存在性判断"已装"，不覆盖用户改动；persona 覆盖层以 `# dsh-agent-pack` 注释标记去重。
+- 自动安装定位：`internal/executor/dsh/install.go` 的 `FindAgentPackDir`（env `REASONIX_DSH_PACK_DIR` → cwd → exe 向上 4 层找 `docs/deepseek-harness/dsh-agent-pack`）；自检只用 `ProbeAgentPack` 只读探测，安装由 `POST /orchestrator/api/dsh-presets/install`（前端「一键导入」按钮）显式触发。复制预设时以 `preset.yml` 存在性判断"已装"，不覆盖用户改动；persona 覆盖层以 `# dsh-agent-pack` 注释标记去重。
 
 ## 8. 验收清单
 
 - [ ] `$DSH_HOME/.agent-presets/` 下存在 4 个预设目录，每个都有 `agent.cordis.yml` + `preset.yml` + `headless.patch.yml`
-- [ ] **首次自检自动安装**：新克隆后打开控制台 `/selfcheck`，「内置 DSH 客制化包」区显示"已自动安装预设：architect · executor · frontend-analyst · reviewer"，`$DSH_HOME/.agent-presets/` 自动出现 4 个预设
+- [ ] **手动一键导入**：新克隆后打开控制台 `/selfcheck`，「内置 deepseek-harness 客制化包」区显示检测到的 pack 路径与「一键导入」按钮（不自检时不写任何文件）；点击后按钮下方显示"已导入预设：architect · executor · frontend-analyst · reviewer"，`$DSH_HOME/.agent-presets/` 出现 4 个预设
 - [ ] 自检后 dsh 节点配置面板「客制化 Agent」下拉无需退出重进即可看到/刷新预设
 - [ ] 控制台 `/selfcheck` 的「客制化 DSH Agent」区列出 4 个预设，均可用于节点
 - [ ] dsh 节点配置面板「客制化 Agent」下拉可选 4 个预设，卡片显示「客制化 Agent：xxx」
