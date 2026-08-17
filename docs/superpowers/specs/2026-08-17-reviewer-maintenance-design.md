@@ -92,8 +92,9 @@ pipeline.go:2819-2867），用户测试场景（opencode serve + mimo serve 免�
 
 1. T1：无新进展 ≥ `stall.noProgressTimeout`（默认 90s）；
 2. T2/T3：turn 进行中 ≥ `stall.turnWarnTimeout`（默认 3min）；
-3. 执行返回错误且错误类型属于"疑似卡住"（空输出、超时类错误、快速失败信号
-   如 permission 死循环——现有 mimoFastFailureReason 检测保留）。
+3. 执行返回错误且错误类型属于"疑似卡住"：空输出错误（ErrEmptyOutput 类）、
+   上下文超时类错误（DeadlineExceeded）、快速失败信号（permission 死循环——
+   现有 mimoFastFailureReason 检测保留）。
 
 不做独立的"重复输出文本相似度"检测（审计修正：实现复杂、弱模型下判定不可靠），
 循环与否由审查者从现场包中的事件摘要判断。
@@ -150,6 +151,11 @@ pipeline.go:2819-2867），用户测试场景（opencode serve + mimo serve 免�
 ## 6. Maintenance Executor：指令执行
 
 ### 6.1 时序（先中断再诊断，用户已确认）
+
+**协调语义**：stall 命中后，维护流程接管节点执行的控制权——主等待（submitTask /
+Execute 等待）被解除（维护流程持有执行上下文的取消句柄，interrupt 由维护流程
+执行）。Execute 返回（T1 中断错误或部分输出）后由维护流程吞掉，不落 failed。
+若中断执行前模型恰好完成（Execute 返回正常结果）→ 放弃维护，走正常完成。
 
 1. StallDetector 命中 → 节点挂起；
 2. **先 interrupt**（T1：调用执行器 interrupt API；T2/T3：无需，进程继续观察）：
