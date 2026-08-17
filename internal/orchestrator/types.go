@@ -85,6 +85,9 @@ type ExecSpec struct {
 	// DshPreset names a locally authored DSH agent preset for dsh executor
 	// nodes (mirrors AgentNode.DshPreset).
 	DshPreset string
+	// StallMaintenance enables the reviewer-driven stall repair loop for this
+	// execution (resolved from AgentNode.StallMaintenance + env master switch).
+	StallMaintenance bool
 }
 
 // ExecResult is the unified execution result from any executor.
@@ -147,6 +150,10 @@ type AgentNode struct {
 	// via its headless.patch.yml; when empty, the node uses DSH's stock
 	// headless persona plus prompt/skill injection.
 	DshPreset string  `json:"dshPreset,omitempty"`
+	// StallMaintenance enables the reviewer-driven stall repair loop for this
+	// node. Nil means enabled (default); false disables it per node. The
+	// global REASONIX_STALL_MAINTENANCE=off env switch overrides everything.
+	StallMaintenance *bool `json:"stallMaintenance,omitempty"`
 	// Assist configures the node's auxiliary "helper hand": a small assistant
 	// agent (default: mimo vision) that the node can delegate side tasks to
 	// (image analysis first) during a run. Nil or Enabled=false means no helper.
@@ -195,7 +202,10 @@ type PipelineRun struct {
 	TerminationReason  string              `json:"terminationReason,omitempty"` // review_pass | fixed_limit | max_iterations | blocked | failed | canceled
 	NodeStates         map[string]RunState `json:"nodeStates"`
 	NodeAttemptIDs     []string            `json:"nodeAttemptIDs,omitempty"`
-	CurrentNodeID      string              `json:"currentNodeID,omitempty"`
+	// MaintenanceEvents records reviewer-driven stall repairs applied during
+	// the run (detect → diagnose → nudge/restart/noop), newest last.
+	MaintenanceEvents []MaintenanceEvent  `json:"maintenanceEvents,omitempty"`
+	CurrentNodeID     string              `json:"currentNodeID,omitempty"`
 	CreatedAt          string              `json:"createdAt"`
 	StartedAt          string              `json:"startedAt,omitempty"`
 	FinishedAt         string              `json:"finishedAt,omitempty"`
@@ -204,9 +214,20 @@ type PipelineRun struct {
 	Cancel             func()              `json:"-"`
 }
 
+// MaintenanceEvent records one reviewer-driven stall repair applied during
+// a run.
+type MaintenanceEvent struct {
+	NodeID      string `json:"nodeId"`
+	IterationID string `json:"iterationId,omitempty"`
+	At          string `json:"at"`
+	Reason      string `json:"reason"`
+	Action      string `json:"action"` // nudge | restart | noop
+	Outcome     string `json:"outcome"` // applied | skipped | failed | max_interventions
+	Detail      string `json:"detail,omitempty"`
+}
+
 // RunState captures a node's execution state during a run.
-type RunState struct {
-	Status     NodeStatus `json:"status"`
+type RunState struct {	Status     NodeStatus `json:"status"`
 	Input      string     `json:"input,omitempty"`
 	Output     string     `json:"output,omitempty"`
 	Stderr     string     `json:"stderr,omitempty"` // full stderr (thinking, tool calls)

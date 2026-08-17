@@ -867,8 +867,18 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 		}
 	}
 
-	// Execute the node — pass context policy and session ID for Codex resume
-	output, nodeStderr, realUsage, nodeRuntimeID, nodeEndpoint, execExternalSessionID, execErr := s.executeNodeWithLoopProtocolAtWorkspace(ctx, &nodeCopy, input, contextPolicy, externalSessionID, true, loopReview, runWorkspace(run))
+	// Execute the node — pass context policy and session ID for Codex resume.
+	// Reviewer-driven stall repair (L-53) wraps the call when the loop review
+	// is enabled and a reviewer node exists; otherwise it degrades to the
+	// plain execution below.
+	outcome := s.execWithStallRepair(ctx, run, pipe, sessionID, iterationID, nodeID, &nodeCopy, input, contextPolicy, externalSessionID, loopReview, binding.ID, providerSessionID, 0)
+	output, nodeStderr, realUsage, nodeRuntimeID, nodeEndpoint, execExternalSessionID, execErr := outcome.output, outcome.stderr, outcome.usage, outcome.runtimeID, outcome.endpoint, outcome.extSessionID, outcome.err
+	// A restart repair records its result under the new attempt, not the
+	// original one.
+	attemptID := attempt.ID
+	if outcome.attemptID != "" {
+		attemptID = outcome.attemptID
+	}
 
 	// Reviewer gets at most one corrective turn when a provider exposes a tool
 	// call as its final text. This preserves compatibility with providers that
@@ -918,7 +928,7 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 
 	// Update attempt with results
 	doneAt := time.Now().UTC().Format(time.RFC3339)
-	if err := s.UpdateAttempt(attempt.ID, func(a *NodeAttempt) {
+	if err := s.UpdateAttempt(attemptID, func(a *NodeAttempt) {
 		a.Output = output
 		a.Stderr = nodeStderr
 		a.FinishedAt = doneAt

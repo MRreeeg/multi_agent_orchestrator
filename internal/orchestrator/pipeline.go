@@ -932,6 +932,19 @@ func mimoEventText(evt map[string]any) string {
 	return ""
 }
 
+// stallMaintenanceEnabled resolves whether reviewer-driven stall repair runs
+// for a node: the global REASONIX_STALL_MAINTENANCE=off env switch disables
+// everything; otherwise the node-level switch applies (nil means enabled).
+func stallMaintenanceEnabled(nodeSwitch *bool) bool {
+	if v := strings.TrimSpace(os.Getenv("REASONIX_STALL_MAINTENANCE")); v != "" {
+		switch strings.ToLower(v) {
+		case "off", "false", "0", "disable", "disabled":
+			return false
+		}
+	}
+	return nodeSwitch == nil || *nodeSwitch
+}
+
 func mimoFastFailureReason(line string) string {
 	clean := strings.ToLower(stripANSIEscapeCodes(strings.TrimSpace(line)))
 	switch {
@@ -3084,7 +3097,7 @@ func (s *Store) executeNodeWithLoopProtocol(ctx context.Context, node *AgentNode
 	return s.executeNodeWithLoopProtocolAtWorkspace(ctx, node, input, contextPolicy, externalSessionID, loopActive, loopReview, detectWorkspace())
 }
 
-func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node *AgentNode, input string, contextPolicy, externalSessionID string, loopActive, loopReview bool, workspace string) (output, stderr string, realUsage *TokenUsage, runtimeID, endpoint, retExternalSessionID string, err error) {
+func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node *AgentNode, input string, contextPolicy, externalSessionID string, loopActive, loopReview bool, workspace string, startNotify ...func(string, int)) (output, stderr string, realUsage *TokenUsage, runtimeID, endpoint, retExternalSessionID string, err error) {
 	// Emit start event.
 	s.emit(event.Event{Kind: event.PipelineNodeStart, Text: node.ID})
 
@@ -3177,6 +3190,7 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		ContextPolicy:     contextPolicy,
 		ExternalSessionID: externalSessionID,
 		DshPreset:         strings.TrimSpace(node.DshPreset),
+		StallMaintenance:  stallMaintenanceEnabled(node.StallMaintenance),
 	}
 	if loopReview {
 		// Keep reviewer cost bounded even if the provider ignores the prompt
@@ -3222,6 +3236,9 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	// Execute — pass onStart callback so the frontend shows the port badge
 	// the moment the serve process starts (before waiting for readiness).
 	onStart := func(endpoint string, port int) {
+		if len(startNotify) > 0 && startNotify[0] != nil {
+			startNotify[0](endpoint, port)
+		}
 		s.emitRuntimeEvent(node.ID, endpoint, port, "starting", string(node.Executor), runtimeAccessMode(node.Executor, node.Mode), "")
 	}
 	result, execErr := executor.Execute(ctx, spec, onStart)
@@ -3272,9 +3289,11 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	}
 
 	if execErr != nil {
-		if ctx.Err() == context.Canceled {
+		if ctx.Err() == context.Canceled || ctx.Err() == context.DeadlineExceeded {
 			s.emit(event.Event{Kind: event.PipelineNodeFailed, Text: node.ID, Detail: "cancelled"})
-			return "", "", nil, result.RuntimeID, result.Endpoint, result.ExternalSessionID, context.Canceled
+			// Keep any partial output so the stall-repair scene and the
+			// interrupted attempt state can still be inspected.
+			return result.FinalText, stderr, result.TokenUsage, result.RuntimeID, result.Endpoint, result.ExternalSessionID, ctx.Err()
 		}
 		errMsg := stderr
 		if errMsg == "" {

@@ -112,6 +112,10 @@ const (
 	// PipelineIteration signals a Loop iteration began. Text carries the run id,
 	// Detail carries JSON with runID/iteration/maxIterations. Appended last.
 	PipelineIteration
+	// PipelineNodeMaintenance signals a reviewer-driven stall repair decision
+	// for a loop node. Text carries the node id, Detail carries JSON with
+	// action/outcome/reason. Appended last.
+	PipelineNodeMaintenance
 	// AnalyzeProgress signals progress of an in-flight AI analysis subprocess
 	// (requirement analysis or run-progress analysis). Text carries the stage
 	// (spawning|thinking|parsing|done|failed|retrying); Detail carries JSON

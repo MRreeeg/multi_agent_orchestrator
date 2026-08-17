@@ -152,3 +152,85 @@ func ValidateReviewDecision(d ReviewDecision) error {
 
 	return nil
 }
+
+// MaintenancePlan is the reviewer's repair instruction for a stalled node
+// (maintenance-plan-v1). judgment nudge sends a corrective message to the
+// live runtime; restart kills it and reruns the node with a correction;
+// noop means the reviewer judged the node merely slow.
+type MaintenancePlan struct {
+	SchemaVersion string `json:"schemaVersion"`
+	Judgment      string `json:"judgment"`
+	Reason        string `json:"reason"`
+	Nudge         *struct {
+		Message string `json:"message"`
+	} `json:"nudge,omitempty"`
+	Restart *struct {
+		Correction string `json:"correction"`
+	} `json:"restart,omitempty"`
+}
+
+// ParseMaintenancePlan extracts a MaintenancePlan from the reviewer's
+// maintenance-mode output, reusing the same "last complete JSON object"
+// scanning strategy as ParseReviewDecision.
+func ParseMaintenancePlan(output string) (MaintenancePlan, error) {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return MaintenancePlan{}, fmt.Errorf("empty maintenance output")
+	}
+	var jsonStr string
+	var direct MaintenancePlan
+	if err := json.Unmarshal([]byte(output), &direct); err == nil && direct.Judgment != "" {
+		jsonStr = output
+	} else {
+		for i := 0; i < len(output); i++ {
+			if output[i] != '{' {
+				continue
+			}
+			end := scanJSONObjectEnd(output, i)
+			if end < 0 {
+				continue
+			}
+			candidate := output[i : end+1]
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(candidate), &raw); err == nil {
+				if _, ok := raw["judgment"]; ok {
+					jsonStr = candidate
+				}
+			}
+			i = end
+		}
+	}
+	if jsonStr == "" {
+		return MaintenancePlan{}, fmt.Errorf("no JSON with 'judgment' field found in maintenance output")
+	}
+	var plan MaintenancePlan
+	if err := json.Unmarshal([]byte(jsonStr), &plan); err != nil {
+		return MaintenancePlan{}, fmt.Errorf("failed to parse maintenance JSON: %w", err)
+	}
+	return plan, nil
+}
+
+// ValidateMaintenancePlan checks that a MaintenancePlan conforms to the
+// maintenance-plan-v1 protocol.
+func ValidateMaintenancePlan(p MaintenancePlan) error {
+	if p.SchemaVersion != "maintenance-plan-v1" {
+		return fmt.Errorf("invalid schemaVersion %q: must be maintenance-plan-v1", p.SchemaVersion)
+	}
+	switch p.Judgment {
+	case "nudge":
+		if p.Nudge == nil || strings.TrimSpace(p.Nudge.Message) == "" {
+			return fmt.Errorf("nudge judgment requires non-empty nudge.message")
+		}
+	case "restart":
+		if p.Restart == nil || strings.TrimSpace(p.Restart.Correction) == "" {
+			return fmt.Errorf("restart judgment requires non-empty restart.correction")
+		}
+	case "noop":
+	default:
+		return fmt.Errorf("invalid judgment %q: must be nudge, restart, or noop", p.Judgment)
+	}
+	if strings.TrimSpace(p.Reason) == "" {
+		return fmt.Errorf("reason is required")
+	}
+	return nil
+}
