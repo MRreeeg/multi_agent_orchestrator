@@ -184,6 +184,14 @@ input,textarea,select{font:inherit;color:inherit}
 /* 输入区居中卡片化：不贴两侧、不贴底部，宽度收窄到舒适区；
    align-items:stretch 让发送按钮与输入框同高同圆角，视觉上完全对齐 */
 .chat__composer{display:flex;align-items:stretch;gap:10px;width:min(860px,100%);margin:0 auto}
+.chat__attachments{display:flex;flex-wrap:wrap;gap:8px;width:min(860px,100%);margin:0 auto 8px}
+.chat__attach-chip{position:relative;display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--bg-2, var(--bg))}
+.chat__attach-chip img{width:36px;height:36px;object-fit:cover;border-radius:4px}
+.chat__attach-chip .chat__attach-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.chat__attach-chip .chat__attach-del{cursor:pointer;border:none;background:none;color:var(--fg-2, #999);font-size:14px;line-height:1}
+.chat__attach-btn{flex-shrink:0;align-self:stretch;width:38px;border:1px solid var(--border);border-radius:8px;background:var(--bg-2, var(--bg));color:var(--fg, inherit);font-size:18px;cursor:pointer}
+.chat__attach-btn:hover{background:var(--bg-3, var(--bg))}
+.chat__composer.is-dragging{outline:2px dashed var(--accent, #4a9eff);outline-offset:-4px;border-radius:10px}
 /* 工作目录卡片：位于输入框上方，小按钮卡片式（不再是顶栏里的文本框） */
 /* 注意：input/按钮的显示/隐藏由 JS 用内联 style 控制（display 不写进类），
    否则 style.display='' 会被类的 display:none 覆盖，路径一隐藏输入框却不出
@@ -599,7 +607,10 @@ input,textarea,select{font:inherit;color:inherit}
           <select class="chat__opt" id="chat-agent" title="需求分析使用的 Agent 人设：deepseek-harness 执行器下为本机客制化 agent 预设（可手动导入）"></select>
         </div>
         <div class="chat__input-bar" id="chat-input-bar">
+          <div class="chat__attachments" id="chat-attachments" style="display:none"></div>
           <div class="chat__composer">
+            <input type="file" id="chat-file-input" accept="image/*" multiple style="display:none" />
+            <button class="chat__attach-btn" id="chat-attach-btn" title="添加图片">＋</button>
             <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
             <button class="chat__send" id="chat-send" title="生成编排">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
@@ -1316,6 +1327,7 @@ const state = {
   sseConnection: null,
   nextNodeId: 4,
   canvasOffset: { x: 0, y: 0 },
+  pendingAttachments: [], // 待发送图片附件 [{id, name, url}]
 };
 
 function edgeId(edge, index) {
@@ -1560,6 +1572,79 @@ const chatInput = $('#chat-input');
   const chatSend = $('#chat-send');
 const chatWelcome = $('#chat-welcome');
 const chatInputBar = $('#chat-input-bar');
+const chatAttachBtn = $('#chat-attach-btn');
+const chatFileInput = $('#chat-file-input');
+const chatAttachments = $('#chat-attachments');
+
+// ── 附件（图片）──
+function isImageFile(file) {
+  return file && file.type && file.type.startsWith('image/');
+}
+
+function renderPendingAttachments() {
+  if (!chatAttachments) return;
+  chatAttachments.innerHTML = '';
+  state.pendingAttachments.forEach(a => {
+    const chip = document.createElement('div');
+    chip.className = 'chat__attach-chip';
+    chip.innerHTML = '<img src="' + escAttr(a.url) + '" alt="" />' +
+      '<span class="chat__attach-name">' + escHtml(a.name) + '</span>' +
+      '<button class="chat__attach-del" title="移除" onclick="removePendingAttachment(\'' + a.id + '\')">×</button>';
+    chatAttachments.appendChild(chip);
+  });
+  chatAttachments.style.display = state.pendingAttachments.length ? 'flex' : 'none';
+}
+
+async function uploadPendingImage(file) {
+  if (!isImageFile(file)) { toast('仅支持图片文件（png/jpg/gif/webp/bmp）', 'error'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('图片不能超过 10MB', 'error'); return; }
+  const data = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+    fr.onerror = () => reject(new Error('读取文件失败'));
+    fr.readAsDataURL(file);
+  });
+  try {
+    const up = await apiPost('/upload-image', { data, name: file.name || 'image' });
+    if (state.pendingAttachments.some(a => a.id === up.id)) return;
+    state.pendingAttachments.push({ id: up.id, name: up.name || file.name, url: up.url });
+    renderPendingAttachments();
+  } catch (e) {
+    toast('图片上传失败: ' + e.message, 'error');
+  }
+}
+
+function removePendingAttachment(id) {
+  state.pendingAttachments = state.pendingAttachments.filter(a => a.id !== id);
+  renderPendingAttachments();
+}
+
+function handleAttachFiles(files) {
+  if (!files || !files.length) return;
+  Array.from(files).forEach(f => uploadPendingImage(f));
+}
+
+function setupChatAttachments() {
+  if (!chatAttachBtn || !chatFileInput) return;
+  chatAttachBtn.addEventListener('click', () => chatFileInput.click());
+  chatFileInput.addEventListener('change', () => {
+    handleAttachFiles(chatFileInput.files);
+    chatFileInput.value = '';
+  });
+  const composer = document.querySelector('.chat__composer');
+  if (!composer) return;
+  composer.addEventListener('dragover', e => {
+    e.preventDefault();
+    composer.classList.add('is-dragging');
+  });
+  composer.addEventListener('dragleave', () => composer.classList.remove('is-dragging'));
+  composer.addEventListener('drop', e => {
+    e.preventDefault();
+    composer.classList.remove('is-dragging');
+    handleAttachFiles(e.dataTransfer && e.dataTransfer.files);
+  });
+}
+setupChatAttachments();
 
 // Clears conversation bubbles while keeping the hero (welcome) node alive.
 // Replacing innerHTML would detach #chat-welcome and leave a blank chat area.
@@ -6005,6 +6090,8 @@ function escHtml(s) {
   if (s == null) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+function escAttr(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function formatNumber(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
