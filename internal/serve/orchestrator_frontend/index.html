@@ -185,13 +185,13 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__input-bar{border-top:1px solid var(--border);padding:14px 20px 18px;background:var(--bg)}
 /* 输入区居中卡片化：不贴两侧、不贴底部，宽度收窄到舒适区；
    align-items:stretch 让发送按钮与输入框同高同圆角，视觉上完全对齐 */
-.chat__composer{display:flex;align-items:stretch;gap:10px;width:min(860px,100%);margin:0 auto}
+.chat__composer{position:relative;display:flex;align-items:stretch;gap:10px;width:min(860px,100%);margin:0 auto}
 .chat__attachments{display:flex;flex-wrap:wrap;gap:8px;width:min(860px,100%);margin:0 auto 8px}
 .chat__attach-chip{position:relative;display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--bg-2, var(--bg))}
 .chat__attach-chip img{width:36px;height:36px;object-fit:cover;border-radius:4px}
 .chat__attach-chip .chat__attach-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .chat__attach-chip .chat__attach-del{cursor:pointer;border:none;background:none;color:var(--fg-2, #999);font-size:14px;line-height:1}
-.chat__attach-btn{flex-shrink:0;align-self:stretch;width:38px;border:1px solid var(--border);border-radius:8px;background:var(--bg-2, var(--bg));color:var(--fg, inherit);font-size:18px;cursor:pointer}
+.chat__attach-btn{position:absolute;right:58px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .chat__attach-btn:hover{background:var(--bg-3, var(--bg))}
 .chat__composer.is-dragging{outline:2px dashed var(--accent, #4a9eff);outline-offset:-4px;border-radius:10px}
 /* 工作目录卡片：位于输入框上方，小按钮卡片式（不再是顶栏里的文本框） */
@@ -215,7 +215,7 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__opt-label{font-size:10.5px;color:var(--muted-2);font-family:var(--mono)}
 .chat__opt{border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--fg-2);font-size:11px;padding:2px 6px;max-width:180px;outline:none;transition:border-color .15s}
 .chat__opt:hover{border-color:var(--border-strong)}
-.chat__input{flex:1;min-height:52px;max-height:180px;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:10px 14px;font-size:14px;line-height:1.6;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
+.chat__input{flex:1;min-height:52px;max-height:180px;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:10px 52px 10px 14px;font-size:14px;line-height:1.6;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
 .chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 20px -6px oklch(0% 0 0/.18)}
 .chat__input::placeholder{color:var(--muted-2)}
 .chat__send{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex-shrink:0;align-self:flex-end;border-radius:12px;background:var(--accent);color:oklch(99% 0 0);transition:background .18s ease,transform .15s}
@@ -226,9 +226,13 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__title{font-family:var(--heading);font-size:24px;font-weight:700;letter-spacing:-.02em;color:var(--fg);text-align:center;line-height:1.3}
 .hero__sub{font-size:13.5px;color:var(--muted-2);text-align:center;width:min(680px,92%);line-height:1.65}
 .hero__box{position:relative;width:min(680px,94%);margin-top:10px}
-.hero__input{display:block;width:100%;min-height:62px;resize:none;border:1px solid var(--border-strong);border-radius:16px;background:var(--card);padding:14px 62px 14px 16px;font:14px/1.65 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 8px oklch(0% 0 0/.06),0 1px 2px oklch(0% 0 0/.04)}
+.hero__box.is-dragging .hero__input{outline:2px dashed var(--accent, #4a9eff);outline-offset:-4px;border-radius:16px}
+.hero__attachments{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.hero__input{display:block;width:100%;min-height:62px;resize:none;border:1px solid var(--border-strong);border-radius:16px;background:var(--card);padding:14px 112px 14px 16px;font:14px/1.65 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 8px oklch(0% 0 0/.06),0 1px 2px oklch(0% 0 0/.04)}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 8px 24px -8px oklch(0% 0 0/.2)}
 .hero__input::placeholder{color:var(--muted-2)}
+.hero__attach-btn{position:absolute;right:58px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:1px solid var(--border);border-radius:10px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.hero__attach-btn:hover{background:var(--bg-3, var(--bg))}
 .hero__send{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:none;border-radius:12px;background:var(--accent-strong);color:oklch(99% 0 0);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
 .hero__send:hover{transform:translateY(-50%) scale(1.05)}
 .hero__send svg{width:20px;height:20px;opacity:1}
@@ -590,7 +594,9 @@ input,textarea,select{font:inherit;color:inherit}
               <button class="chat__ws-confirm" id="cwd-confirm" style="display:none" onclick="confirmCwd()">确定</button>
             </div>
             <div class="hero__box">
+              <div class="hero__attachments" id="hero-attachments" style="display:none"></div>
               <textarea class="hero__input" id="hero-input" rows="2" placeholder="描述你的任务，例如：实现端口范围解析函数并补测试"></textarea>
+              <button class="hero__attach-btn" id="hero-attach-btn" title="添加图片">＋</button>
               <button class="hero__send" id="hero-send" title="生成编排"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></button>
             </div>
             <div class="hero__chips">
@@ -1577,6 +1583,9 @@ const chatInputBar = $('#chat-input-bar');
 const chatAttachBtn = $('#chat-attach-btn');
 const chatFileInput = $('#chat-file-input');
 const chatAttachments = $('#chat-attachments');
+const heroAttachments = $('#hero-attachments');
+const heroAttachBtn = $('#hero-attach-btn');
+const heroBox = document.querySelector('.hero__box');
 
 // ── 附件（图片）──
 function isImageFile(file) {
@@ -1584,17 +1593,19 @@ function isImageFile(file) {
 }
 
 function renderPendingAttachments() {
-  if (!chatAttachments) return;
-  chatAttachments.innerHTML = '';
-  state.pendingAttachments.forEach(a => {
-    const chip = document.createElement('div');
-    chip.className = 'chat__attach-chip';
-    chip.innerHTML = '<img src="' + escAttr(a.url) + '" alt="" />' +
-      '<span class="chat__attach-name">' + escHtml(a.name) + '</span>' +
-      '<button class="chat__attach-del" title="移除" onclick="removePendingAttachment(\'' + a.id + '\')">×</button>';
-    chatAttachments.appendChild(chip);
+  [chatAttachments, heroAttachments].forEach(container => {
+    if (!container) return;
+    container.innerHTML = '';
+    state.pendingAttachments.forEach(a => {
+      const chip = document.createElement('div');
+      chip.className = 'chat__attach-chip';
+      chip.innerHTML = '<img src="' + escAttr(a.url) + '" alt="" />' +
+        '<span class="chat__attach-name">' + escHtml(a.name) + '</span>' +
+        '<button class="chat__attach-del" title="移除" onclick="removePendingAttachment(\'' + a.id + '\')">×</button>';
+      container.appendChild(chip);
+    });
+    container.style.display = state.pendingAttachments.length ? 'flex' : 'none';
   });
-  chatAttachments.style.display = state.pendingAttachments.length ? 'flex' : 'none';
 }
 
 async function uploadPendingImage(file) {
@@ -1629,21 +1640,24 @@ function handleAttachFiles(files) {
 function setupChatAttachments() {
   if (!chatAttachBtn || !chatFileInput) return;
   chatAttachBtn.addEventListener('click', () => chatFileInput.click());
+  if (heroAttachBtn) heroAttachBtn.addEventListener('click', () => chatFileInput.click());
   chatFileInput.addEventListener('change', () => {
     handleAttachFiles(chatFileInput.files);
     chatFileInput.value = '';
   });
-  const composer = document.querySelector('.chat__composer');
-  if (!composer) return;
-  composer.addEventListener('dragover', e => {
-    e.preventDefault();
-    composer.classList.add('is-dragging');
-  });
-  composer.addEventListener('dragleave', () => composer.classList.remove('is-dragging'));
-  composer.addEventListener('drop', e => {
-    e.preventDefault();
-    composer.classList.remove('is-dragging');
-    handleAttachFiles(e.dataTransfer && e.dataTransfer.files);
+  // 欢迎页与对话输入框都可拖拽放置图片
+  [[document.querySelector('.chat__composer'), null], [heroBox, null]].forEach(([target, _]) => {
+    if (!target) return;
+    target.addEventListener('dragover', e => {
+      e.preventDefault();
+      target.classList.add('is-dragging');
+    });
+    target.addEventListener('dragleave', () => target.classList.remove('is-dragging'));
+    target.addEventListener('drop', e => {
+      e.preventDefault();
+      target.classList.remove('is-dragging');
+      handleAttachFiles(e.dataTransfer && e.dataTransfer.files);
+    });
   });
 }
 
