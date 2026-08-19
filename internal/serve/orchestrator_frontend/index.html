@@ -155,6 +155,8 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__welcome-title{font-family:var(--heading);font-size:16px;font-weight:600;color:var(--fg-2)}
 .chat__welcome-desc{font-size:13px;text-align:center;max-width:320px}
 .chat-bubble{max-width:1080px;animation:msg-in .25s ease}
+.chat-bubble__imgs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chat-bubble__img{max-width:240px;max-height:180px;border-radius:8px;border:1px solid var(--border);cursor:zoom-in}
 @keyframes msg-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .chat-bubble--user{width:max-content;max-width:78%;margin-left:auto;align-self:flex-end}
 .chat-bubble--ai{width:100%}
@@ -3347,24 +3349,30 @@ function renderTable(rows) {
   return h + '</tbody></table>';
 }
 
-function addChatMessage(role, text, meta, persist = true) {
+function addChatMessage(role, text, meta, persist = true, images) {
   hideChatWelcome();
   const div = document.createElement('div');
   div.className = 'chat-bubble chat-bubble--' + role;
+  const imgHtml = (images && images.length)
+    ? '<div class="chat-bubble__imgs">' + images.map(im =>
+        '<img class="chat-bubble__img" src="' + escAttr(im.url || ('/orchestrator/api/images/' + im.id)) + '" alt="' + escAttr(im.name || '') + '" title="' + escAttr(im.name || '') + '" />'
+      ).join('') + '</div>'
+    : '';
   div.innerHTML = `
     <div class="chat-bubble__inner">${renderMarkdown(text)}</div>
+    ${imgHtml}
     ${meta ? `<div class="chat-bubble__meta">${escHtml(meta)}</div>` : ''}
   `;
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   if (!persist) return;
-  state.chatMessages.push({ role, text, meta });
+  state.chatMessages.push({ role, text, meta, images: images || [] });
   // Categorize: requirement messages vs pipeline logs
   const isPipelineLog = meta === '流水线' || meta === '工具' || meta === '工具结果' || meta === '通知';
   if (role === 'user' || (!isPipelineLog && meta !== '分析中' && meta !== '错误')) {
-    state.requirementMessages.push({ role, text, meta });
+    state.requirementMessages.push({ role, text, meta, images: images || [] });
   } else {
-    state.pipelineMessages.push({ role, text, meta });
+    state.pipelineMessages.push({ role, text, meta, images: images || [] });
   }
 }
 
@@ -3419,7 +3427,8 @@ async function refreshChatHistory() {
       if (!m || !m.role || m.role === 'system' || m.role === 'tool') continue;
       const role = m.role === 'assistant' ? 'ai' : m.role;
       const text = [m.reasoning, m.content].filter(Boolean).join(m.reasoning && m.content ? '\n\n' : '');
-      addChatMessage(role, text || '', m.toolName || m.toolCallId || '');
+      const images = (m.images || []).map(im => ({ id: im.id, name: im.name, url: '/orchestrator/api/images/' + im.id }));
+      addChatMessage(role, text || '', m.toolName || m.toolCallId || '', true, images);
     }
   } catch (err) {
     console.warn('refreshChatHistory failed:', err);
@@ -3440,8 +3449,9 @@ async function loadOrchestrationConversation(sessionID) {
   }
   hideChatWelcome();
   for (const m of messages) {
-    addChatMessage(m.role, m.text || '', m.meta || '', false);
-    state.chatMessages.push({ role: m.role, text: m.text || '', meta: m.meta || '' });
+    const images = (m.images || []).map(im => ({ id: im.id, name: im.name, url: '/orchestrator/api/images/' + im.id }));
+    addChatMessage(m.role, m.text || '', m.meta || '', false, images);
+    state.chatMessages.push({ role: m.role, text: m.text || '', meta: m.meta || '', images });
   }
   return true;
 }
@@ -3557,7 +3567,18 @@ async function sendChat() {
     if (heroSendBtn) { heroSendBtn.disabled = false; heroSendBtn.classList.remove('is-loading'); }
     chatSend.disabled = false;
   };
-  addChatMessage('user', text);
+  // 图片附件：本次发送的 + 历史 requirementMessages 中带图的（保持上下文）
+  const pendingImages = state.pendingAttachments.splice(0);
+  renderPendingAttachments();
+  const historyImages = [];
+  state.requirementMessages.forEach(m => {
+    if (m.images && m.images.length) {
+      m.images.forEach(im => historyImages.push({ id: im.id, name: im.name || '' }));
+    }
+  });
+  const allImages = pendingImages.concat(historyImages);
+  // 用户消息持久化（含本次图片）
+  addChatMessage('user', text, '', true, pendingImages);
 
   // Ensure we have an orchestration session
   if (!state.sessionID) {
@@ -3604,7 +3625,8 @@ async function sendChat() {
       lang: currentLang || 'zh',
       executor: $('#chat-executor').value || '',
       model: $('#chat-model').value || '',
-      agent: $('#chat-agent').value || ''
+      agent: $('#chat-agent').value || '',
+      images: allImages
     });
     console.log('[sendChat] analysis result:', JSON.stringify(analysis).substring(0, 500));
     // Loop is a runtime repetition of one base DAG. If the model still
