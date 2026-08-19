@@ -121,6 +121,11 @@ func runtimeAccessMode(executor ExecutorType, mode string) string {
 		// the Orchestrator Runtime Console; the browser never dials the CLI.
 		return "runtime_console"
 	}
+	if executor == ExecutorOpencode && strings.EqualFold(mode, "serve") {
+		// opencode serve is driven purely over its HTTP API (no bound UI
+		// conversation thread); the browser must use the Runtime Console.
+		return "runtime_console"
+	}
 	return "browser"
 }
 
@@ -164,6 +169,9 @@ func managedRuntimeState(runtimeID string) (*RuntimeState, bool) {
 		return rt, true
 	}
 	if rt, ok := claudeRuntimeMgr.Get(runtimeID); ok {
+		return rt, true
+	}
+	if rt, ok := opencodeRuntimeMgr.Get(runtimeID); ok {
 		return rt, true
 	}
 	return nil, false
@@ -2456,7 +2464,7 @@ func (s *Store) executePipelineV2(ctx context.Context, run *PipelineRun, pipe *P
 						CreatedAt:      createdAt,
 						LastActiveAt:   time.Now(),
 						CleanupPolicy:  CleanupRetained,
-						AccessMode:     "browser",
+						AccessMode:     runtimeAccessMode(nodeCopy.Executor, nodeCopy.Mode),
 						ApprovalMode:   nodeCopy.ApprovalMode,
 						ExecutionMode:  nodeCopy.ExecutionMode,
 					}

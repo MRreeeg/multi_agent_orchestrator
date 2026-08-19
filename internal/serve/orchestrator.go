@@ -2456,6 +2456,7 @@ func (h *orchestratorHandler) listOrchRuntimes(w http.ResponseWriter, _ *http.Re
 	live = append(live, orchestrator.ListReasonixRuntimes()...)
 	live = append(live, orchestrator.ListCodexRuntimes()...)
 	live = append(live, orchestrator.ListClaudeRuntimes()...)
+	live = append(live, orchestrator.ListOpencodeRuntimes()...)
 	for _, runtime := range live {
 		persisted, ok := byID[runtime.RuntimeID]
 		if !ok {

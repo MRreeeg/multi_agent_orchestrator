@@ -585,6 +585,8 @@ func (s *Store) finalizeLoopRuntimes(run *PipelineRun) {
 				_ = codexRuntimeMgr.Release(rt.id)
 			case ExecutorClaude:
 				_ = claudeRuntimeMgr.Release(rt.id)
+			case ExecutorOpencode:
+				_ = opencodeRuntimeMgr.Release(rt.id)
 			default:
 				_ = reasonixRuntimeMgr.Release(rt.id)
 			}
@@ -1007,6 +1009,7 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 			CreatedAt:      time.Now(),
 			LastActiveAt:   time.Now(),
 			CleanupPolicy:  CleanupRetained,
+			AccessMode:     runtimeAccessMode(nodeCopy.Executor, nodeCopy.Mode),
 		}
 		applyLiveRuntimeState(&rtState)
 		if err := s.CreateRuntimeState(rtState); err != nil {
@@ -1129,6 +1132,8 @@ func stopManagedRuntime(executor ExecutorType, runtimeID string) error {
 		return StopCodexRuntime(runtimeID)
 	case ExecutorClaude:
 		return StopClaudeRuntime(runtimeID)
+	case ExecutorOpencode:
+		return StopOpencodeRuntime(runtimeID)
 	default:
 		return nil
 	}
