@@ -58,6 +58,9 @@ type ExecOptions struct {
 	// Variant is the model variant (provider-specific reasoning effort,
 	// e.g. high / medium / low / max / minimal), passed as `--variant`.
 	Variant string
+	// OnLine, when non-nil, is called with each non-empty trimmed stdout line
+	// as the subprocess streams it (used to show live thinking progress).
+	OnLine func(string)
 }
 
 // Executor executes tasks via the opencode CLI (`opencode run`).
@@ -159,10 +162,26 @@ func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string)
 		cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_CONTENT="+opts.PermissionConfig)
 	}
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-
-	err := cmd.Run()
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("opencode run: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("opencode run: %w", err)
+	}
+	sc := bufio.NewScanner(stdoutPipe)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := sc.Text()
+		stdout.WriteString(line + "\n")
+		if opts.OnLine != nil {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				opts.OnLine(trimmed)
+			}
+		}
+	}
+	err = cmd.Wait()
 	exitCode := 0
 	if err != nil {
 		var exitErr *exec.ExitError

@@ -23,6 +23,12 @@ func (e *DshPipelineExecutor) Name() string { return "dsh" }
 
 // Execute runs a DSH node through the one-shot headless profile.
 func (e *DshPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int)) (*ExecResult, error) {
+	return e.ExecuteWithProgress(ctx, spec, onStart, nil)
+}
+
+// ExecuteWithProgress runs a DSH node through the one-shot headless profile,
+// forwarding each non-empty stdout line to onLine when set.
+func (e *DshPipelineExecutor) ExecuteWithProgress(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int), onLine func(line string)) (*ExecResult, error) {
 	client := e.Client
 	if client == nil {
 		client = dshclient.New()
@@ -55,6 +61,7 @@ func (e *DshPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStar
 		PermissionMode:  dshPermissionMode(spec),
 		AgentPreset:     spec.DshPreset,
 		ReasoningEffort: spec.ReasoningEffort,
+		OnLine:          onLine,
 	}
 	result, err := client.Exec(ctx, prompt, opts)
 	if result == nil {

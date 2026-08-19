@@ -18,6 +18,13 @@ func (e *CodexPipelineExecutor) Name() string { return "codex" }
 // Execute runs a Codex node through one-shot `codex exec` or the retained
 // `codex app-server` Runtime Manager, depending on the selected node mode.
 func (e *CodexPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int)) (*ExecResult, error) {
+	return e.ExecuteWithProgress(ctx, spec, onStart, nil)
+}
+
+// ExecuteWithProgress runs a Codex node through one-shot `codex exec` or the
+// retained `codex app-server` Runtime Manager, forwarding each non-empty
+// stdout line to onLine when set (one-shot path only).
+func (e *CodexPipelineExecutor) ExecuteWithProgress(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int), onLine func(line string)) (*ExecResult, error) {
 	client := e.Client
 	if client == nil {
 		client = codex.New()
@@ -50,6 +57,7 @@ func (e *CodexPipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onSt
 		Ephemeral:       ephemeral,
 		JSON:            true,
 		ResumeSessionID: resumeID,
+		OnLine:          onLine,
 	}
 
 	// Inject Skill content into prompt if present. Both one-shot exec and the

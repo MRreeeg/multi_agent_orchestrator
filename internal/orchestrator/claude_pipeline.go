@@ -19,6 +19,14 @@ func (e *ClaudePipelineExecutor) Name() string { return "claude" }
 // Execute runs a Claude node through one-shot `claude -p --output-format json`
 // or the retained stream-json Runtime Manager, depending on the node mode.
 func (e *ClaudePipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int)) (*ExecResult, error) {
+	return e.ExecuteWithProgress(ctx, spec, onStart, nil)
+}
+
+// ExecuteWithProgress runs a Claude node through one-shot `claude -p
+// --output-format json` or the retained stream-json Runtime Manager,
+// forwarding each non-empty stdout line to onLine when set (one-shot path
+// only).
+func (e *ClaudePipelineExecutor) ExecuteWithProgress(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int), onLine func(line string)) (*ExecResult, error) {
 	client := e.Client
 	if client == nil {
 		client = claudeclient.New()
@@ -61,6 +69,7 @@ func (e *ClaudePipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onS
 		PermissionMode:     claudeclient.PermissionModeForApproval(spec.ApprovalMode),
 		AppendSystemPrompt: spec.SkillContent,
 		Effort:             spec.ReasoningEffort,
+		OnLine:             onLine,
 	}
 	result, err := client.Exec(ctx, prompt, opts)
 	if result == nil {

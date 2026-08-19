@@ -497,7 +497,13 @@ func runAnalysisExec(ctx context.Context, bin, workDir, prompt, executor, model,
 	if exType == "dsh" {
 		spec.DshPreset = strings.TrimSpace(agent)
 	}
-	res, err := exec.Execute(ctx, spec, nil)
+	var res *orchestrator.ExecResult
+	var err error
+	if se, ok := exec.(orchestrator.LineStreamingExecutor); ok {
+		res, err = se.ExecuteWithProgress(ctx, spec, nil, onProgress)
+	} else {
+		res, err = exec.Execute(ctx, spec, nil)
+	}
 	if err != nil && res == nil {
 		return "", "", err
 	}

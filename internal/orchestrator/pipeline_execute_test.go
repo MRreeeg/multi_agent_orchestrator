@@ -370,7 +370,7 @@ func TestMimoRunReturnsVisibleTextEndToEnd(t *testing.T) {
 		NodeID:    "e2e-mimo-run",
 		NodeLabel: "e2e-mimo-run",
 	}
-	res, err := executeMimoRun(context.Background(), spec)
+	res, err := executeMimoRun(context.Background(), spec, nil)
 	if err != nil {
 		t.Fatalf("executeMimoRun() error = %v\nstderr:\n%s\nstdout:\n%s", err, res.RawStderr, res.RawStdout)
 	}

@@ -1,6 +1,7 @@
 package dsh
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -65,6 +66,9 @@ type ExecOptions struct {
 	ReasoningEffort string
 	// Bin overrides the discovered dsh entry (binary or "node <bin.js>" prefix).
 	Bin string
+	// OnLine, when non-nil, is called with each non-empty trimmed stdout line
+	// as the subprocess streams it (used to show live thinking progress).
+	OnLine func(string)
 }
 
 // DshExecutor executes tasks via the DeepSeek Harness one-shot profile
@@ -139,9 +143,26 @@ func (e *DshExecutor) Exec(ctx context.Context, prompt string, opts ExecOptions)
 	cmd.Env = buildEnv(opts)
 
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err = cmd.Run()
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return &ExecutorResult{ExitCode: -1, Stderr: err.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, err)
+	}
+	if err := cmd.Start(); err != nil {
+		return &ExecutorResult{ExitCode: -1, Stderr: err.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, err)
+	}
+	sc := bufio.NewScanner(stdoutPipe)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := sc.Text()
+		stdout.WriteString(line + "\n")
+		if opts.OnLine != nil {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				opts.OnLine(trimmed)
+			}
+		}
+	}
+	err = cmd.Wait()
 
 	rawStdout := stdout.String()
 	exitCode := 0

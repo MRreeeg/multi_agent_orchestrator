@@ -50,6 +50,13 @@ type PipelineExecutor interface {
 	Execute(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int)) (*ExecResult, error)
 }
 
+// LineStreamingExecutor is optionally implemented by executors that can
+// stream subprocess stdout lines while executing (used by the requirement
+// analysis to show live thinking progress).
+type LineStreamingExecutor interface {
+	ExecuteWithProgress(ctx context.Context, spec ExecSpec, onStart func(endpoint string, port int), onLine func(line string)) (*ExecResult, error)
+}
+
 // RuntimeManager is the interface for managing serve runtime instances.
 type RuntimeManager interface {
 	Borrow(ctx context.Context, spec ExecSpec, policy CleanupPolicy) (*RuntimeState, error)
@@ -677,6 +684,13 @@ func (e *ReasonixExecutor) Execute(ctx context.Context, spec ExecSpec, onStart f
 	}, err
 }
 
+// ExecuteWithProgress is a no-streaming delegation: the requirement analysis
+// never routes reasonix through the executor registry (it uses
+// spawnReasonixAnalysis), so the subprocess run path keeps its buffers.
+func (e *ReasonixExecutor) ExecuteWithProgress(ctx context.Context, spec ExecSpec, onStart func(string, int), onLine func(line string)) (*ExecResult, error) {
+	return e.Execute(ctx, spec, onStart)
+}
+
 // MimoExecutor executes nodes via `mimo run`.
 type MimoExecutor struct{}
 
@@ -688,8 +702,14 @@ func GetReasonixRuntime(id string) (*RuntimeState, bool) { return reasonixRuntim
 func StopReasonixRuntime(id string) error                { return reasonixRuntimeMgr.Stop(id) }
 
 func (e *MimoExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*ExecResult, error) {
+	return e.ExecuteWithProgress(ctx, spec, onStart, nil)
+}
+
+// ExecuteWithProgress runs a Mimo node, forwarding each non-empty stdout line
+// to onLine when set (run mode only; serve mode delegates without streaming).
+func (e *MimoExecutor) ExecuteWithProgress(ctx context.Context, spec ExecSpec, onStart func(string, int), onLine func(line string)) (*ExecResult, error) {
 	if strings.EqualFold(strings.TrimSpace(spec.Mode), "run") {
-		return executeMimoRun(ctx, spec)
+		return executeMimoRun(ctx, spec, onLine)
 	}
 	return mimoRuntimeMgr.Execute(ctx, spec, onStart)
 }
@@ -715,7 +735,7 @@ func (o *synchronizedOutput) String() string {
 // it is running. Mimo may repeatedly ask for an external_directory approval;
 // in a non-interactive orchestrator there is nobody who can answer it, so
 // waiting for cmd.Run() would burn tokens until the outer 30-minute timeout.
-func runMimoCommand(ctx context.Context, args []string, workspace string) (string, string, error) {
+func runMimoCommand(ctx context.Context, args []string, workspace string, onLine func(line string)) (string, string, error) {
 	cmd := exec.Command("mimo", args...)
 	proc.HideWindow(cmd)
 	if strings.TrimSpace(workspace) != "" {
@@ -762,6 +782,11 @@ func runMimoCommand(ctx context.Context, args []string, workspace string) (strin
 				select {
 				case terminalCh <- struct{}{}:
 				default:
+				}
+			}
+			if onLine != nil {
+				if trimmed := strings.TrimSpace(line); trimmed != "" {
+					onLine(trimmed)
 				}
 			}
 		}
@@ -1303,7 +1328,7 @@ func stripANSIEscapeCodes(s string) string {
 	return b.String()
 }
 
-func executeMimoRun(ctx context.Context, spec ExecSpec) (*ExecResult, error) {
+func executeMimoRun(ctx context.Context, spec ExecSpec, onLine func(line string)) (*ExecResult, error) {
 	args, cleanup, err := buildMimoRunArgs(spec, "")
 	if err != nil {
 		return &ExecResult{ExitCode: -1}, err
@@ -1311,7 +1336,7 @@ func executeMimoRun(ctx context.Context, spec ExecSpec) (*ExecResult, error) {
 	defer cleanup()
 
 	start := time.Now()
-	stdoutText, stderrText, runErr := runMimoCommand(ctx, args, spec.Workspace)
+	stdoutText, stderrText, runErr := runMimoCommand(ctx, args, spec.Workspace, onLine)
 	duration := time.Since(start).Milliseconds()
 
 	exitCode := 0

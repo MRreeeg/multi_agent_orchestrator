@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -53,6 +54,9 @@ type ExecOptions struct {
 	// Effort is the reasoning effort level ("high" | "medium" | "low"),
 	// passed through as `--effort` (claude -p supports it).
 	Effort string
+	// OnLine, when non-nil, is called with each non-empty trimmed stdout line
+	// as the subprocess streams it (used to show live thinking progress).
+	OnLine func(string)
 }
 
 // ClaudeExecutor executes tasks via the Claude CLI (`claude -p`).
@@ -118,9 +122,26 @@ func (e *ClaudeExecutor) Exec(ctx context.Context, prompt string, opts ExecOptio
 	cmd.Stdin = stdin
 
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err := cmd.Run()
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return &ExecutorResult{ExitCode: -1, Stderr: err.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, err)
+	}
+	if err := cmd.Start(); err != nil {
+		return &ExecutorResult{ExitCode: -1, Stderr: err.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, err)
+	}
+	sc := bufio.NewScanner(stdoutPipe)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := sc.Text()
+		stdout.WriteString(line + "\n")
+		if opts.OnLine != nil {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				opts.OnLine(trimmed)
+			}
+		}
+	}
+	err = cmd.Wait()
 
 	rawStdout := stdout.String()
 	exitCode := 0

@@ -972,19 +972,27 @@ type OpenCodePipelineExecutor struct{}
 func (e *OpenCodePipelineExecutor) Name() string { return "opencode" }
 
 func (e *OpenCodePipelineExecutor) Execute(ctx context.Context, spec ExecSpec, onStart func(string, int)) (*ExecResult, error) {
+	return e.ExecuteWithProgress(ctx, spec, onStart, nil)
+}
+
+// ExecuteWithProgress runs an opencode node, forwarding each non-empty stdout
+// line to onLine when set (run mode only; serve mode delegates without
+// streaming).
+func (e *OpenCodePipelineExecutor) ExecuteWithProgress(ctx context.Context, spec ExecSpec, onStart func(string, int), onLine func(line string)) (*ExecResult, error) {
 	if strings.EqualFold(strings.TrimSpace(spec.Mode), "run") {
-		return executeOpencodeRun(ctx, spec)
+		return executeOpencodeRun(ctx, spec, onLine)
 	}
 	return opencodeRuntimeMgr.Execute(ctx, spec, onStart)
 }
 
-func executeOpencodeRun(ctx context.Context, spec ExecSpec) (*ExecResult, error) {
+func executeOpencodeRun(ctx context.Context, spec ExecSpec, onLine func(line string)) (*ExecResult, error) {
 	executor := &opencodeclient.Executor{}
 	opts := opencodeclient.ExecOptions{
 		Model:     spec.ModelRef,
 		Workspace: spec.Workspace,
 		MaxSteps:  spec.MaxSteps,
 		Variant:   spec.ReasoningEffort,
+		OnLine:    onLine,
 		// opencode run has no programmatic permission-reply channel (unlike
 		// mimo ACP / claude SDK), so an ask would hang the one-shot process
 		// forever. Always auto-approve non-denied requests and hard-deny the

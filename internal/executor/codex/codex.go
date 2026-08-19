@@ -10,6 +10,7 @@
 package codex
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -61,6 +62,9 @@ type ExecOptions struct {
 	JSON            bool   // --json (JSONL output)
 	OutputFile      string // -o <file> (write last message to file)
 	ResumeSessionID string // codex exec resume <id>
+	// OnLine, when non-nil, is called with each non-empty trimmed stdout line
+	// as the subprocess streams it (used to show live thinking progress).
+	OnLine func(string)
 }
 
 // CodexExecutor executes tasks via the Codex CLI (`codex exec`).
@@ -94,7 +98,7 @@ func (e *CodexExecutor) Exec(ctx context.Context, prompt string, opts ExecOption
 	args := e.buildArgs(opts)
 	args = append(args, "-")
 
-	return e.executeWithInput(ctx, args, strings.NewReader(prompt))
+	return e.executeWithInputStream(ctx, args, strings.NewReader(prompt), opts.OnLine)
 }
 
 // buildArgs builds the non-prompt portion of a `codex exec` command.
@@ -148,6 +152,12 @@ func (e *CodexExecutor) execute(ctx context.Context, args []string) (*ExecutorRe
 
 // executeWithInput runs the codex binary with optional stdin and captures output.
 func (e *CodexExecutor) executeWithInput(ctx context.Context, args []string, input io.Reader) (*ExecutorResult, error) {
+	return e.executeWithInputStream(ctx, args, input, nil)
+}
+
+// executeWithInputStream runs the codex binary with optional stdin, captures
+// output, and streams each non-empty trimmed stdout line to onLine when set.
+func (e *CodexExecutor) executeWithInputStream(ctx context.Context, args []string, input io.Reader, onLine func(string)) (*ExecutorResult, error) {
 	bin := e.codexBin()
 	cmd := exec.CommandContext(ctx, bin, args...)
 	// One-shot codex exec must not flash a console window on Windows (the
@@ -158,10 +168,26 @@ func (e *CodexExecutor) executeWithInput(ctx context.Context, args []string, inp
 	}
 
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-
-	err := cmd.Run()
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return &ExecutorResult{ExitCode: -1, Stderr: err.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, err)
+	}
+	if err := cmd.Start(); err != nil {
+		return &ExecutorResult{ExitCode: -1, Stderr: err.Error()}, fmt.Errorf("%w: %v", ErrExecutorStart, err)
+	}
+	sc := bufio.NewScanner(stdoutPipe)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := sc.Text()
+		stdout.WriteString(line + "\n")
+		if onLine != nil {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				onLine(trimmed)
+			}
+		}
+	}
+	err = cmd.Wait()
 
 	rawStdout := stdout.String()
 	exitCode := 0
