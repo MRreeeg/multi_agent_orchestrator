@@ -355,6 +355,11 @@ func writeErr(w http.ResponseWriter, msg string, code int) {
 
 const maxImageUploadBytes = 10 * 1024 * 1024
 
+// maxAnalyzeImages caps the images an analyze request may carry. Each image
+// costs one assist.Run network call, so an unbounded array could burn the
+// analysis budget.
+const maxAnalyzeImages = 20
+
 func imageAttachmentDir() string {
 	return filepath.Join(orchestrator.DataRoot(), "attachments")
 }
@@ -419,10 +424,15 @@ func (h *orchestratorHandler) uploadImage(w http.ResponseWriter, r *http.Request
 // interpolated into filepath.Glob and leak stored attachments.
 var imageIDRe = regexp.MustCompile(`^[0-9]{13}_[0-9a-f]{8}$`)
 
+// validImageID reports whether id is a well-formed attachment id. Shared by
+// serveImage and the analyze vision path: both interpolate the id into
+// filepath.Glob, so glob metacharacters must never reach it.
+func validImageID(id string) bool { return imageIDRe.MatchString(id) }
+
 // serveImage reads back an uploaded image by id.
 func (h *orchestratorHandler) serveImage(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/orchestrator/api/images/")
-	if !imageIDRe.MatchString(id) {
+	if !validImageID(id) {
 		writeErr(w, "bad image id", http.StatusBadRequest)
 		return
 	}
@@ -1399,6 +1409,10 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 		writeErr(w, "text is required", http.StatusBadRequest)
 		return
 	}
+	if len(body.Images) > maxAnalyzeImages {
+		writeErr(w, fmt.Sprintf("too many images: %d (max %d)", len(body.Images), maxAnalyzeImages), http.StatusBadRequest)
+		return
+	}
 
 	// Build conversation context
 	historyText := ""
@@ -1551,7 +1565,14 @@ func buildHistoryTextWithImages(historyText string, images []struct {
 	var b strings.Builder
 	b.WriteString(historyText)
 	visionFailed := 0
+	seen := make(map[string]bool, len(images))
 	for _, img := range images {
+		// 非法 id（含 glob 元字符/路径穿越）直接跳过，绝不进入 glob 与视觉调用；
+		// 同一 id 只转述一次（保留首次出现的顺序），每次转述都消耗一次网络调用。
+		if !validImageID(img.ID) || seen[img.ID] {
+			continue
+		}
+		seen[img.ID] = true
 		path := filepath.Join(imageAttachmentDir(), img.ID+".png")
 		// 上传时按真实类型落盘，可能是 .jpg/.gif 等；先 glob 定位
 		if matches, err := filepath.Glob(filepath.Join(imageAttachmentDir(), img.ID+".*")); err == nil && len(matches) > 0 {
