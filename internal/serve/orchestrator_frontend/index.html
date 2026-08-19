@@ -4505,9 +4505,20 @@ $('#btn-execute').addEventListener('click', () => {
   // Show confirmation modal
   $('#confirm-task').value = task;
   const typeLabels = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
-  $('#confirm-nodes').innerHTML = state.nodes.map(n =>
-    `<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0">${escHtml(n.name)} <span style="color:var(--muted-2)">(${escHtml(typeLabels[n.type] || n.type)} · ${escHtml(n.executor || 'reasonix')}/${escHtml(n.model || '-')})</span></span>`
-  ).join('');
+  // dsh 节点：模型是 advisory（实际模型由 $DSH_HOME/settings.yaml 决定），
+  // 开启辅助手且节点模型非视觉时给出警示（不硬拦）。
+  const isVisionModel = m => {
+    const n = String(m || '').toLowerCase();
+    return (n.includes('mimo-v2.5') && !n.includes('pro')) || n.includes('glm');
+  };
+  const warns = state.nodes
+    .filter(n => n.executor === 'dsh' && !isVisionModel(n.model || '') && (!n.assist || n.assist.enabled !== false))
+    .map(n => `${escHtml(n.name)}（${escHtml(n.model || '未指定模型')}）：dsh 执行器实际模型由 harness settings.yaml 决定，若需识图请确认该模型支持图像输入（推荐 mimo-v2.5），并保持节点辅助手开启（识图将委派 reasonix assist）`);
+  $('#confirm-nodes').innerHTML =
+    (warns.length ? '<div style="margin-bottom:8px;padding:8px 10px;background:rgba(255,180,0,.1);border:1px solid rgba(255,180,0,.45);border-radius:8px;color:#d99700;line-height:1.6">⚠️ ' + warns.join('<br/>⚠️ ') + '</div>' : '') +
+    state.nodes.map(n =>
+      `<span style="display:inline-block;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 8px;margin:2px 4px 2px 0">${escHtml(n.name)} <span style="color:var(--muted-2)">(${escHtml(typeLabels[n.type] || n.type)} · ${escHtml(n.executor || 'reasonix')}/${escHtml(n.model || '-')})</span></span>`
+    ).join('');
   $('#confirm-modal').style.display = 'flex';
 });
 
@@ -5426,23 +5437,36 @@ async function interruptRuntime(runtimeID) {
 function buildPipelinePayload() {
   const payload = {
     name: state.pipelineName,
-    nodes: state.nodes.map(n => ({
-      id: String(n.id),
-      name: n.name,
-      type: n.type,
-      model: n.model,
-      agent: n.agent,
-      skill: canonicalSkillForNode(n.skill || '', n.type, state.rewrittenTask || '', n.role || ''),
-      skillPolicy: n.skillPolicy || '',
-      reasoningEffort: n.reasoningEffort || '',
-      mode: n.mode || 'serve',
-      executor: n.executor || 'reasonix',
-      approvalMode: n.approvalMode || 'auto',
-      stallMaintenance: n.stallMaintenance === false ? false : true,
-      role: n.role,
-      x: n.x,
-      y: n.y,
-    })),
+    nodes: state.nodes.map(n => {
+      const assist = (n.assist && typeof n.assist === 'object') ? n.assist : null;
+      const assistOn = assist && (assist.enabled !== false || assist.model || assist.driver || assist.role);
+      return {
+        id: String(n.id),
+        name: n.name,
+        type: n.type,
+        model: n.model,
+        agent: n.agent,
+        skill: canonicalSkillForNode(n.skill || '', n.type, state.rewrittenTask || '', n.role || ''),
+        skillPolicy: n.skillPolicy || '',
+        reasoningEffort: n.reasoningEffort || '',
+        mode: n.mode || 'serve',
+        executor: n.executor || 'reasonix',
+        approvalMode: n.approvalMode || 'auto',
+        stallMaintenance: n.stallMaintenance === false ? false : true,
+        dshPreset: n.dshPreset || '',
+        providerRoute: n.providerRoute || '',
+        executionMode: n.executionMode || '',
+        assist: assistOn ? {
+          enabled: assist.enabled !== false,
+          model: assist.model || 'mimo-v2.5',
+          driver: assist.driver || 'opencode',
+          role: assist.role || '',
+        } : null,
+        role: n.role,
+        x: n.x,
+        y: n.y,
+      };
+    }),
     edges: state.edges.map((e, index) => ({
       id: edgeId(e, index),
       from: String(e.from),
