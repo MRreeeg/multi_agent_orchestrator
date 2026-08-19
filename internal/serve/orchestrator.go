@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"reasonix/internal/assist"
 	"reasonix/internal/config"
 	"reasonix/internal/event"
 	dshclient "reasonix/internal/executor/dsh"
@@ -1372,6 +1373,9 @@ func enforceGeneratedRoleBoundary(agent, roleDesc string) string {
 	return roleDesc + "\n\n【固定职责边界（不得覆盖）】\n" + boundary
 }
 
+// analyzeVision 把一张图片转述为文本；默认为 assist.Run，测试可替换。
+var analyzeVision = assist.Run
+
 // analyzeRequirement analyzes a user requirement and suggests pipeline configuration.
 // Returns structured requirement + suggested node roles.
 func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.Request) {
@@ -1386,6 +1390,10 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 		Executor     string `json:"executor"`
 		Model        string `json:"model"`
 		Agent        string `json:"agent"`
+		Images       []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"images"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Text == "" {
 		writeErr(w, "text is required", http.StatusBadRequest)
@@ -1402,6 +1410,7 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 		historyText += fmt.Sprintf("[%s]: %s\n", role, msg.Content)
 	}
 	historyText += fmt.Sprintf("[用户]: %s", body.Text)
+	historyText = buildHistoryTextWithImages(historyText, body.Images)
 	if body.PipelineInfo != "" {
 		historyText += body.PipelineInfo
 	}
@@ -1531,6 +1540,38 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 	}
 
 	writeJSON(w, result)
+}
+
+// buildHistoryTextWithImages 对每张图片做视觉转述并注入 historyText。
+// 转述失败降级为占位文本，绝不阻塞需求分析。
+func buildHistoryTextWithImages(historyText string, images []struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}) string {
+	var b strings.Builder
+	b.WriteString(historyText)
+	visionFailed := 0
+	for _, img := range images {
+		path := filepath.Join(imageAttachmentDir(), img.ID+".png")
+		// 上传时按真实类型落盘，可能是 .jpg/.gif 等；先 glob 定位
+		if matches, err := filepath.Glob(filepath.Join(imageAttachmentDir(), img.ID+".*")); err == nil && len(matches) > 0 {
+			path = matches[0]
+		}
+		desc, err := analyzeVision(assist.Options{
+			Task:   "请用中文描述这张图片的内容与关键细节（用户把它作为需求上下文：可能是 UI 截图、设计稿或报错截图）。",
+			Images: []string{path},
+		})
+		if err != nil {
+			visionFailed++
+			b.WriteString(fmt.Sprintf("\n[图片 %s 无法解析：%v]", img.Name, err))
+			continue
+		}
+		b.WriteString(fmt.Sprintf("\n[图片 %s]: %s", img.Name, desc))
+	}
+	if len(images) > 0 {
+		slog.Info("analyze: vision", "count", len(images), "failed", visionFailed)
+	}
+	return b.String()
 }
 
 // analysisCapabilitySummary lists what the orchestrator can actually orchestrate
