@@ -549,6 +549,8 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /orchestrator/api/requirements/expand", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/requirements/understand", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/requirements/analyze", s.orchestratorAPI)
+	mux.HandleFunc("POST /orchestrator/api/upload-image", s.orchestratorAPI)
+	mux.HandleFunc("GET /orchestrator/api/images/", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/sessions", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/sessions/", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/sessions/", s.orchestratorAPI)

@@ -4,8 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -280,6 +284,10 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.expandRequirement(w, r)
 	case path == "/requirements/understand" && r.Method == http.MethodPost:
 		h.understandRequirement(w, r)
+	case path == "/upload-image" && r.Method == http.MethodPost:
+		h.uploadImage(w, r)
+	case strings.HasPrefix(path, "/images/") && r.Method == http.MethodGet:
+		h.serveImage(w, r)
 	case path == "/requirements/analyze" && r.Method == http.MethodPost:
 		h.analyzeRequirement(w, r)
 	case path == "/sessions" && r.Method == http.MethodGet:
@@ -339,6 +347,94 @@ func (h *orchestratorHandler) emitAnalyzeProgress(stage string, elapsedSec, atte
 // writeErr writes a text error response.
 func writeErr(w http.ResponseWriter, msg string, code int) {
 	http.Error(w, msg, code)
+}
+
+// ── Image attachment upload/serve (L-54) ──
+
+const maxImageUploadBytes = 10 * 1024 * 1024
+
+func imageAttachmentDir() string {
+	return filepath.Join(orchestrator.DataRoot(), "attachments")
+}
+
+func allowedImageType(ct string) bool {
+	switch ct {
+	case "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp":
+		return true
+	}
+	return false
+}
+
+// uploadImage persists a base64 image attachment and returns its id + readback URL.
+func (h *orchestratorHandler) uploadImage(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Data string `json:"data"`
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Data == "" {
+		writeErr(w, "data is required", http.StatusBadRequest)
+		return
+	}
+	raw, err := base64.StdEncoding.DecodeString(body.Data)
+	if err != nil {
+		writeErr(w, "invalid base64", http.StatusBadRequest)
+		return
+	}
+	if len(raw) > maxImageUploadBytes {
+		writeErr(w, "image too large (max 10MB)", http.StatusBadRequest)
+		return
+	}
+	ct := http.DetectContentType(raw)
+	if !allowedImageType(ct) {
+		writeErr(w, "unsupported image type: "+ct, http.StatusBadRequest)
+		return
+	}
+	ext := ".png"
+	if m, err := mime.ExtensionsByType(ct); err == nil && len(m) > 0 {
+		ext = m[0]
+	}
+	var rnd [4]byte
+	rand.Read(rnd[:])
+	id := fmt.Sprintf("%d_%s", time.Now().UnixMilli(), hex.EncodeToString(rnd[:]))
+	dir := imageAttachmentDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		writeErr(w, "cannot create attachment dir", http.StatusInternalServerError)
+		return
+	}
+	if err := os.WriteFile(filepath.Join(dir, id+ext), raw, 0644); err != nil {
+		writeErr(w, "cannot save image", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{
+		"id":   id,
+		"name": body.Name,
+		"url":  "/orchestrator/api/images/" + id,
+	})
+}
+
+// serveImage reads back an uploaded image by id.
+func (h *orchestratorHandler) serveImage(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/orchestrator/api/images/")
+	if id == "" || strings.ContainsAny(id, `/\`) {
+		writeErr(w, "bad image id", http.StatusBadRequest)
+		return
+	}
+	matches, err := filepath.Glob(filepath.Join(imageAttachmentDir(), id+".*"))
+	if err != nil || len(matches) == 0 {
+		writeErr(w, "image not found", http.StatusNotFound)
+		return
+	}
+	ct := mime.TypeByExtension(filepath.Ext(matches[0]))
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	raw, err := os.ReadFile(matches[0])
+	if err != nil {
+		writeErr(w, "image not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", ct)
+	w.Write(raw)
 }
 
 func truncate(s string, n int) string {
