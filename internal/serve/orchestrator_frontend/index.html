@@ -258,6 +258,11 @@ input,textarea,select{font:inherit;color:inherit}
 .run-dash__spacer{flex:1}
 .run-dash__btn{border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--fg-2);font-size:11px;padding:3px 10px;transition:all .15s}
 .run-dash__sel{border:1px solid var(--border);border-radius:6px;background:var(--bg-2);color:var(--fg-2);font-size:10.5px;padding:2px 4px;max-width:160px;outline:none;transition:border-color .15s}
+.rd-actions{display:flex;align-items:center;gap:6px;position:relative}
+.rd-menu{position:relative}
+.rd-menu__pop{position:absolute;right:0;top:calc(100% + 5px);min-width:132px;padding:4px;display:flex;flex-direction:column;background:var(--panel, var(--bg));border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 8px 24px oklch(0% 0 0/.25);z-index:60}
+.rd-menu__item{text-align:left;padding:7px 10px;font-size:12px;color:var(--fg-2);background:none;border:none;border-radius:6px;cursor:pointer}
+.rd-menu__item:hover{background:var(--bg-2)}
 .run-dash__sel:hover{border-color:var(--border-strong)}
 .run-dash__btn:hover{border-color:var(--border-strong);color:var(--fg)}
 .run-dash__btn--danger:hover{border-color:var(--danger);color:var(--danger)}
@@ -728,11 +733,18 @@ input,textarea,select{font:inherit;color:inherit}
         <span class="run-dash__badge" id="rd-badge">● 执行中</span>
         <span class="run-dash__title">Loop 运行看板</span>
         <span class="run-dash__spacer"></span>
-        <select class="run-dash__sel" id="rd-executor" title="分析进展使用的执行器"></select>
-        <button class="run-dash__btn" id="rd-analyze" title="AI 分析当前执行进展">分析进展</button>
-        <button class="run-dash__btn" id="rd-stop" title="停止当前 Loop">停止</button>
-        <button class="run-dash__btn" id="rd-collapse" title="把执行情况收缩成一行">收缩</button>
-        <button class="run-dash__btn" id="rd-close" title="收起看板">收起</button>
+        <div class="rd-actions">
+          <select class="run-dash__sel" id="rd-executor" title="分析进展使用的执行器"></select>
+          <div class="rd-menu">
+            <button class="run-dash__btn" id="rd-menu-btn" title="看板操作">⋯</button>
+            <div class="rd-menu__pop hidden" id="rd-menu-pop">
+              <button class="rd-menu__item" id="rd-analyze">分析进展</button>
+              <button class="rd-menu__item" id="rd-stop">停止</button>
+              <button class="rd-menu__item" id="rd-collapse">收缩</button>
+              <button class="rd-menu__item" id="rd-close">收起</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="run-dash__iter" id="rd-iter"></div>
       <div class="run-dash__nodes" id="rd-nodes"></div>
@@ -5068,6 +5080,28 @@ function closeRuntimeConsole(runtimeID) {
   runtimeConsoles.delete(runtimeID);
 }
 
+// 输出/结果 应用内预览弹窗（替代会被浏览器拦截的 window.open）
+let outputPreviewEl = null;
+function showOutputPreview(text) {
+  if (outputPreviewEl) outputPreviewEl.remove();
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.style.zIndex = ++consoleZ;
+  const m = document.createElement('div');
+  m.className = 'modal modal--win';
+  m.style.cssText = 'width:min(860px,94vw);height:min(640px,86vh)';
+  m.innerHTML = '<div class="modal__head modal__head--drag"><span style="font-size:13px;font-weight:600">输出 / 结果（Markdown 原文）</span>' +
+    '<span class="modal__close" title="关闭" style="margin-left:auto">&times;</span></div>' +
+    '<div class="modal__body" style="flex:1;min-height:0;overflow:auto;margin:0 14px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;color:var(--fg-2);font:12.5px/1.55 var(--mono);white-space:pre-wrap"></div>';
+  m.querySelector('.modal__close').addEventListener('click', () => ov.remove());
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  m.querySelector('.modal__body').textContent = text;
+  ov.appendChild(m);
+  document.body.appendChild(ov);
+  makeModalDraggable(m);
+  outputPreviewEl = ov;
+}
+
 async function openRuntimeConsole(runtimeID) {
   if (!runtimeID) return;
   const existing = runtimeConsoles.get(runtimeID);
@@ -5093,18 +5127,13 @@ async function openRuntimeConsole(runtimeID) {
   modal.querySelector('.rc-close').addEventListener('click', () => closeRuntimeConsole(runtimeID));
   modal.querySelector('.rc-send').addEventListener('click', () => sendRuntimeConsoleMessage(runtimeID));
   modal.querySelector('.rc-interrupt').addEventListener('click', () => interruptRuntime(runtimeID));
-  // 输出/结果：新窗口以 Markdown 原样查看（带预览小窗，这里 rc-output 即预览）
+  // 输出/结果：应用内弹窗以 Markdown 原文查看（window.open 会被浏览器拦截）
   const viewBtn = modal.querySelector('.rc-view-output');
   if (viewBtn) viewBtn.addEventListener('click', () => {
     const out = modal.querySelector('.rc-output');
     const text = out ? (out.textContent || '').trim() : '';
     if (!text) { toast('当前没有可查看的输出', 'error'); return; }
-    const w = window.open('', '_blank');
-    if (!w) { toast('浏览器拦截了新窗口，请允许弹出窗口后重试', 'error'); return; }
-    w.document.write('<!doctype html><meta charset="utf-8"><title>Runtime 输出（Markdown）</title>' +
-      '<style>body{font:13px/1.65 ui-monospace,Consolas,monospace;padding:24px 32px;max-width:980px;margin:0 auto;color:#1f2328;background:#fff}pre{white-space:pre-wrap;word-break:break-word}</style>' +
-      '<body><pre>' + escHtml(text) + '</pre></body>');
-    w.document.close();
+    showOutputPreview(text);
   });
   modal.querySelector('.rc-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -6023,6 +6052,20 @@ $('#rd-collapse').addEventListener('click', () => {
   const collapsed = dash.classList.toggle('run-dash--collapsed');
   $('#rd-collapse').textContent = collapsed ? T('run.expand') : T('run.collapse');
 });
+// 看板操作合并为 ⋯ 下拉菜单（不再挤占一行）
+const rdMenuBtn = $('#rd-menu-btn');
+const rdMenuPop = $('#rd-menu-pop');
+if (rdMenuBtn && rdMenuPop) {
+  rdMenuBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    rdMenuPop.classList.toggle('hidden');
+  });
+  rdMenuPop.addEventListener('click', () => rdMenuPop.classList.add('hidden'));
+  document.addEventListener('click', e => {
+    if (e.target.closest && e.target.closest('.rd-menu')) return;
+    rdMenuPop.classList.add('hidden');
+  });
+}
 
 async function cancelOrchRun(runID) {
   if (!state.sessionID || !runID) return;
