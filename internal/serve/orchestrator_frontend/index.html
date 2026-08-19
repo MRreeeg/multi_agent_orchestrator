@@ -215,6 +215,7 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__opt-label{font-size:10.5px;color:var(--muted-2);font-family:var(--mono)}
 .chat__opt{border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--fg-2);font-size:11px;padding:2px 6px;max-width:180px;outline:none;transition:border-color .15s}
 .chat__opt:hover{border-color:var(--border-strong)}
+#chat-agent{width:150px}
 .chat__input{flex:1;min-height:52px;max-height:180px;border:1px solid var(--border-strong);border-radius:14px;background:var(--card);padding:10px 52px 10px 14px;font-size:14px;line-height:1.6;resize:none;overflow-y:auto;outline:none;transition:border-color .18s ease,box-shadow .18s ease;box-shadow:0 2px 6px oklch(0% 0 0/.05),0 1px 2px oklch(0% 0 0/.04)}
 .chat__input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 6px 20px -6px oklch(0% 0 0/.18)}
 .chat__input::placeholder{color:var(--muted-2)}
@@ -617,7 +618,8 @@ input,textarea,select{font:inherit;color:inherit}
           <span class="chat__opt-label">分析模型</span>
           <select class="chat__opt" id="chat-model" title="需求分析使用的模型"></select>
           <span class="chat__opt-label">分析人设</span>
-          <select class="chat__opt" id="chat-agent" title="需求分析使用的 Agent 人设：deepseek-harness 执行器下为本机客制化 agent 预设（可手动导入）"></select>
+          <input class="chat__opt" id="chat-agent" list="chat-agent-list" placeholder="默认（无）" title="需求分析使用的 Agent 人设：deepseek-harness 执行器下为本机客制化 agent 预设；mimo 等执行器下可输入任意 agent 名（如 mimocode 的 agents 预设）" />
+          <datalist id="chat-agent-list"></datalist>
         </div>
         <div class="chat__input-bar" id="chat-input-bar">
           <div class="chat__attachments" id="chat-attachments" style="display:none"></div>
@@ -1891,26 +1893,61 @@ async function loadAnalysisOptions() {
   const byExec = live ? data.modelsByExecutor : ANALYSIS_DEFAULT_MODELS_BY_EXECUTOR;
   const dshPresets = (live && Array.isArray(data.dshPresets)) ? data.dshPresets : [];
   const subAgents = (live && Array.isArray(data.agents)) ? data.agents : [];
+  const modelTypes = (live && typeof data.modelTypes === 'object') ? data.modelTypes : {};
+  // 前端兜底：后端未标注时按已知命名规律补标注
+  const modelTypeFallback = m => {
+    const n = String(m || '').toLowerCase();
+    if (n.includes('mimo-v2.5') && !n.includes('pro')) return '视觉 ✓';
+    if (n.includes('mimo-v2.5-pro')) return '对话';
+    if (n.includes('mimo-auto')) return '自动';
+    if (n.includes('glm')) return '视觉 ✓';
+    if (n.includes('deepseek-reasoner') || n.includes(' o1') || n.includes('o3') || n.includes('codex')) return '推理';
+    if (n.includes('deepseek') || n.includes('claude') || n.includes('gpt')) return '对话';
+    return '';
+  };
+  const modelTypeLabel = m => {
+    const t = modelTypes[m] || modelTypeFallback(m);
+    return t ? m + '（' + t + '）' : m;
+  };
   const fillModels = (executor, modelSel) => {
     if (!modelSel) return;
     const models = (byExec[executor] || []).filter(Boolean);
     const defModel = models.includes('deepseek-v4-flash') ? 'deepseek-v4-flash' : (models.includes('deepseek-flash') ? 'deepseek-flash' : models[0]);
     modelSel.innerHTML = models.map(m =>
-      '<option value="' + escHtml(m) + '"' + (m === defModel ? ' selected' : '') + '>' + escHtml(m) + '</option>'
+      '<option value="' + escHtml(m) + '"' + (m === defModel ? ' selected' : '') + '>' + escHtml(modelTypeLabel(m)) + '</option>'
     ).join('');
   };
   const fillAgent = (executor, agentSel) => {
     if (!agentSel) return;
+    // 非 select（可编辑输入框）：选项进 datalist 作提示，值保持自由输入
+    const fillList = (items, idKey, textKey) => {
+      const dl = agentSel.getAttribute && document.getElementById(agentSel.getAttribute('list') || '');
+      if (!dl) return;
+      dl.innerHTML = items.map(it =>
+        '<option value="' + escHtml(idKey ? it[idKey] : it) + '"' + (textKey && it[textKey] ? ' label="' + escHtml(String(it[textKey]).replace(/\s+/g, ' ')) + '"' : '') + '></option>'
+      ).join('');
+    };
     if (executor === 'dsh') {
       // dsh 的"人设"= 本机客制化 agent 预设；选项文本保持简短（不带括号 id），
       // 完整 id/说明放 title，避免整行被撑高换行。
+      if (agentSel.tagName !== 'SELECT') {
+        fillList(dshPresets, 'id', 'name');
+        if (!agentSel.value) agentSel.value = ANALYSIS_DEFAULT_AGENT;
+        return;
+      }
       agentSel.innerHTML = '<option value="">默认（内置 persona）</option>' +
         dshPresets.map(p =>
           '<option value="' + escHtml(p.id) + '" title="' + escHtml(p.id + ' · ' + (p.description || '')) + '"' + (p.id === ANALYSIS_DEFAULT_AGENT ? ' selected' : '') + '>' +
           escHtml(p.name) + '</option>'
         ).join('');
     } else {
-      // 其他执行器：reasonix subagent 人设
+      // 其他执行器：可自由输入（如 mimocode 的 agent），现有项（reasonix
+      // subagent skills）仅作提示
+      if (agentSel.tagName !== 'SELECT') {
+        fillList(subAgents, 'name', 'description');
+        agentSel.value = '';
+        return;
+      }
       agentSel.innerHTML = '<option value="">默认（无）</option>' +
         subAgents.map(a =>
           '<option value="' + escHtml(a.name) + '" title="' + escHtml(a.description || '') + '">' + escHtml(a.name) + '</option>'

@@ -906,12 +906,43 @@ func (h *orchestratorHandler) analysisOptions(w http.ResponseWriter, r *http.Req
 	if dshPresets == nil {
 		dshPresets = []dshclient.AgentPresetInfo{}
 	}
+	// 自检只给出模型名；能力类型按已知映射标注，供前端下拉显示"名称（类型）"。
+	modelTypes := map[string]string{}
+	for _, ms := range modelsByExecutor {
+		for _, m := range ms {
+			if _, ok := modelTypes[m]; !ok {
+				modelTypes[m] = modelTypeDesc(m)
+			}
+		}
+	}
 	writeJSON(w, map[string]any{
 		"executors":        executors,
 		"modelsByExecutor": modelsByExecutor,
 		"agents":           agents,
 		"dshPresets":       dshPresets,
+		"modelTypes":       modelTypes,
 	})
+}
+
+// modelTypeDesc 给自检 probe 出的模型名标注能力类型。zen/go 上只有 mimo-v2.5
+// 支持图像输入（调试记录）；推理型模型单列；未知模型返回空串（前端不标注）。
+func modelTypeDesc(name string) string {
+	n := strings.ToLower(name)
+	switch {
+	case strings.Contains(n, "mimo-v2.5") && !strings.Contains(n, "pro"):
+		return "视觉 ✓"
+	case strings.Contains(n, "mimo-v2.5-pro"):
+		return "对话"
+	case strings.Contains(n, "mimo-auto"):
+		return "自动"
+	case strings.Contains(n, "glm"):
+		return "视觉 ✓"
+	case strings.Contains(n, "deepseek-reasoner"), strings.Contains(n, "o1"), strings.Contains(n, "o3"), strings.Contains(n, "codex"):
+		return "推理"
+	case strings.Contains(n, "deepseek"), strings.Contains(n, "claude"), strings.Contains(n, "gpt"):
+		return "对话"
+	}
+	return ""
 }
 
 type analysisAgent struct {
