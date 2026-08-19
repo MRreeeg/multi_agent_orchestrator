@@ -9,15 +9,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"mime"
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -412,10 +413,15 @@ func (h *orchestratorHandler) uploadImage(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// imageIDRe matches the ids produced by uploadImage (UnixMilli "_" hex4).
+// Strict validation also rejects glob metacharacters, which would otherwise be
+// interpolated into filepath.Glob and leak stored attachments.
+var imageIDRe = regexp.MustCompile(`^[0-9]{13}_[0-9a-f]{8}$`)
+
 // serveImage reads back an uploaded image by id.
 func (h *orchestratorHandler) serveImage(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/orchestrator/api/images/")
-	if id == "" || strings.ContainsAny(id, `/\`) {
+	if !imageIDRe.MatchString(id) {
 		writeErr(w, "bad image id", http.StatusBadRequest)
 		return
 	}
@@ -1370,9 +1376,9 @@ func enforceGeneratedRoleBoundary(agent, roleDesc string) string {
 // Returns structured requirement + suggested node roles.
 func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Text         string `json:"text"`
-		Lang         string `json:"lang"` // "zh" | "en"; UI language for replies
-		History      []struct {
+		Text    string `json:"text"`
+		Lang    string `json:"lang"` // "zh" | "en"; UI language for replies
+		History []struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`
 		} `json:"history"`

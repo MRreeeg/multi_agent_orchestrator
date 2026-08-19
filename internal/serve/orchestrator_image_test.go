@@ -126,10 +126,35 @@ func TestServeImageReturnsContentType(t *testing.T) {
 
 func TestServeImageUnknownID404(t *testing.T) {
 	h := imageTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/orchestrator/api/images/does-not-exist", nil)
+	// well-formed id (13 digits + "_" + 8 hex) that was never uploaded
+	req := httptest.NewRequest(http.MethodGet, "/orchestrator/api/images/0000000000000_00000000", nil)
 	w := httptest.NewRecorder()
 	h.serveImage(w, req)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", w.Code)
+	}
+}
+
+// TestServeImageRejectsGlobMetaIDs guards the strict id validation: glob
+// metacharacters must never be interpreted as patterns or serve stored files.
+func TestServeImageRejectsGlobMetaIDs(t *testing.T) {
+	h := imageTestHandler(t)
+	body, _ := json.Marshal(map[string]string{
+		"data": base64.StdEncoding.EncodeToString(tinyPNGBytes),
+		"name": "shot.png",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/orchestrator/api/upload-image", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.uploadImage(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("upload failed: %d %s", w.Code, w.Body.String())
+	}
+	for _, id := range []string{"*", "?", "[abc]", "*.png"} {
+		imgReq := httptest.NewRequest(http.MethodGet, "/orchestrator/api/images/"+id, nil)
+		imgW := httptest.NewRecorder()
+		h.serveImage(imgW, imgReq)
+		if imgW.Code != http.StatusBadRequest {
+			t.Fatalf("id %q: status = %d, want 400", id, imgW.Code)
+		}
 	}
 }
