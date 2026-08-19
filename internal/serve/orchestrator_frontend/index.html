@@ -1598,13 +1598,13 @@ function renderPendingAttachments() {
 async function uploadPendingImage(file) {
   if (!isImageFile(file)) { toast('仅支持图片文件（png/jpg/gif/webp/bmp）', 'error'); return; }
   if (file.size > 10 * 1024 * 1024) { toast('图片不能超过 10MB', 'error'); return; }
-  const data = await new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
-    fr.onerror = () => reject(new Error('读取文件失败'));
-    fr.readAsDataURL(file);
-  });
   try {
+    const data = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+      fr.onerror = () => reject(new Error('读取文件失败'));
+      fr.readAsDataURL(file);
+    });
     const up = await apiPost('/upload-image', { data, name: file.name || 'image' });
     if (state.pendingAttachments.some(a => a.id === up.id)) return;
     state.pendingAttachments.push({ id: up.id, name: up.name || file.name, url: up.url });
