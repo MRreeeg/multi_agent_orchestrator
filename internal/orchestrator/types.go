@@ -394,11 +394,18 @@ type SessionState struct {
 	RuntimeStates map[string]RuntimeState `json:"runtimeStates,omitempty"`
 }
 
+// ChatImage references an uploaded image attached to a chat message.
+type ChatImage struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // ChatMsg is a single chat message for persistence.
 type ChatMsg struct {
-	Role string `json:"role"`
-	Text string `json:"text"`
-	Meta string `json:"meta,omitempty"`
+	Role   string      `json:"role"`
+	Text   string      `json:"text"`
+	Meta   string      `json:"meta,omitempty"`
+	Images []ChatImage `json:"images,omitempty"`
 }
 
 // ── Orchestration Session (P0) ──
