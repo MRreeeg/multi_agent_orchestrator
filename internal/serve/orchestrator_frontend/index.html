@@ -1646,6 +1646,15 @@ function setupChatAttachments() {
     handleAttachFiles(e.dataTransfer && e.dataTransfer.files);
   });
 }
+
+// Dropping a file anywhere outside the composer must not navigate the page to
+// the file (browser default), which would lose unsaved app state.
+window.addEventListener('dragover', e => {
+  if (!e.target.closest || !e.target.closest('.chat__composer')) e.preventDefault();
+});
+window.addEventListener('drop', e => {
+  if (!e.target.closest || !e.target.closest('.chat__composer')) e.preventDefault();
+});
 setupChatAttachments();
 
 // Clears conversation bubbles while keeping the hero (welcome) node alive.
