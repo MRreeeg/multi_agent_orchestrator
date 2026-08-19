@@ -228,7 +228,7 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__box{position:relative;width:min(680px,94%);margin-top:10px}
 .hero__box.is-dragging .hero__input{outline:2px dashed var(--accent, #4a9eff);outline-offset:-4px;border-radius:16px}
 .hero__attachments{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-.hero__input{display:block;width:100%;min-height:62px;resize:none;border:1px solid var(--border-strong);border-radius:16px;background:var(--card);padding:14px 112px 14px 16px;font:14px/1.65 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 8px oklch(0% 0 0/.06),0 1px 2px oklch(0% 0 0/.04)}
+.hero__input{position:relative;display:block;width:100%;min-height:62px;resize:none;border:1px solid var(--border-strong);border-radius:16px;background:var(--card);padding:14px 112px 14px 16px;font:14px/1.65 var(--fg);color:var(--fg);outline:none;transition:border-color .18s,box-shadow .18s;box-shadow:0 2px 8px oklch(0% 0 0/.06),0 1px 2px oklch(0% 0 0/.04)}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 8px 24px -8px oklch(0% 0 0/.2)}
 .hero__input::placeholder{color:var(--muted-2)}
 .hero__attach-btn{position:absolute;right:58px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:1px solid var(--border);border-radius:10px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
@@ -2554,6 +2554,9 @@ function switchPanel(name) {
   $$('.nav-btn').forEach(b => b.classList.toggle('nav-btn--active', b.dataset.panel === name));
   $$('.panel').forEach(p => p.classList.toggle('panel--active', p.id === 'panel-' + name));
   if (name === 'data') loadRuns();
+  // 面板由隐藏转可见后 DOM rect 才有效，此时重绘连线（隐藏期间画出的
+  // 路径坐标全 0，必须等可见后再画一次）。
+  if (name === 'pipeline') requestAnimationFrame(() => renderEdges());
 }
 
 $$('.nav-btn').forEach(btn => {
@@ -3062,6 +3065,13 @@ function portCenter(nodeId, which) {
     if (port) {
       const wrapRect = canvasWrap.getBoundingClientRect();
       const r = port.getBoundingClientRect();
+      // 面板隐藏时 rect 全 0：回退到节点坐标近似，避免画出退化路径。
+      if (r.width === 0 && r.height === 0) {
+        return {
+          x: node.x + (which === 'out' ? 181 : -1),
+          y: node.y + (el.offsetHeight || 80) / 2,
+        };
+      }
       return {
         x: r.left - wrapRect.left + canvasWrap.scrollLeft + r.width / 2,
         y: r.top - wrapRect.top + canvasWrap.scrollTop + r.height / 2,
