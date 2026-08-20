@@ -151,3 +151,67 @@ func TestAutoVisionInject(t *testing.T) {
 		t.Errorf("task without image reference must be untouched; output:\n%s", out)
 	}
 }
+
+func TestAutoVisionInjectWorkspaceImages(t *testing.T) {
+	// 图片直接放在 run 工作目录（未走上传附件通道）：Orchestrator 必须能
+	// 在工作目录定位并委派，而不是跳过。
+	root := t.TempDir()
+	t.Setenv("REASONIX_ORCHESTRATOR_DATA_DIR", root)
+	ws := filepath.Join(root, "project")
+	if err := os.MkdirAll(filepath.Join(ws, "assets"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	img1 := filepath.Join(ws, "assets", "效果图1.1.png")
+	img2 := filepath.Join(ws, "效果图2.1.png")
+	for _, p := range []string{img1, img2} {
+		if err := os.WriteFile(p, []byte("fake"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	store := NewStore()
+	run := &PipelineRun{ExecOptions: ExecutionOptions{Workspace: ws}} // 无 Images
+	task := "请读取 assets/效果图1.1.png 与 效果图2.1.png 并按模板输出"
+
+	var gotImages []string
+	autoVisionDispatch = func(_ context.Context, _ *Store, opts AssistDispatchOptions) (*AssistDispatchResult, error) {
+		gotImages = append(gotImages, opts.Images...)
+		return &AssistDispatchResult{RuntimeID: "rt_t", Port: 1, ModelRef: "opencode/mimo-v2.5",
+			Result: "[图片 效果图1.1.png]: 蓝色主视觉登录页。"}, nil
+	}
+	defer func() { autoVisionDispatch = func(ctx context.Context, s *Store, opts AssistDispatchOptions) (*AssistDispatchResult, error) {
+		return s.AssistDispatch(ctx, opts)
+	} }()
+
+	assistOn := &AgentNode{Type: NodeExecutor, Label: "执行者", Model: "deepseek-chat", Assist: &AssistConfig{Enabled: true}}
+	out := store.autoVisionInject(context.Background(), run, assistOn, task)
+
+	if len(gotImages) != 2 {
+		t.Fatalf("expected dispatch with 2 workspace images, got %v", gotImages)
+	}
+	found := false
+	for _, p := range gotImages {
+		if p == img1 || p == img2 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("workspace image paths not dispatched: %v", gotImages)
+	}
+	if !strings.Contains(out, "效果图1.1.png →") || !strings.Contains(out, "效果图2.1.png →") {
+		t.Errorf("path list must be injected; output:\n%s", out)
+	}
+	if !strings.Contains(out, "蓝色主视觉登录页") {
+		t.Errorf("auto vision result must be injected; output:\n%s", out)
+	}
+
+	// 找不到的引用 → 未定位声明，不委派。
+	autoVisionDispatch = func(_ context.Context, _ *Store, _ AssistDispatchOptions) (*AssistDispatchResult, error) {
+		t.Fatal("dispatch must not run when no image can be located")
+		return nil, nil
+	}
+	out = store.autoVisionInject(context.Background(), run, assistOn, "请读取 不存在.png 并描述")
+	if !strings.Contains(out, "附件库与工作目录") || !strings.Contains(out, "无法自动识图") {
+		t.Errorf("missing image must degrade honestly; output:\n%s", out)
+	}
+}

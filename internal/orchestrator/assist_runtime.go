@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -243,6 +244,22 @@ func imageAttachmentPaths(refs []ImageRef) []string {
 	return out
 }
 
+// matchAttachmentPath 按原名在 run 附件里定位磁盘路径；未命中返回空串。
+func matchAttachmentPath(refs []ImageRef, name string) string {
+	for _, ref := range refs {
+		if !validImageRef(ref.ID) {
+			continue
+		}
+		if ref.Name == name || ref.ID == name {
+			if matches, err := filepath.Glob(filepath.Join(attachmentDir(), ref.ID+".*")); err == nil && len(matches) > 0 {
+				return matches[0]
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
 // taskReferencesImages 判定任务文本是否引用图片（按附件原名/ID 或图片扩展名
 // 文件名模式）。宽松匹配避免漏掉架构师的不同写法。
 func taskReferencesImages(task string, refs []ImageRef) bool {
@@ -262,54 +279,119 @@ func taskReferencesImages(task string, refs []ImageRef) bool {
 }
 
 // imageFileRe 匹配常见图片文件名引用（中文/字母/数字/空格/点 + 扩展名）。
+// 仅用于"任务是否涉及图片"与"引用存在但无法定位"的判定——提取名字可能被
+// 中文连接词污染，路径解析一律走附件精确名 / 工作目录真实文件反向匹配。
 var imageFileRe = regexp.MustCompile(`(?i)[\p{L}\p{N}\-_. ]+\.(png|jpe?g|gif|webp|bmp)\b`)
+
+// workspaceImageFiles 收集工作目录下的图片文件绝对路径（WalkDir，跳过
+// node_modules/.git/.venv/dist/build/.next 等大目录，防止全树扫描拖慢节点）。
+func workspaceImageFiles(workspace string) []string {
+	workspace = strings.TrimSpace(workspace)
+	if workspace == "" {
+		return nil
+	}
+	var out []string
+	_ = filepath.WalkDir(workspace, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if p != workspace {
+				base := filepath.Base(p)
+				if base == "node_modules" || base == ".git" || base == ".venv" || base == "dist" || base == "build" || base == ".next" {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if imageFileRe.MatchString(d.Name()) {
+			out = append(out, p)
+		}
+		return nil
+	})
+	return out
+}
+
+// resolveImageRefs 把任务文本里的图片引用解析为 (引用名 → 绝对路径)。三层：
+//  1. run 附件按原名/ID 精确子串匹配（最可靠）；
+//  2. 工作目录枚举真实图片文件，basename 在任务文本中出现即命中（绕开正则
+//     连接词污染）；
+//  3. 仍以扩展名模式判定"有引用但无法定位"，供调用方如实声明。
+func resolveImageRefs(task string, refs []ImageRef, workspace string) (hits []struct{ Name, Path string }, unresolved bool) {
+	task = strings.TrimSpace(task)
+	seen := make(map[string]bool)
+
+	for _, ref := range refs {
+		if !validImageRef(ref.ID) {
+			continue
+		}
+		if ref.Name != "" && strings.Contains(task, ref.Name) || (ref.ID != "" && strings.Contains(task, ref.ID)) {
+			p := matchAttachmentPath(refs, ref.Name)
+			key := ref.Name
+			if key == "" {
+				key = ref.ID
+			}
+			if p != "" && !seen[key] {
+				seen[key] = true
+				hits = append(hits, struct{ Name, Path string }{key, p})
+			}
+		}
+	}
+	for _, p := range workspaceImageFiles(workspace) {
+		base := filepath.Base(p)
+		if !strings.Contains(task, base) || seen[base] {
+			continue
+		}
+		seen[base] = true
+		hits = append(hits, struct{ Name, Path string }{base, p})
+	}
+	unresolved = imageFileRe.MatchString(task)
+	return hits, unresolved
+}
 
 // autoVisionDispatch 执行自动识图委派；测试可替换为假实现避免启动真实运行时。
 var autoVisionDispatch = func(ctx context.Context, s *Store, opts AssistDispatchOptions) (*AssistDispatchResult, error) {
 	return s.AssistDispatch(ctx, opts)
 }
 
-// autoVisionInject 是自动识图兜底入口：解析 run 图片附件，注入路径清单，
-// 需要时自动委派辅助手识图并注入结果。永不阻塞流水线——委派失败降级为
-// 如实声明。
+// autoVisionInject 是自动识图兜底入口。图片来源有两层：run 上传附件
+// （id+原名映射）与 run 工作目录（架构师可能直接在 workspace 放图并 read 到）。
+// 任务文本含图片引用时：
+//  1. 无论模型，先注入每个引用解析出的绝对路径（视觉模型 read 直读；无视觉
+//     模型委派时也有可靠路径）；
+//  2. assist 开启且模型无视觉的 executor，由 Orchestrator 自动委派辅助手
+//     视觉运行时完成识图，把结构化结果直接注入任务文本。
+//
+// 永不阻塞流水线：委派失败降级为如实声明。
 func (s *Store) autoVisionInject(ctx context.Context, run *PipelineRun, node *AgentNode, task string) string {
-	if len(run.Images) == 0 || strings.TrimSpace(task) == "" {
+	if strings.TrimSpace(task) == "" {
 		return task
 	}
-	paths := imageAttachmentPaths(run.Images)
-	if len(paths) == 0 {
-		return task
-	}
-	if !taskReferencesImages(task, run.Images) {
+	workspace := runWorkspace(run)
+	hits, unresolved := resolveImageRefs(task, run.Images, workspace)
+	if len(hits) == 0 && !unresolved {
 		return task
 	}
 
 	var b strings.Builder
-	b.WriteString("\n\n## Orchestrator 附件图片（本机绝对路径，与编排服务同机文件系统）\n")
-	for i, ref := range run.Images {
-		p := ""
-		if i < len(paths) {
-			p = paths[i]
-		} else if !validImageRef(ref.ID) {
-			continue
-		} else if m, err := filepath.Glob(filepath.Join(attachmentDir(), ref.ID+".*")); err == nil && len(m) > 0 {
-			p = m[0]
-		}
-		name := ref.Name
-		if name == "" {
-			name = ref.ID
-		}
-		if p == "" {
-			b.WriteString(fmt.Sprintf("- %s → (文件缺失，无法定位)\n", name))
-		} else {
-			b.WriteString(fmt.Sprintf("- %s → %s\n", name, p))
+	b.WriteString("\n\n## Orchestrator 图片定位（本机绝对路径，与编排服务同机文件系统）\n")
+	if len(hits) == 0 {
+		b.WriteString("任务文本引用了图片文件，但附件库与工作目录 " + workspace + " 中均未找到：无法自动识图。\n")
+	} else {
+		for _, h := range hits {
+			b.WriteString(fmt.Sprintf("- %s → %s\n", h.Name, h.Path))
 		}
 	}
 
 	// 仅对无视觉模型自动委派；有视觉的模型直接 read 上面注入的路径即可。
 	assistOn := node != nil && node.Assist != nil && node.Assist.Enabled
-	if !assistOn || modelSupportsVision(node.Model) || node.Type == NodeArchitect {
+	if len(hits) == 0 || !assistOn || modelSupportsVision(node.Model) || node.Type == NodeArchitect {
 		return task + b.String()
+	}
+
+	visionPaths := make([]string, 0, len(hits))
+	for _, h := range hits {
+		visionPaths = append(visionPaths, h.Path)
 	}
 
 	// 委派：任务文本给辅助手作上下文（截断），由它逐张读图并输出。
@@ -320,7 +402,7 @@ func (s *Store) autoVisionInject(ctx context.Context, run *PipelineRun, node *Ag
 	}
 	res, err := autoVisionDispatch(ctx, s, AssistDispatchOptions{
 		Task:    visionTask,
-		Images:  paths,
+		Images:  visionPaths,
 		Timeout: 150 * time.Second,
 	})
 	if err != nil {
