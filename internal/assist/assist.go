@@ -110,7 +110,7 @@ func imageMime(path string) string {
 	}
 }
 
-// opencodeAuthKey reads the OpenCode CLI credential store so `reasonix assist`
+// opencodeAuthKey reads the OpenCode CLI credential store so the assist command
 // works with zero extra configuration on machines that already logged in to
 // OpenCode (opencode-go / zen-go route). Returns "" when unavailable.
 func opencodeAuthKey() string {

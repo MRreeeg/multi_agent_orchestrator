@@ -2048,10 +2048,21 @@ func (s *Store) executePipeline(ctx context.Context, run *PipelineRun, pipe *Pip
 	return
 }
 
+// helperAssistCommand returns the helper-agent delegation command name derived
+// from the running binary, so a binary rename never breaks the injected hint.
+func helperAssistCommand() string {
+	if len(os.Args) > 0 {
+		if base := filepath.Base(os.Args[0]); base != "" && base != "." && base != string(filepath.Separator) {
+			return base
+		}
+	}
+	return "reasonix"
+}
+
 // gatherInput collects output from upstream nodes.
 // assistHint returns the auxiliary helper-agent section for a node when its
 // Assist config is enabled. The node may then delegate small side tasks (image
-// analysis first) to the configured helper via `reasonix assist`; the hint
+// analysis first) to the configured helper via the assist subcommand; the hint
 // explicitly says to keep going when the command is unavailable, so a pipeline
 // without any configured assist backend never blocks on this.
 func assistHint(node *AgentNode) string {
@@ -2072,13 +2083,14 @@ func assistHint(node *AgentNode) string {
 	if driver != "" {
 		driverPart = " --driver " + driver
 	}
+	cmd := helperAssistCommand() + " assist"
 	return "## 辅助手（Helper Agent）\n" +
 		"重要：当前模型很可能不支持图像输入（read_image 等图像工具调用必然失败），你不保证能直接读图。\n" +
 		"你有一个专属辅助 agent（默认识图），职责：" + duty + "\n" +
-		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，必须委派，运行：\n" +
-		"reasonix assist \"任务描述\" [--image 图片路径...]" + modelPart + driverPart + "\n" +
+		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，必须委派，运行辅助手委派命令：\n" +
+		cmd + " \"任务描述\" [--image 图片路径...]" + modelPart + driverPart + "\n" +
 		"禁止直接调用 read_image 等图像输入工具，也不要假装看到了图像。\n" +
-		"把返回的分析结果纳入你的工作；若 reasonix assist 命令不可用或失败，如实说明你无法识图并继续其余工作，不要卡住，更不要编造图像内容。"
+		"把返回的分析结果纳入你的工作；若" + cmd + "不可用或失败，如实说明你无法识图并继续其余工作，不要卡住，更不要编造图像内容。"
 }
 
 func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) string {
@@ -3074,7 +3086,7 @@ const architectAssignmentRules = `# TASK ASSIGNMENT RULES (MANDATORY)
 你是架构师，负责为下游节点分配子任务。你无法感知下游节点的实际模型能力，必须遵守：
 
 - 下游执行者/审查者的模型可能不支持图像输入（视觉能力未知），不要假设它们"直接看图"。
-- 凡涉及识图的任务（比对效果图、截图、设计稿、报错图等），分配文本必须明确要求执行者"通过辅助手（reasonix assist）委派识图"，并把图片文件路径写清楚。
+- 凡涉及识图的任务（比对效果图、截图、设计稿、报错图等），分配文本必须明确要求执行者通过辅助手委派识图（运行执行环境提供的辅助手委派命令），并把图片文件路径写清楚。
 - 禁止在分配文本中要求下游节点直接调用 read_image 等图像输入工具；禁止替下游节点编造任何图像内容或图像差异。
 - 分配文本应写明最终交付格式（JSON 结构、字段、文件路径），让下游节点只负责执行，不负责猜测你的意图。
 `

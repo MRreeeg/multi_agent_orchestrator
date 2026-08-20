@@ -26,7 +26,7 @@ func TestAssistHintInjection(t *testing.T) {
 		}
 	}
 
-	const hintMarker = "reasonix assist"
+	const hintMarker = " assist"
 
 	store := NewStore()
 
@@ -92,13 +92,13 @@ func TestLoopIterationAssistHintInjection(t *testing.T) {
 
 	// n1 has disabled helper: iteration input must not contain the hint.
 	in := store.gatherInputForIteration(pipe, run, "it1", "n1")
-	if strings.Contains(in, "reasonix assist") {
+	if strings.Contains(in, "assist") {
 		t.Errorf("disabled helper must NOT get hint in loop iteration; input:\n%s", in)
 	}
 
 	// n2 has enabled helper: iteration input should contain the hint.
 	in = store.gatherInputForIteration(pipe, run, "it1", "n2")
-	if !strings.Contains(in, "reasonix assist") {
+	if !strings.Contains(in, "assist") {
 		t.Errorf("enabled helper should get assist hint in loop iteration; input:\n%s", in)
 	}
 }

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"reasonix/internal/assist"
@@ -11,7 +12,7 @@ import (
 // assistCommand dispatches a small auxiliary task (image analysis first) to a
 // vision-capable model. Usage:
 //
-//	reasonix assist "describe this screenshot" [--image a.png] [--image b.jpg] [--model mimo-v2.5] [--driver opencode|claude]
+//	<binary> assist "describe this screenshot" [--image a.png] [--image b.jpg] [--model mimo-v2.5] [--driver opencode|claude]
 //
 // Options come from flags, then environment (REASONIX_ASSIST_*), then defaults
 // (OpenCode Zen Go route, mimo-v2.5).
@@ -54,7 +55,7 @@ func assistCommand(args []string) int {
 		}
 	}
 	if strings.TrimSpace(task) == "" && len(images) == 0 {
-		fmt.Fprintln(os.Stderr, "assist: usage: reasonix assist \"task\" [--image path ...] [--model name] [--driver opencode|claude]")
+		fmt.Fprintf(os.Stderr, "assist: usage: %s assist \"task\" [--image path ...] [--model name] [--driver opencode|claude]\n", filepath.Base(os.Args[0]))
 		return 2
 	}
 
