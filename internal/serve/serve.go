@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -114,6 +115,27 @@ func (s *Server) orchestratorAPI(w http.ResponseWriter, r *http.Request) {
 	h := s.orch
 	s.orchMu.Unlock()
 	h.ServeHTTP(w, r)
+}
+
+// setupOrchestratorAddr 把编排服务监听地址注入 orchestrator store，供辅助手
+// 委派协议提示（执行者 curl 目标）使用。":8080" 这类通配地址规范化为
+// 127.0.0.1:port（执行者与 orchestrator 同机）。惰性创建 store 以便后续
+// orchestratorAPI 复用同一个实例。
+func (s *Server) setupOrchestratorAddr(addr string) {
+	s.orchMu.Lock()
+	if s.orch == nil {
+		s.orch = newOrchestratorHandler(s.bc)
+	}
+	h := s.orch
+	s.orchMu.Unlock()
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	h.store.SetOrchestratorAddr(net.JoinHostPort(host, port))
 }
 
 func (s *Server) orchestratorEvents(w http.ResponseWriter, r *http.Request) {
@@ -550,6 +572,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /orchestrator/api/requirements/understand", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/requirements/analyze", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/upload-image", s.orchestratorAPI)
+	mux.HandleFunc("POST /orchestrator/api/orch-assist/dispatch", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/images/", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/sessions", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/sessions/", s.orchestratorAPI)
@@ -609,6 +632,7 @@ func csrfGuard(next http.Handler) http.Handler {
 // "ask" decisions surface as approval_request events answered via POST /approve.
 func (s *Server) Run(addr string) error {
 	s.ctl().EnableInteractiveApproval()
+	s.setupOrchestratorAddr(addr)
 	return http.ListenAndServe(addr, s.Handler())
 }
 
@@ -617,6 +641,7 @@ func (s *Server) Run(addr string) error {
 // before returning.
 func (s *Server) RunGraceful(ctx context.Context, addr string) error {
 	s.ctl().EnableInteractiveApproval()
+	s.setupOrchestratorAddr(addr)
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           s.Handler(),

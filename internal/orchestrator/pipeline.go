@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"sync"
 	"time"
 
@@ -1498,6 +1499,12 @@ type Store struct {
 	providerSessions  map[string]*ProviderSession
 	runtimeStates     map[string]*RuntimeState
 	iterations        map[string]*LoopIteration
+
+	// orchAddr 是编排服务对外地址（host:port），注入辅助手委派协议（执行者
+	// curl 目标）。用 atomic.Value 承载，因为 assistHint 可能在被调用方持有
+	// s.mu 时读取（gatherInput 上游分支），不能再加锁。由 serve 启动时经
+	// SetOrchestratorAddr 设置。
+	orchAddr atomic.Value // string
 }
 
 // NewStore creates an empty pipeline store.
@@ -2048,24 +2055,14 @@ func (s *Store) executePipeline(ctx context.Context, run *PipelineRun, pipe *Pip
 	return
 }
 
-// helperAssistCommand returns the helper-agent delegation command name derived
-// from the running binary, so a binary rename never breaks the injected hint.
-func helperAssistCommand() string {
-	if len(os.Args) > 0 {
-		if base := filepath.Base(os.Args[0]); base != "" && base != "." && base != string(filepath.Separator) {
-			return base
-		}
-	}
-	return "reasonix"
-}
-
 // gatherInput collects output from upstream nodes.
 // assistHint returns the auxiliary helper-agent section for a node when its
-// Assist config is enabled. The node may then delegate small side tasks (image
-// analysis first) to the configured helper via the assist subcommand; the hint
-// explicitly says to keep going when the command is unavailable, so a pipeline
-// without any configured assist backend never blocks on this.
-func assistHint(node *AgentNode) string {
+// Assist config is enabled. The hint is an explicit delegation protocol: the
+// node curls the Orchestrator's assist dispatch endpoint instead of inventing
+// its own sub-agents; the endpoint runs a vision-capable model on a retained
+// runtime. The hint always says to keep going when the command is unavailable,
+// so a pipeline without a configured orchestrator address never blocks.
+func (s *Store) assistHint(node *AgentNode) string {
 	if node == nil || node.Assist == nil || !node.Assist.Enabled {
 		return ""
 	}
@@ -2074,23 +2071,29 @@ func assistHint(node *AgentNode) string {
 		duty = "识图：描述截图/设计稿/报错图等图像内容，或完成交给你的独立小任务"
 	}
 	model := strings.TrimSpace(node.Assist.Model)
-	modelPart := ""
-	if model != "" {
-		modelPart = " --model " + model
+	if model == "" {
+		model = "mimo-v2.5"
 	}
 	driver := strings.TrimSpace(node.Assist.Driver)
-	driverPart := ""
-	if driver != "" {
-		driverPart = " --driver " + driver
+	if driver == "" {
+		driver = "opencode"
 	}
-	cmd := helperAssistCommand() + " assist"
-	return "## 辅助手（Helper Agent）\n" +
+	addr, _ := s.orchAddr.Load().(string)
+
+	base := "## 辅助手（Helper Agent）— 委派协议\n" +
 		"重要：当前模型很可能不支持图像输入（read_image 等图像工具调用必然失败），你不保证能直接读图。\n" +
-		"你有一个专属辅助 agent（默认识图），职责：" + duty + "\n" +
-		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，必须委派，运行辅助手委派命令：\n" +
-		cmd + " \"任务描述\" [--image 图片路径...]" + modelPart + driverPart + "\n" +
-		"禁止直接调用 read_image 等图像输入工具，也不要假装看到了图像。\n" +
-		"把返回的分析结果纳入你的工作；若" + cmd + "不可用或失败，如实说明你无法识图并继续其余工作，不要卡住，更不要编造图像内容。"
+		"你有一个专属辅助 agent（默认识图，模型 " + driver + "/" + model + "），职责：" + duty + "。\n" +
+		"辅助手由 Orchestrator 托管为独立运行时，无需你启动任何东西、不要自己设立 subagent。\n"
+	if strings.TrimSpace(addr) == "" {
+		return base + "当前编排服务地址未配置，你无法委派识图：遇到需要识图的任务时，如实声明「无法识图（辅助手端点未配置）」并继续其余工作，禁止编造图像内容。"
+	}
+	return base +
+		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，按以下协议委派：\n" +
+		"1. 传输：在 shell 中执行（图片必须写绝对路径；任务文本按 JSON 字符串转义；图片不存在则不要委派）：\n" +
+		"   curl -s -m 150 -X POST http://" + addr + "/orchestrator/api/orch-assist/dispatch -H \"Content-Type: application/json\" -d '{\"task\":\"<识图任务>\",\"images\":[\"<图片绝对路径1>\",\"<图片绝对路径2>\"]}'\n" +
+		"2. 获取：响应是 JSON。{\"ok\":true,\"result\":\"...\"} → 把 result 中的分析纳入你的交付物。\n" +
+		"3. 判定：HTTP 200 且 ok=true 即委派成功；ok=false（error 字段是原因）、超时、连接失败、或你无法执行 curl（无 shell 权限）→ 如实声明「无法识图」+原因，继续其余工作，禁止编造图像内容。\n" +
+		"若你无法确定图片绝对路径，不要委派，如实声明缺少图片路径。"
 }
 
 func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) string {
@@ -2098,7 +2101,7 @@ func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) str
 	upstream := upstreamEdges(pipe, nodeID)
 	if len(upstream) == 0 {
 		if run.Task != "" {
-			if hint := assistHint(node); hint != "" {
+			if hint := s.assistHint(node); hint != "" {
 				if node != nil && node.RoleDesc != "" {
 					return fmt.Sprintf("## 节点职责 / Node duty\n%s\n\n## 原始任务 / Original task\n%s\n\n%s", node.RoleDesc, run.Task, hint)
 				}
@@ -2110,12 +2113,12 @@ func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) str
 			return run.Task
 		}
 		if node != nil && node.RoleDesc != "" {
-			if hint := assistHint(node); hint != "" {
+			if hint := s.assistHint(node); hint != "" {
 				return fmt.Sprintf("你是一个%s / You are a(n) %s。你的任务是：%s。请开始工作 / Begin.\n\n%s", node.Label, node.Label, node.RoleDesc, hint)
 			}
 			return fmt.Sprintf("你是一个%s / You are a(n) %s。你的任务是：%s。请开始工作 / Begin.", node.Label, node.Label, node.RoleDesc)
 		}
-		if hint := assistHint(node); hint != "" {
+		if hint := s.assistHint(node); hint != "" {
 			return fmt.Sprintf("请完成你的角色任务 / Complete your role task。角色 / Role：%s\n\n%s", node.Label, hint)
 		}
 		return fmt.Sprintf("请完成你的角色任务 / Complete your role task。角色 / Role：%s", node.Label)
@@ -2126,7 +2129,7 @@ func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) str
 	if node != nil && node.RoleDesc != "" {
 		parts = append(parts, "## 节点职责 / Node duty\n"+node.RoleDesc)
 	}
-	if hint := assistHint(node); hint != "" {
+	if hint := s.assistHint(node); hint != "" {
 		parts = append(parts, hint)
 	}
 	if run.Task != "" {

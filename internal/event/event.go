@@ -121,6 +121,12 @@ const (
 	// (spawning|thinking|parsing|done|failed|retrying); Detail carries JSON
 	// with elapsedSec/stdoutLen/attempt/line. Appended last.
 	AnalyzeProgress
+	// AssistStart signals a helper-agent dispatch began. Text carries the task
+	// preview; Detail carries JSON with runtimeID/port/model. Appended last.
+	AssistStart
+	// AssistDone reports the outcome of a helper-agent dispatch. Detail carries
+	// JSON with runtimeID/port/model/ok/result/error. Appended last.
+	AssistDone
 	// KindCount is a sentinel one past the last real Kind. New event kinds must
 	// be inserted above it so completeness tests cover them automatically.
 	KindCount

@@ -1219,7 +1219,7 @@ func (s *Store) gatherInputForIteration(pipe *Pipeline, run *PipelineRun, iterat
 	if node != nil && node.RoleDesc != "" {
 		parts = append(parts, "## 节点职责 / Node duty\n"+node.RoleDesc)
 	}
-	if hint := assistHint(node); hint != "" {
+	if hint := s.assistHint(node); hint != "" {
 		parts = append(parts, hint)
 	}
 	if run.Task != "" {

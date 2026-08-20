@@ -288,6 +288,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.understandRequirement(w, r)
 	case path == "/upload-image" && r.Method == http.MethodPost:
 		h.uploadImage(w, r)
+	case path == "/orch-assist/dispatch" && r.Method == http.MethodPost:
+		h.dispatchOrchAssist(w, r)
 	case strings.HasPrefix(path, "/images/") && r.Method == http.MethodGet:
 		h.serveImage(w, r)
 	case path == "/requirements/analyze" && r.Method == http.MethodPost:
@@ -1397,6 +1399,44 @@ func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Re
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// dispatchOrchAssist 是辅助手委派协议的 HTTP 端点。执行者节点（模型可能无
+// 视觉能力）用 curl 调用：任务文本 + 图片绝对路径（同机文件系统），响应统一
+// 为 JSON {"ok":true,"result":...} 或 {"ok":false,"error":...}（HTTP 恒 200，
+// 便于执行者按 JSON 判定）。
+func (h *orchestratorHandler) dispatchOrchAssist(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Task       string   `json:"task"`
+		Images     []string `json:"images"`
+		Model      string   `json:"model"`
+		Driver     string   `json:"driver"`
+		TimeoutSec int      `json:"timeoutSec"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": "assist: invalid body: " + err.Error()})
+		return
+	}
+	result, err := h.store.AssistDispatch(r.Context(), orchestrator.AssistDispatchOptions{
+		Task:    body.Task,
+		Images:  body.Images,
+		Model:   body.Model,
+		Driver:  body.Driver,
+		Timeout: time.Duration(body.TimeoutSec) * time.Second,
+	})
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{
+		"ok":     true,
+		"result": result.Result,
+		"runtime": map[string]any{
+			"runtimeID": result.RuntimeID,
+			"port":      result.Port,
+			"model":     result.ModelRef,
+		},
+	})
 }
 
 func enforceGeneratedRoleBoundary(agent, roleDesc string) string {
