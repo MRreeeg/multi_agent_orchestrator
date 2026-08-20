@@ -182,6 +182,15 @@ type Edge struct {
 	Label  string `json:"label,omitempty"`
 }
 
+// ImageRef records one uploaded image attachment attached to a run: the
+// persisted id (validated, never path-like) plus the original filename as the
+// user uploaded it. Executors reference images by their original name, so the
+// id→name mapping is required for Orchestrator-side auto vision delegation.
+type ImageRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
 // PipelineRun tracks one execution of a Pipeline.
 type PipelineRun struct {
 	ID                 string              `json:"id"`
@@ -202,6 +211,10 @@ type PipelineRun struct {
 	TerminationReason  string              `json:"terminationReason,omitempty"` // review_pass | fixed_limit | max_iterations | blocked | failed | canceled
 	NodeStates         map[string]RunState `json:"nodeStates"`
 	NodeAttemptIDs     []string            `json:"nodeAttemptIDs,omitempty"`
+	// Images records the run's uploaded image attachments (id + original
+	// filename). Executors reference images by original name; Orchestrator
+	// resolves them to attachment paths for auto vision delegation.
+	Images []ImageRef `json:"images,omitempty"`
 	// MaintenanceEvents records reviewer-driven stall repairs applied during
 	// the run (detect → diagnose → nudge/restart/noop), newest last.
 	MaintenanceEvents []MaintenanceEvent  `json:"maintenanceEvents,omitempty"`
@@ -535,6 +548,10 @@ type ExecutionOptions struct {
 	// Workspace is snapshotted on PipelineRun creation. Execution must not
 	// silently follow the process cwd after a session or browser changes it.
 	Workspace string `json:"workspace,omitempty"`
+	// Images carries the run's uploaded image attachments (id + original
+	// name). Orchestrator uses them for automatic vision delegation when an
+	// executor model cannot read images itself.
+	Images []ImageRef `json:"images,omitempty"`
 }
 
 // ── Loop Types (P7) ──

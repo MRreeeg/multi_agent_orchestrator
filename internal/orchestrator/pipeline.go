@@ -1789,6 +1789,7 @@ func (s *Store) ExecutePipelineV2(ctx context.Context, sessionID, pipelineRevID,
 		LoopConfig:         loopConfig,
 		NodeStates:         nodeStates,
 		NodeAttemptIDs:     []string{},
+		Images:             append([]ImageRef(nil), opts.Images...),
 		CreatedAt:          now,
 		StartedAt:          now,
 		UpdatedAt:          now,
@@ -2019,6 +2020,8 @@ func (s *Store) executePipeline(ctx context.Context, run *PipelineRun, pipe *Pip
 
 				// Gather input from upstream edges.
 				input := s.gatherInput(pipe, run, nodeID)
+				// Auto vision: 注入附件路径，无视觉模型自动委派辅助手识图。
+				input = s.autoVisionInject(ctx, run, node, input)
 
 				// Execute the agent via reasonix serve subprocess.
 				output, nodeStderr, realUsage, _, _, _, err := s.executeNode(ctx, node, input, "", "")
@@ -2394,6 +2397,8 @@ func (s *Store) executePipelineV2(ctx context.Context, run *PipelineRun, pipe *P
 
 				// Gather input from upstream Attempts.
 				input := s.gatherInputV2(pipe, run, nodeID)
+				// Auto vision: 注入附件路径，无视觉模型自动委派辅助手识图。
+				input = s.autoVisionInject(ctx, run, &nodeCopy, input)
 
 				if err := s.UpdateAttempt(attempt.ID, func(a *NodeAttempt) {
 					a.Input = input

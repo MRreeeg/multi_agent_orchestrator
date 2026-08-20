@@ -2308,13 +2308,14 @@ func (h *orchestratorHandler) updateCurrentRevision(w http.ResponseWriter, r *ht
 
 func (h *orchestratorHandler) createOrchRun(w http.ResponseWriter, r *http.Request, sessionID string) {
 	var body struct {
-		Task               string `json:"task"`
-		RewrittenTask      string `json:"rewrittenTask,omitempty"`
-		Trigger            string `json:"trigger"`
-		ParentRunID        string `json:"parentRunID,omitempty"`
-		ReuseAgentSessions *bool  `json:"reuseAgentSessions,omitempty"`
-		ResumeRunID        string `json:"resumeRunID,omitempty"`
-		ContextPolicy      string `json:"contextPolicy,omitempty"`
+		Task               string                  `json:"task"`
+		RewrittenTask      string                  `json:"rewrittenTask,omitempty"`
+		Trigger            string                  `json:"trigger"`
+		ParentRunID        string                  `json:"parentRunID,omitempty"`
+		ReuseAgentSessions *bool                   `json:"reuseAgentSessions,omitempty"`
+		ResumeRunID        string                  `json:"resumeRunID,omitempty"`
+		ContextPolicy      string                  `json:"contextPolicy,omitempty"`
+		Images             []orchestrator.ImageRef `json:"images,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, "invalid request body", http.StatusBadRequest)
@@ -2371,6 +2372,7 @@ func (h *orchestratorHandler) createOrchRun(w http.ResponseWriter, r *http.Reque
 		Trigger:       body.Trigger,
 		ParentRunID:   body.ParentRunID,
 		ContextPolicy: body.ContextPolicy,
+		Images:        validImageRefs(body.Images),
 	}
 	if body.ReuseAgentSessions != nil {
 		opts.ReuseAgentSessions = *body.ReuseAgentSessions
@@ -2408,6 +2410,21 @@ func (h *orchestratorHandler) listOrchIterations(w http.ResponseWriter, _ *http.
 		iterations = []orchestrator.LoopIteration{}
 	}
 	writeJSON(w, iterations)
+}
+
+// validImageRefs 过滤掉非法附件 id（glob 元字符/路径穿越不得进入文件解析），
+// 保留原名供执行者引用映射。
+func validImageRefs(refs []orchestrator.ImageRef) []orchestrator.ImageRef {
+	out := make([]orchestrator.ImageRef, 0, len(refs))
+	seen := make(map[string]bool, len(refs))
+	for _, r := range refs {
+		if !validImageID(r.ID) || seen[r.ID] {
+			continue
+		}
+		seen[r.ID] = true
+		out = append(out, r)
+	}
+	return out
 }
 
 func (h *orchestratorHandler) cancelOrchRun(w http.ResponseWriter, _ *http.Request, sessionID, runID string) {

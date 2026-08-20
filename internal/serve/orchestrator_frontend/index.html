@@ -4564,7 +4564,7 @@ $('#btn-execute').addEventListener('click', () => {
   };
   const warns = state.nodes
     .filter(n => n.executor === 'dsh' && !isVisionModel(n.model || '') && (!n.assist || n.assist.enabled !== false))
-    .map(n => `${escHtml(n.name)}（${escHtml(n.model || '未指定模型')}）：dsh 执行器实际模型由 harness settings.yaml 决定，若需识图请确认该模型支持图像输入（推荐 mimo-v2.5），并保持节点辅助手开启（识图将经辅助手委派通道：orch-assist 视觉运行时）`);
+    .map(n => `${escHtml(n.name)}（${escHtml(n.model || '未指定模型')}）：dsh 执行器实际模型由 harness settings.yaml 决定；若需识图，Orchestrator 会自动委派辅助手视觉运行时完成并把结果注入本节点，请保持节点辅助手开启`);
   $('#confirm-nodes').innerHTML =
     (warns.length ? '<div style="margin-bottom:8px;padding:8px 10px;background:rgba(255,180,0,.1);border:1px solid rgba(255,180,0,.45);border-radius:8px;color:#d99700;line-height:1.6">⚠️ ' + warns.join('<br/>⚠️ ') + '</div>' : '') +
     state.nodes.map(n =>
@@ -4585,12 +4585,19 @@ $('#confirm-ok').addEventListener('click', async () => {
     await saveCurrentPipelineRevision(pipeline);
     let run;
     if (state.sessionID) {
+      // 收集会话中上传的图片附件（id+原名），供 Orchestrator 自动识图委派。
+      const imgs = [];
+      const seenImg = new Set();
+      state.chatMessages.forEach(m => (m.images || []).forEach(im => {
+        if (im && im.id && !seenImg.has(im.id)) { seenImg.add(im.id); imgs.push({ id: im.id, name: im.name || '' }); }
+      }));
       run = await apiPost('/orch-sessions/' + state.sessionID + '/runs', {
         task,
         rewrittenTask: state.rewrittenTask || task,
         trigger: 'manual',
         reuseAgentSessions: true,
-        contextPolicy: 'reuse'
+        contextPolicy: 'reuse',
+        images: imgs
       });
     } else {
       run = await apiPost('/pipelines/' + state.pipelineId + '/execute', { task });

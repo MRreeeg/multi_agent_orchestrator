@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -185,4 +187,149 @@ func (s *Store) emitAssistEvent(kind event.Kind, rt *opencodeRuntime, modelRef, 
 		text = string([]rune(text)[:120]) + "…"
 	}
 	s.emit(event.Event{Kind: kind, Text: text, Detail: string(detail)})
+}
+
+// ── 自动识图兜底（AutoVision）──
+//
+// 依赖 LLM 自觉调用委派协议不可靠（无视觉模型可能忽略提示、没有 curl 或
+// 不知道图片绝对路径）。Orchestrator 因此在流水线层主动拦截：run 携带上传
+// 图片清单（id+原名），executor 任务文本含图片引用时：
+//  1. 无论模型，先注入附件图片的绝对路径清单（视觉模型可用 read 工具直读，
+//     无视觉模型委派时也有了可靠路径）；
+//  2. assist 开启且模型无视觉时，Orchestrator 自动调用辅助手运行时完成识图，
+//     把结构化结果直接注入任务文本——executor 不再需要自己调 curl。
+
+// modelSupportsVision 报告模型是否具备图像输入能力（经 opencode read 工具
+// 可读图）。未知/未指定模型保守视为无视觉，交给辅助手兜底。
+func modelSupportsVision(model string) bool {
+	m := strings.ToLower(strings.TrimSpace(model))
+	if m == "" {
+		return false
+	}
+	if strings.Contains(m, "mimo-v2.5") && !strings.Contains(m, "pro") {
+		return true
+	}
+	if strings.HasPrefix(m, "glm") || strings.HasPrefix(m, "claude") {
+		return true
+	}
+	return false
+}
+
+// attachmentDir 返回上传图片附件目录（与 serve 的 imageAttachmentDir 一致）。
+func attachmentDir() string {
+	return filepath.Join(DataRoot(), "attachments")
+}
+
+// imageIDRe/validImageRef 校验附件 id（UnixMilli "_" hex4），与 serve 侧
+// validImageID 同构；id 会拼入 filepath.Glob，glob 元字符必须被拒绝。
+var imageIDRe = regexp.MustCompile(`^[0-9]{13}_[0-9a-f]{8}$`)
+
+func validImageRef(id string) bool { return imageIDRe.MatchString(id) }
+
+// imageAttachmentPaths 把 run 的图片附件解析为磁盘绝对路径（按声明顺序，
+// 跳过已删除/非法文件）。
+func imageAttachmentPaths(refs []ImageRef) []string {
+	var out []string
+	for _, ref := range refs {
+		if !validImageRef(ref.ID) {
+			continue
+		}
+		matches, err := filepath.Glob(filepath.Join(attachmentDir(), ref.ID+".*"))
+		if err != nil || len(matches) == 0 {
+			continue
+		}
+		out = append(out, matches[0])
+	}
+	return out
+}
+
+// taskReferencesImages 判定任务文本是否引用图片（按附件原名/ID 或图片扩展名
+// 文件名模式）。宽松匹配避免漏掉架构师的不同写法。
+func taskReferencesImages(task string, refs []ImageRef) bool {
+	task = strings.TrimSpace(task)
+	if task == "" {
+		return false
+	}
+	for _, ref := range refs {
+		if ref.Name != "" && strings.Contains(task, ref.Name) {
+			return true
+		}
+		if ref.ID != "" && strings.Contains(task, ref.ID) {
+			return true
+		}
+	}
+	return imageFileRe.MatchString(task)
+}
+
+// imageFileRe 匹配常见图片文件名引用（中文/字母/数字/空格/点 + 扩展名）。
+var imageFileRe = regexp.MustCompile(`(?i)[\p{L}\p{N}\-_. ]+\.(png|jpe?g|gif|webp|bmp)\b`)
+
+// autoVisionDispatch 执行自动识图委派；测试可替换为假实现避免启动真实运行时。
+var autoVisionDispatch = func(ctx context.Context, s *Store, opts AssistDispatchOptions) (*AssistDispatchResult, error) {
+	return s.AssistDispatch(ctx, opts)
+}
+
+// autoVisionInject 是自动识图兜底入口：解析 run 图片附件，注入路径清单，
+// 需要时自动委派辅助手识图并注入结果。永不阻塞流水线——委派失败降级为
+// 如实声明。
+func (s *Store) autoVisionInject(ctx context.Context, run *PipelineRun, node *AgentNode, task string) string {
+	if len(run.Images) == 0 || strings.TrimSpace(task) == "" {
+		return task
+	}
+	paths := imageAttachmentPaths(run.Images)
+	if len(paths) == 0 {
+		return task
+	}
+	if !taskReferencesImages(task, run.Images) {
+		return task
+	}
+
+	var b strings.Builder
+	b.WriteString("\n\n## Orchestrator 附件图片（本机绝对路径，与编排服务同机文件系统）\n")
+	for i, ref := range run.Images {
+		p := ""
+		if i < len(paths) {
+			p = paths[i]
+		} else if !validImageRef(ref.ID) {
+			continue
+		} else if m, err := filepath.Glob(filepath.Join(attachmentDir(), ref.ID+".*")); err == nil && len(m) > 0 {
+			p = m[0]
+		}
+		name := ref.Name
+		if name == "" {
+			name = ref.ID
+		}
+		if p == "" {
+			b.WriteString(fmt.Sprintf("- %s → (文件缺失，无法定位)\n", name))
+		} else {
+			b.WriteString(fmt.Sprintf("- %s → %s\n", name, p))
+		}
+	}
+
+	// 仅对无视觉模型自动委派；有视觉的模型直接 read 上面注入的路径即可。
+	assistOn := node != nil && node.Assist != nil && node.Assist.Enabled
+	if !assistOn || modelSupportsVision(node.Model) || node.Type == NodeArchitect {
+		return task + b.String()
+	}
+
+	// 委派：任务文本给辅助手作上下文（截断），由它逐张读图并输出。
+	visionTask := strings.TrimSpace(task)
+	runes := []rune(visionTask)
+	if len(runes) > 3000 {
+		visionTask = string(runes[:3000]) + "\n…（任务文本过长已截断，按上述要求识图）"
+	}
+	res, err := autoVisionDispatch(ctx, s, AssistDispatchOptions{
+		Task:    visionTask,
+		Images:  paths,
+		Timeout: 150 * time.Second,
+	})
+	if err != nil {
+		b.WriteString("\n## 辅助手自动识图失败（Orchestrator 已尝试委派视觉运行时）\n" +
+			"失败原因：" + err.Error() + "\n" +
+			"如本任务确需识图，请如实声明「无法识图」，禁止编造任何图像内容。\n")
+		return task + b.String()
+	}
+	b.WriteString("\n## 辅助手自动识图结果（Orchestrator 已完成识图，直接使用以下内容，禁止再调用任何识图工具或委派命令）\n")
+	b.WriteString(res.Result)
+	return task + b.String()
 }
