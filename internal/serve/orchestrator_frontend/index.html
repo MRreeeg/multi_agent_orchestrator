@@ -247,7 +247,7 @@ input,textarea,select{font:inherit;color:inherit}
 .config .run-dash{margin:12px 12px 0;flex-shrink:0;max-height:min(55vh,440px);overflow-y:auto;min-height:0}
 .run-dash__head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 /* 执行情况可收缩成一行：隐藏内容区，只留头部 + 展开按钮 */
-.run-dash--collapsed .run-dash__iter,.run-dash--collapsed .run-dash__nodes,.run-dash--collapsed .rd-review,.run-dash--collapsed .rd-analysis{display:none!important}
+.run-dash--collapsed .run-dash__iter,.run-dash--collapsed .run-dash__nodes,.run-dash--collapsed .rd-review,.run-dash--collapsed .rd-analysis,.run-dash--collapsed .rd-assist{display:none!important}
 .run-dash--collapsed .run-dash__head{margin-bottom:0}
 /* 右侧悬浮按钮：config 面板隐藏时显示，点击重新打开右侧卡片 */
 .side-fab{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:60;width:40px;height:40px;border-radius:12px;background:var(--accent);color:oklch(99% 0 0);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-md);transition:transform .15s,background .18s}
@@ -295,6 +295,12 @@ input,textarea,select{font:inherit;color:inherit}
 .rd-analysis__progress{color:var(--fg-2);white-space:pre-wrap}
 .rd-analysis__blocking{color:var(--warning);margin-top:4px}
 .rd-analysis__sugg{color:var(--accent);margin-top:4px}
+.rd-assist{margin-top:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--bg-2);font-size:12px;line-height:1.6}
+.rd-assist__row{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.rd-assist__dot{width:8px;height:8px;border-radius:50%;flex:none}
+.rd-assist__btn{padding:2px 8px;font-size:11px;border-radius:6px;border:1px solid var(--border-strong);background:var(--card);color:var(--fg);cursor:pointer}
+.rd-assist__btn:hover{background:var(--bg-1)}
+.rd-assist__preview{color:var(--fg-2);white-space:pre-wrap;margin-top:4px;word-break:break-all}
 .hero__chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
 .hero__chip{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--fg-2);font-size:12px;cursor:pointer;transition:all .15s}
 .hero__chip:hover{border-color:var(--accent);color:var(--accent)}
@@ -752,6 +758,10 @@ input,textarea,select{font:inherit;color:inherit}
       <div class="run-dash__nodes" id="rd-nodes"></div>
       <div class="rd-review hidden" id="rd-review"></div>
       <div class="rd-analysis hidden" id="rd-analysis"></div>
+      <div class="rd-assist hidden" id="rd-assist">
+        <div class="rd-analysis__head">🤝 辅助手委派</div>
+        <div id="rd-assist-body"></div>
+      </div>
     </div>
     <div class="config__head">
       <div class="config__head-title" id="config-title">节点配置</div>
@@ -3494,6 +3504,43 @@ function updateAnalyzingProgress(stage, detail) {
   inner.textContent = (target.dataset.base || '正在分析需求…') + '\n\n' + lines.map(l => '> ' + l).join('\n');
 }
 
+// 辅助手委派状态行（assist_start / assist_done 事件）。
+function updateAssistRow(phase, detail) {
+  const box = $('#rd-assist');
+  if (!box) return;
+  let d = {};
+  try { d = detail ? JSON.parse(detail) : {}; } catch (_) {}
+  const body = $('#rd-assist-body');
+  if (phase === 'start') {
+    box.className = 'rd-assist';
+    const model = d.model || '-';
+    const port = d.port ? ':' + d.port : '';
+    body.innerHTML =
+      '<div class="rd-assist__row"><span class="rd-assist__dot" style="background:var(--warning)"></span>' +
+      '<b>委派中</b><span>🤝 辅助手 (' + escHtml(model) + ')' + escHtml(port) + '</span>' +
+      (d.runtimeID ? '<button class="rd-assist__btn" data-rt="' + escHtml(d.runtimeID) + '">打开控制台</button>' : '') +
+      '</div>' +
+      (d.task ? '<div class="rd-assist__preview">任务：' + escHtml(String(d.task).slice(0, 120)) + '</div>' : '');
+  } else {
+    box.className = 'rd-assist';
+    const ok = d.ok !== false;
+    body.innerHTML =
+      '<div class="rd-assist__row"><span class="rd-assist__dot" style="background:' + (ok ? 'var(--success)' : 'var(--danger, #e5484d)') + '"></span>' +
+      '<b>' + (ok ? '完成' : '失败') + '</b>' +
+      '<span>🤝 辅助手 (' + escHtml(d.model || '-') + ')</span>' +
+      (d.runtimeID ? '<button class="rd-assist__btn" data-rt="' + escHtml(d.runtimeID) + '">打开控制台</button>' : '') +
+      '</div>' +
+      (ok ? (d.result ? '<div class="rd-assist__preview">' + escHtml(String(d.result).slice(0, 200)) + '</div>' : '') :
+            '<div class="rd-assist__preview">' + escHtml(d.error || '未知错误') + '</div>');
+  }
+}
+
+// 委派行内的“打开控制台”委托给 Runtime Console。
+document.addEventListener('click', ev => {
+  const btn = ev.target.closest && ev.target.closest('.rd-assist__btn');
+  if (btn && btn.dataset.rt) openRuntimeConsole(btn.dataset.rt);
+});
+
 async function refreshChatHistory() {
   try {
     const msgs = await mainApi('GET', '/history');
@@ -4382,6 +4429,10 @@ function connectSSE() {
             updateAnalyzingProgress(e.text, ap);
           }
           break;
+        case 'assist_start':
+        case 'assist_done':
+          updateAssistRow(e.kind === 'assist_start' ? 'start' : 'done', e.detail);
+          break;
         case 'pipeline_done':
           addChatMessage('ai', '🎉 流水线执行完成！', '流水线');
           finishRunDashboard(true);
@@ -4513,7 +4564,7 @@ $('#btn-execute').addEventListener('click', () => {
   };
   const warns = state.nodes
     .filter(n => n.executor === 'dsh' && !isVisionModel(n.model || '') && (!n.assist || n.assist.enabled !== false))
-    .map(n => `${escHtml(n.name)}（${escHtml(n.model || '未指定模型')}）：dsh 执行器实际模型由 harness settings.yaml 决定，若需识图请确认该模型支持图像输入（推荐 mimo-v2.5），并保持节点辅助手开启（识图将委派 reasonix assist）`);
+    .map(n => `${escHtml(n.name)}（${escHtml(n.model || '未指定模型')}）：dsh 执行器实际模型由 harness settings.yaml 决定，若需识图请确认该模型支持图像输入（推荐 mimo-v2.5），并保持节点辅助手开启（识图将经辅助手委派通道：orch-assist 视觉运行时）`);
   $('#confirm-nodes').innerHTML =
     (warns.length ? '<div style="margin-bottom:8px;padding:8px 10px;background:rgba(255,180,0,.1);border:1px solid rgba(255,180,0,.45);border-radius:8px;color:#d99700;line-height:1.6">⚠️ ' + warns.join('<br/>⚠️ ') + '</div>' : '') +
     state.nodes.map(n =>
