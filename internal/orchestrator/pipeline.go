@@ -2084,19 +2084,16 @@ func (s *Store) assistHint(node *AgentNode) string {
 	addr, _ := s.orchAddr.Load().(string)
 
 	base := "## 辅助手（Helper Agent）— 委派协议\n" +
-		"重要：当前模型很可能不支持图像输入（read_image 等图像工具调用必然失败），你不保证能直接读图。\n" +
-		"你有一个专属辅助 agent（默认识图，模型 " + driver + "/" + model + "），职责：" + duty + "。\n" +
-		"辅助手由 Orchestrator 托管为独立运行时，无需你启动任何东西、不要自己设立 subagent。\n"
+		"当前模型很可能无视觉能力：read_image 等图像工具必然失败，禁止尝试直接读图，禁止编造图像内容。\n" +
+		"若任务文本中已含「辅助手自动识图结果」区块：直接使用其结果，无需再委派。\n"
 	if strings.TrimSpace(addr) == "" {
 		return base + "当前编排服务地址未配置，你无法委派识图：遇到需要识图的任务时，如实声明「无法识图（辅助手端点未配置）」并继续其余工作，禁止编造图像内容。"
 	}
 	return base +
-		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，按以下协议委派：\n" +
-		"1. 传输：在 shell 中执行（图片必须写绝对路径；任务文本按 JSON 字符串转义；图片不存在则不要委派）：\n" +
-		"   curl -s -m 150 -X POST http://" + addr + "/orchestrator/api/orch-assist/dispatch -H \"Content-Type: application/json\" -d '{\"task\":\"<识图任务>\",\"images\":[\"<图片绝对路径1>\",\"<图片绝对路径2>\"]}'\n" +
-		"2. 获取：响应是 JSON。{\"ok\":true,\"result\":\"...\"} → 把 result 中的分析纳入你的交付物。\n" +
-		"3. 判定：HTTP 200 且 ok=true 即委派成功；ok=false（error 字段是原因）、超时、连接失败、或你无法执行 curl（无 shell 权限）→ 如实声明「无法识图」+原因，继续其余工作，禁止编造图像内容。\n" +
-		"若你无法确定图片绝对路径，不要委派，如实声明缺少图片路径。"
+		"需要识图（截图/设计稿/报错图）或适合交给视觉辅助 agent 的独立小任务时，运行以下命令委派（辅助手=" + driver + "/" + model + "，职责：" + duty + "）：\n" +
+		"curl -s -m 150 -X POST http://" + addr + "/orchestrator/api/orch-assist/dispatch -H \"Content-Type: application/json\" -d '{\"task\":\"<识图问题>\",\"images\":[\"<图片绝对路径>\"]}'\n" +
+		"返回 JSON ok=true → 把 result 纳入交付物；ok=false、超时或无法执行 curl → 声明「无法识图:原因」并继续其余工作，禁止编造。\n" +
+		"图片绝对路径见任务中「Orchestrator 图片定位」清单；无法确定路径则不委派，如实声明。"
 }
 
 func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) string {
