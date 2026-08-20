@@ -2073,10 +2073,12 @@ func assistHint(node *AgentNode) string {
 		driverPart = " --driver " + driver
 	}
 	return "## 辅助手（Helper Agent）\n" +
+		"重要：当前模型很可能不支持图像输入（read_image 等图像工具调用必然失败），你不保证能直接读图。\n" +
 		"你有一个专属辅助 agent（默认识图），职责：" + duty + "\n" +
-		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，运行：\n" +
+		"遇到需要识图（截图/设计稿/报错图）或适合交给辅助 agent 的独立小任务时，必须委派，运行：\n" +
 		"reasonix assist \"任务描述\" [--image 图片路径...]" + modelPart + driverPart + "\n" +
-		"把返回的分析结果纳入你的工作；若命令不可用或失败，说明原因并继续其余工作，不要卡住。"
+		"禁止直接调用 read_image 等图像输入工具，也不要假装看到了图像。\n" +
+		"把返回的分析结果纳入你的工作；若 reasonix assist 命令不可用或失败，如实说明你无法识图并继续其余工作，不要卡住，更不要编造图像内容。"
 }
 
 func (s *Store) gatherInput(pipe *Pipeline, run *PipelineRun, nodeID string) string {
@@ -3068,6 +3070,15 @@ func loadRolePrompt(nodeType NodeType) string {
 	return string(data)
 }
 
+const architectAssignmentRules = `# TASK ASSIGNMENT RULES (MANDATORY)
+你是架构师，负责为下游节点分配子任务。你无法感知下游节点的实际模型能力，必须遵守：
+
+- 下游执行者/审查者的模型可能不支持图像输入（视觉能力未知），不要假设它们"直接看图"。
+- 凡涉及识图的任务（比对效果图、截图、设计稿、报错图等），分配文本必须明确要求执行者"通过辅助手（reasonix assist）委派识图"，并把图片文件路径写清楚。
+- 禁止在分配文本中要求下游节点直接调用 read_image 等图像输入工具；禁止替下游节点编造任何图像内容或图像差异。
+- 分配文本应写明最终交付格式（JSON 结构、字段、文件路径），让下游节点只负责执行，不负责猜测你的意图。
+`
+
 const opencodeExecutionDisciplinePrompt = `# EXECUTION DISCIPLINE (MANDATORY)
 
 免费/流式模型容易把思考过程当作输出。本节点必须遵守：
@@ -3149,6 +3160,13 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 	task := input
 	if rolePrompt != "" {
 		task = rolePrompt + "\n\n---\n\n## 当前节点\n\n- 名称: " + node.Label + "\n- 模型: " + node.Model + "\n\n## 执行上下文\n\n" + input
+	}
+	// Architect nodes assign work to downstream nodes without knowing the
+	// downstream model's capabilities. Constrain the assignment so vision work
+	// always goes through the helper-agent delegation path instead of raw image
+	// tools the downstream model may not support.
+	if node.Type == NodeArchitect {
+		task = architectAssignmentRules + "\n\n" + task
 	}
 	// Free/streaming models (e.g. deepseek-v4-flash-free) tend to burn their
 	// output budget restating plans and "let me explore" loops, then fail with

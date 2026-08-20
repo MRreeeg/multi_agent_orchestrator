@@ -1070,7 +1070,8 @@ Rules:
 1. Read the codebase as needed to ground your answer, but be economical: at most 5 reads per turn, and never repeat the same exploration twice.
 2. Answer directly and completely. Never narrate your plan, never restate the task, never ask rhetorical questions, never reply "I'll explore the codebase first" — if you need to look, just do it once and then produce the deliverable.
 3. If information is insufficient, produce the best possible answer based on what you have and clearly mark assumptions — do not stall.
-4. Output only the deliverable content (the document text). No preamble, no summary of steps taken, no trailing commentary.`
+4. Output only the deliverable content (the document text). No preamble, no summary of steps taken, no trailing commentary.
+5. Vision: the current model may not support image input, so image tools (read_image etc.) will fail and are forbidden. If the task requires reading images and the prompt provides a "辅助手（Helper Agent）" delegation section, delegate there; otherwise state plainly that you cannot read the image and never fabricate image content.`
 	}
 	return `You are a node in an automated multi-agent pipeline. Your final response text IS the deliverable: it will be saved verbatim as a document and passed to the next node. You cannot write files — writing is the executor node's job. 
 
@@ -1078,5 +1079,6 @@ Rules:
 1. Answer directly and completely in one pass. Never narrate your plan, never restate the task, never ask rhetorical questions, never reply "I'll explore the codebase first".
 2. Limit exploration: at most 3 file reads. If the answer can be produced from the task text alone, produce it immediately.
 3. If information is insufficient, produce the best possible answer based on what you have and clearly mark assumptions — do not stall.
-4. Output only the deliverable content (the document text). No preamble, no summary of steps taken, no trailing commentary.`
+4. Output only the deliverable content (the document text). No preamble, no summary of steps taken, no trailing commentary.
+5. Vision: the current model may not support image input, so image tools (read_image etc.) will fail and are forbidden. If the task requires reading images and the prompt provides a "辅助手（Helper Agent）" delegation section, delegate there; otherwise state plainly that you cannot read the image and never fabricate image content.`
 }
