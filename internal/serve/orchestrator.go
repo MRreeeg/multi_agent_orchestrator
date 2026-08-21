@@ -81,6 +81,14 @@ func newOrchestratorHandler(emitter event.Sink) *orchestratorHandler {
 	if err := h.store.LoadIndexData(); err != nil {
 		slog.Warn("orchestrator: failed to load session index", "err", err)
 	}
+	// 启动时自动清理非活动 runtime 目录（每个 50MB+ 的 exe 副本）：保留最近
+	// 2 个，运行中（Windows 占用）无法删除的目录保留。
+	go func() {
+		del, freed, locked := pruneOldRuntimeDirs(2)
+		if del > 0 || len(locked) > 0 {
+			slog.Info("orchestrator: pruned stale runtime dirs", "deleted", del, "freed_mb", freed>>20, "locked", locked)
+		}
+	}()
 	return h
 }
 
@@ -1142,18 +1150,40 @@ func (h *orchestratorHandler) cleanupRuntimes(w http.ResponseWriter, r *http.Req
 		Keep int `json:"keep"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.Keep < 1 {
-		body.Keep = 2
+	deleted, freed, locked := pruneOldRuntimeDirs(body.Keep)
+	var kept []string
+	if entries, err := os.ReadDir(runtimeDirsRoot()); err == nil {
+		for _, e := range entries {
+			if e.IsDir() && strings.HasPrefix(e.Name(), "runtime-") {
+				kept = append(kept, e.Name())
+			}
+		}
 	}
+	sort.Strings(kept)
+	slog.Info("runtimes cleanup", "root", runtimeDirsRoot(), "deleted", deleted, "freed_mb", freed>>20, "kept", kept, "locked", locked)
+	writeJSON(w, map[string]any{"deleted": deleted, "freedMB": int(freed >> 20), "kept": kept, "locked": locked})
+}
 
+// runtimeDirsRoot 返回 runtime 二进制目录（exe 旁 orchestrator-runtimes）。
+func runtimeDirsRoot() string {
 	root := filepath.Join(filepath.Dir(os.Args[0]), "orchestrator-runtimes")
 	if exe, err := os.Executable(); err == nil {
 		root = filepath.Join(filepath.Dir(exe), "orchestrator-runtimes")
 	}
+	return root
+}
+
+// pruneOldRuntimeDirs 删除旧 runtime 目录，保留最近 keep 个（目录名嵌时间戳）。
+// 删除失败（Windows 下目录被运行中的进程占用）的计入 locked 返回并保留，
+// 永不误删正在运行的 exe。
+func pruneOldRuntimeDirs(keep int) (deleted int, freed int64, locked []string) {
+	if keep < 1 {
+		keep = 2
+	}
+	root := runtimeDirsRoot()
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		writeJSON(w, map[string]any{"deleted": 0, "freedMB": 0, "kept": []string{}, "error": err.Error()})
-		return
+		return 0, 0, nil
 	}
 	var dirs []string
 	for _, e := range entries {
@@ -1162,23 +1192,20 @@ func (h *orchestratorHandler) cleanupRuntimes(w http.ResponseWriter, r *http.Req
 		}
 	}
 	sort.Strings(dirs) // names embed timestamps: ascending = oldest first
-	var kept []string
-	deleted := 0
-	var freed int64
 	for i, name := range dirs {
-		if i >= len(dirs)-body.Keep {
-			kept = append(kept, name)
+		if i >= len(dirs)-keep {
 			continue
 		}
 		target := filepath.Join(root, name)
 		dirSize, _ := dirSizeBytes(target)
-		if rmErr := os.RemoveAll(target); rmErr == nil {
-			deleted++
-			freed += dirSize
+		if rmErr := os.RemoveAll(target); rmErr != nil {
+			locked = append(locked, name)
+			continue
 		}
+		deleted++
+		freed += dirSize
 	}
-	slog.Info("runtimes cleanup", "root", root, "deleted", deleted, "freed_mb", freed>>20, "kept", kept)
-	writeJSON(w, map[string]any{"deleted": deleted, "freedMB": int(freed >> 20), "kept": kept})
+	return deleted, freed, locked
 }
 
 func dirSizeBytes(path string) (int64, error) {

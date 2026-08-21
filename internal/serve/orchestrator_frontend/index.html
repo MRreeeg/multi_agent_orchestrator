@@ -300,6 +300,10 @@ input,textarea,select{font:inherit;color:inherit}
 .rd-assist__dot{width:8px;height:8px;border-radius:50%;flex:none}
 .rd-assist__btn{padding:2px 8px;font-size:11px;border-radius:6px;border:1px solid var(--border-strong);background:var(--card);color:var(--fg);cursor:pointer}
 .rd-assist__btn:hover{background:var(--bg-1)}
+.rd-assist__view{padding:2px 8px;font-size:11px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer}
+.rd-assist__view:hover{background:var(--accent);color:#fff}
+.rd-detail-zoom{padding:2px 9px;font-size:11px;border-radius:6px;border:1px solid var(--border-strong);background:var(--card);color:var(--accent);cursor:pointer}
+.rd-detail-zoom:hover{background:var(--bg-1)}
 .rd-assist__preview{color:var(--fg-2);white-space:pre-wrap;margin-top:4px;word-break:break-all}
 .hero__chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
 .hero__chip{padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--fg-2);font-size:12px;cursor:pointer;transition:all .15s}
@@ -1315,9 +1319,9 @@ document.querySelector('#btn-lang').addEventListener('click', () => {
 const state = {
   activePanel: 'chat',
   nodes: [
-    { id: 1, name: '架构师', _nameKey: 'node.architect', type: 'architect', model: 'deepseek-pro', skill: 'brainstorming', mode: 'serve', role: '设计系统架构', assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' }, x: 60, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
-    { id: 2, name: '执行者', _nameKey: 'node.executor', type: 'executor', model: 'mimo-v2.5-pro', skill: '', mode: 'serve', role: '编码实现', assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' }, x: 310, y: 160, status: 'idle', executor: 'mimo', agent: '' },
-    { id: 3, name: '审查者', _nameKey: 'node.reviewer', type: 'reviewer', model: 'deepseek-flash', skill: 'review', mode: 'serve', role: '审查代码', assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' }, x: 560, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+    { id: 1, name: '架构师', _nameKey: 'node.architect', type: 'architect', model: 'deepseek-pro', skill: 'brainstorming', mode: 'serve', role: '设计系统架构', assist: { enabled: true, model: defaultAssistModel(), driver: 'opencode', role: '' }, x: 60, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
+    { id: 2, name: '执行者', _nameKey: 'node.executor', type: 'executor', model: 'mimo-v2.5-pro', skill: '', mode: 'serve', role: '编码实现', assist: { enabled: true, model: defaultAssistModel(), driver: 'opencode', role: '' }, x: 310, y: 160, status: 'idle', executor: 'mimo', agent: '' },
+    { id: 3, name: '审查者', _nameKey: 'node.reviewer', type: 'reviewer', model: 'deepseek-flash', skill: 'review', mode: 'serve', role: '审查代码', assist: { enabled: true, model: defaultAssistModel(), driver: 'opencode', role: '' }, x: 560, y: 160, status: 'idle', executor: 'reasonix', agent: '' },
   ],
   edges: [
     { from: 1, to: 2, mode: 'linear' },
@@ -1381,7 +1385,7 @@ function normalizeNode(raw) {
     mode: raw.mode || 'serve',
     executor: raw.executor || 'reasonix',
     role: raw.role || '',
-    assist: raw.assist || { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' },
+    assist: raw.assist || { enabled: true, model: defaultAssistModel(), driver: 'opencode', role: '' },
     stallMaintenance: raw.stallMaintenance === false ? false : (raw.stallMaintenance || undefined),
     x: raw.x || 60,
     y: raw.y || 60,
@@ -2648,8 +2652,7 @@ function showConfig(nodeId) {
   const assist = node.assist || {};
   const assistOn = assist.enabled !== false;
   $('#cfg-assist-enabled').value = assistOn ? '' : 'off';
-  $('#cfg-assist-model').value = assist.model || 'mimo-v2.5';
-  $('#cfg-assist-driver').value = assist.driver || 'opencode';
+  populateAssistSelects();
   $('#cfg-assist-role').value = assist.role || '';
   $('#assist-model-field').style.display = assistOn ? '' : 'none';
   $('#assist-driver-field').style.display = assistOn ? '' : 'none';
@@ -2816,7 +2819,7 @@ function createNode(type, x, y) {
     executor: type === 'executor' ? 'mimo' : 'reasonix',
     mode: 'serve',
     approvalMode: 'auto',
-    assist: { enabled: true, model: 'mimo-v2.5', driver: 'opencode', role: '' },
+    assist: { enabled: true, model: defaultAssistModel(), driver: 'opencode', role: '' },
     role: '',
     x: x,
     y: y,
@@ -2896,7 +2899,7 @@ function renderNodes() {
         <div class="node__model">${escHtml(node.model || T('node.noModel'))}</div>
         <div class="node__skill">${escHtml(node.executor === 'mimo' ? (node.agent || T('node.defaultAgent')) : (node.skill || T('node.noSkill')))}</div>
         <div class="${agentSourceClass(node)}">${agentSourceLine(node)}</div>
-        ${(!node.assist || node.assist.enabled !== false) ? `<div class="node__assist" title="${escHtml(node.assist && node.assist.role ? node.assist.role : T('assist.badgeTitle'))}" style="font-size:10.5px;color:var(--muted-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🤝 ${escHtml((node.assist && node.assist.model) || 'mimo-v2.5')}</div>` : ''}
+        ${(!node.assist || node.assist.enabled !== false) ? `<div class="node__assist" title="${escHtml(node.assist && node.assist.role ? node.assist.role : T('assist.badgeTitle'))}" style="font-size:10.5px;color:var(--muted-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🤝 ${escHtml((node.assist && node.assist.model) || defaultAssistModel())}</div>` : ''}
         ${node.runtime && node.runtime.output ? `<div class="node__output">${escHtml(node.runtime.output)}</div>` : ''}
       </div>
     `;
@@ -3520,17 +3523,19 @@ function updateAssistRow(phase, detail) {
       '<b>委派中</b><span>🤝 辅助手 (' + escHtml(model) + ')' + escHtml(port) + '</span>' +
       (d.runtimeID ? '<button class="rd-assist__btn" data-rt="' + escHtml(d.runtimeID) + '">打开控制台</button>' : '') +
       '</div>' +
-      (d.task ? '<div class="rd-assist__preview">任务：' + escHtml(String(d.task).slice(0, 120)) + '</div>' : '');
+      (d.task ? '<div class="rd-assist__preview">任务：' + escHtml(String(d.task).slice(0, 300)) + '</div>' : '');
   } else {
     box.className = 'rd-assist';
     const ok = d.ok !== false;
+    const result = ok ? String(d.result || '') : '';
     body.innerHTML =
       '<div class="rd-assist__row"><span class="rd-assist__dot" style="background:' + (ok ? 'var(--success)' : 'var(--danger, #e5484d)') + '"></span>' +
       '<b>' + (ok ? '完成' : '失败') + '</b>' +
       '<span>🤝 辅助手 (' + escHtml(d.model || '-') + ')</span>' +
       (d.runtimeID ? '<button class="rd-assist__btn" data-rt="' + escHtml(d.runtimeID) + '">打开控制台</button>' : '') +
+      (result ? '<button class="rd-assist__view" data-result="' + escHtml(result).replace(/"/g, '&quot;') + '">查看完整结果</button>' : '') +
       '</div>' +
-      (ok ? (d.result ? '<div class="rd-assist__preview">' + escHtml(String(d.result).slice(0, 200)) + '</div>' : '') :
+      (ok ? (result ? '<div class="rd-assist__preview">' + escHtml(result.slice(0, 600)) + '</div>' : '') :
             '<div class="rd-assist__preview">' + escHtml(d.error || '未知错误') + '</div>');
   }
 }
@@ -3539,6 +3544,8 @@ function updateAssistRow(phase, detail) {
 document.addEventListener('click', ev => {
   const btn = ev.target.closest && ev.target.closest('.rd-assist__btn');
   if (btn && btn.dataset.rt) openRuntimeConsole(btn.dataset.rt);
+  const view = ev.target.closest && ev.target.closest('.rd-assist__view');
+  if (view && view.dataset.result) showOutputPreview(view.dataset.result);
 });
 
 async function refreshChatHistory() {
@@ -4432,6 +4439,12 @@ function connectSSE() {
         case 'assist_start':
         case 'assist_done':
           updateAssistRow(e.kind === 'assist_start' ? 'start' : 'done', e.detail);
+          if (e.kind === 'assist_start') {
+            // 委派开始自动弹出辅助手 Runtime Console，实时流式显示其推理与回答。
+            let ad = {};
+            try { ad = e.detail ? JSON.parse(e.detail) : {}; } catch (_) {}
+            if (ad.runtimeID) openRuntimeConsole(ad.runtimeID);
+          }
           break;
         case 'pipeline_done':
           addChatMessage('ai', '🎉 流水线执行完成！', '流水线');
@@ -4920,6 +4933,7 @@ function renderSelfCheck(d) {
 async function openRunDetail(runId) {
   $('#run-detail-title').textContent = T('rd.title');
   $('#run-detail-modal').style.display = 'flex';
+  makeModalDraggable($('#run-detail-modal').querySelector('.modal'));
   $('#run-detail-body').innerHTML = '<div style="text-align:center;color:var(--muted-2);padding:24px;font-size:13px">' + T('rd.loading') + '</div>';
   try {
     const data = await apiGet('/runs/' + encodeURIComponent(runId) + '/detail');
@@ -4978,8 +4992,15 @@ async function openRunDetail(runId) {
         '<span style="font-size:11px;color:var(--muted-2);font-family:var(--mono)">' + escHtml(node.executor || '') + (node.model ? ' / ' + escHtml(node.model) : '') + '</span>' +
         '<span style="margin-left:auto;font-size:11px;color:var(--muted-2)">' + escHtml(st.status || '-') + (dur ? ' · ' + formatDuration(dur) : '') + (st.tokenUsage && st.tokenUsage.totalTokens ? ' · ' + formatNumber(st.tokenUsage.totalTokens) + ' tok' : '') + '</span>' +
         '</div>' +
-        (output ? '<div style="font-size:12px;color:var(--fg-2);margin-top:7px;white-space:pre-wrap;word-break:break-word;max-height:96px;overflow:auto;background:var(--bg-2);border-radius:6px;padding:8px" title="' + escHtml(output) + '">' + escHtml(output.length > 600 ? output.slice(0, 600) + '…' : output) + '</div>' : '') +
-        (errText ? '<div style="font-size:11.5px;color:var(--danger);margin-top:6px">' + escHtml(errText.length > 300 ? errText.slice(0, 300) + '…' : errText) + '</div>' : '') +
+        (output ? '<div style="display:flex;align-items:center;gap:8px;margin-top:7px">' +
+        '<button class="rd-detail-zoom" data-text="' + escHtml(output) + '" title="大窗口显示完整内容">⤢ 放大输出</button>' +
+        (output.length > 600 ? '<span style="font-size:10.5px;color:var(--muted-2)">完整 ' + output.length + ' 字</span>' : '') +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--fg-2);margin-top:4px;white-space:pre-wrap;word-break:break-word;max-height:96px;overflow:auto;background:var(--bg-2);border-radius:6px;padding:8px" title="' + escHtml(output) + '">' + escHtml(output.length > 600 ? output.slice(0, 600) + '…' : output) + '</div>' : '') +
+        (errText ? '<div style="display:flex;align-items:center;gap:8px;margin-top:6px">' +
+          '<button class="rd-detail-zoom" data-text="' + escHtml(errText) + '" title="大窗口显示完整错误">⤢ 放大错误</button>' +
+          '</div>' +
+          '<div style="font-size:11.5px;color:var(--danger);margin-top:4px">' + escHtml(errText.length > 300 ? errText.slice(0, 300) + '…' : errText) + '</div>' : '') +
         '</div>';
     };
     html += '<div style="font-weight:600;font-size:12.5px;margin:2px 0 6px">' + T('rd.agents') + '</div>';
@@ -4995,6 +5016,12 @@ async function openRunDetail(runId) {
 }
 $('#run-detail-close').addEventListener('click', () => { $('#run-detail-modal').style.display = 'none'; });
 $('#run-detail-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) $('#run-detail-modal').style.display = 'none'; });
+
+// 执行详情内的“放大输出/放大错误”按钮：大窗口显示完整内容。
+document.addEventListener('click', ev => {
+  const btn = ev.target.closest && ev.target.closest('.rd-detail-zoom');
+  if (btn && btn.dataset.text) showOutputPreview(btn.dataset.text);
+});
 
 async function showNodeDetail(node) {
   const typeLabels = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
@@ -5668,13 +5695,37 @@ const BUILTIN_PRESET_I18N = {
   'loop-iterate': { name: 'preset.loop.name', desc: 'preset.loop.desc', labels: ['preset.d3.l1', 'preset.d3.l2', 'preset.d3.l3'], roles: ['preset.d3.r1', 'preset.d3.r2', 'preset.d3.r3'] },
 };
 // normalizeAssist builds a default helper-agent config for a preset node.
+// 辅助手默认视觉模型：loadNodeTypes 探测完成后填充（assistDefaultModel），
+// 未探测前回退免费档。此函数不能访问 state——模板节点在 state 初始化
+// 表达式内就会调用它，访问 state 会触发 TDZ 顶层崩溃（页面卡在加载遮罩）。
+// 用 var：模板节点（state 初始化表达式内）调用 defaultAssistModel() 时，
+// 该赋值语句尚未执行到，var 提升后无 TDZ（undefined 会被 fallback 兜底）。
+var assistDefaultModel = 'opencode/mimo-v2.5-free';
+function defaultAssistModel() {
+  return assistDefaultModel || 'opencode/mimo-v2.5-free';
+}
+// 探测 /nodes/types 目录里的真实视觉模型（规范 provider/model 命名，如
+// opencode-go/mimo-v2.5）。仅在 state 初始化完成后调用（loadNodeTypes 后）。
+function refreshAssistDefaultModel() {
+  const cands = [];
+  const seen = new Set();
+  const push = m => { if (m && !seen.has(m)) { seen.add(m); cands.push(m); } };
+  (state.nodeTypes || []).forEach(t => {
+    const byExec = t.modelsByExecutor || {};
+    ['opencode', 'mimo', 'claude'].forEach(ex => (byExec[ex] || []).forEach(push));
+    (t.models || []).forEach(push);
+  });
+  const pick = cands.find(m => m.toLowerCase().includes('mimo-v2.5') && !m.toLowerCase().includes('pro'));
+  if (pick) assistDefaultModel = pick;
+}
+
 // New Assist objects pass through; legacy `assistEnabled` ("off" disables)
 // migrates; built-in presets without either default to enabled.
 function normalizeAssist(n) {
   if (n && n.assist && typeof n.assist === 'object') {
-    return { enabled: n.assist.enabled !== false, model: n.assist.model || 'mimo-v2.5', driver: n.assist.driver || 'opencode', role: n.assist.role || '' };
+    return { enabled: n.assist.enabled !== false, model: n.assist.model || defaultAssistModel(), driver: n.assist.driver || 'opencode', role: n.assist.role || '' };
   }
-  return { enabled: !n || n.assistEnabled !== 'off', model: 'mimo-v2.5', driver: 'opencode', role: '' };
+  return { enabled: !n || n.assistEnabled !== 'off', model: defaultAssistModel(), driver: 'opencode', role: '' };
 }
 
 function localizePreset(p) {
@@ -5896,7 +5947,9 @@ async function loadNodeTypes() {
       execSel.appendChild(opt);
     });
     if (prevVal && allExecutors.includes(prevVal)) execSel.value = prevVal;
+    refreshAssistDefaultModel();
     populateModelSelect();
+    populateAssistSelects();
     populateSkillSelect();
   } catch (err) { console.warn('loadNodeTypes failed:', err); }
 }
@@ -5920,6 +5973,68 @@ function populateModelSelect(node) {
   custom.textContent = T('model.custom');
   sel.appendChild(custom);
   sel.value = activeNode?.model || '';
+}
+
+// 辅助手模型/驱动下拉：与节点模型下拉同源（/nodes/types 探测目录），统一
+// provider/model 规范命名（如 opencode/mimo-v2.5-free），不再用游离的裸名
+// 清单。旧配置里的裸名（如 mimo-v2.5）保留并标注，后端会自动解析。
+function populateAssistSelects() {
+  const modelSel = $('#cfg-assist-model');
+  if (!modelSel) return;
+  const assistNode = state.nodes.find(n => n.id === state.selectedNode) || {};
+  const cur = modelSel.value || assistNode.assist?.model || '';
+  const cands = [];
+  const seen = new Set();
+  const push = m => { if (m && !seen.has(m)) { seen.add(m); cands.push(m); } };
+  (state.nodeTypes || []).forEach(t => {
+    const byExec = t.modelsByExecutor || {};
+    ['opencode', 'mimo', 'claude'].forEach(ex => (byExec[ex] || []).forEach(push));
+    (t.models || []).forEach(push);
+  });
+  // 兜底候选：探测失败时仍保证视觉模型可选。
+  ['opencode/mimo-v2.5-free', 'opencode-go/mimo-v2.5', 'claude/claude-sonnet-4-6', 'mimo-v2.5'].forEach(push);
+  // 视觉优先排序：mimo 视觉 > claude > 其余。
+  const score = m => {
+    const lm = String(m).toLowerCase();
+    if (lm.includes('mimo-v2.5') && !lm.includes('pro')) return 0;
+    if (lm.startsWith('claude')) return 1;
+    return 2;
+  };
+  cands.sort((a, b) => score(a) - score(b) || String(a).localeCompare(String(b)));
+  const pick = cur || cands.find(m => score(m) === 0) || cands[0] || '';
+  modelSel.innerHTML = '';
+  let hasPick = false;
+  cands.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m;
+    o.textContent = m;
+    modelSel.appendChild(o);
+    if (m === pick) hasPick = true;
+  });
+  if (pick && !hasPick) {
+    const o = document.createElement('option');
+    o.value = pick;
+    o.textContent = pick + '（旧值，后端自动解析）';
+    modelSel.appendChild(o);
+  }
+  modelSel.value = pick;
+
+  const driverSel = $('#cfg-assist-driver');
+  if (!driverSel) return;
+  const dcur = driverSel.value || assistNode.assist?.driver || '';
+  const drivers = [
+    ['opencode', 'opencode（zen/go）'],
+    ['mimocode', 'mimocode（复用 opencode 运行时）'],
+    ['claude', 'claude（zen anthropic）'],
+  ];
+  driverSel.innerHTML = '';
+  drivers.forEach(([v, label]) => {
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = label;
+    driverSel.appendChild(o);
+  });
+  driverSel.value = dcur || 'opencode';
 }
 
 function populateSkillSelect(node) {

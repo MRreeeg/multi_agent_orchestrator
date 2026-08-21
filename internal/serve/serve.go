@@ -502,7 +502,31 @@ func applyEffortEdit(edit *config.Config, entry *config.ProviderEntry, effort st
 // CORS is NOT applied by default — same-origin policy protects the unauthenticated
 // agent endpoints. Call HandlerWithCORS to opt in for local development.
 func (s *Server) Handler() http.Handler {
-	return s.handler()
+	return accessLog(s.handler())
+}
+
+// accessLog 记录每个 HTTP 请求的方法/路径/状态/耗时，用于排查前端加载卡顿。
+// 仅在 REASONIX_HTTP_ACCESS_LOG 非空时输出（开发期诊断用，默认关闭）。
+func accessLog(next http.Handler) http.Handler {
+	if os.Getenv("REASONIX_HTTP_ACCESS_LOG") == "" {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		sw := &statusWriter{ResponseWriter: w, status: 200}
+		next.ServeHTTP(sw, r)
+		slog.Info("http", "method", r.Method, "path", r.URL.Path, "status", sw.status, "ms", time.Since(start).Milliseconds())
+	})
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
 }
 
 // HandlerWithCORS returns the same routes as Handler but adds permissive CORS

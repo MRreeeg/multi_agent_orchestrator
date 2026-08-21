@@ -148,17 +148,47 @@ func TestAssistDispatchValidation(t *testing.T) {
 }
 
 func TestAssistModelRef(t *testing.T) {
-	cases := []struct{ driver, model, want string }{
-		{"", "", "opencode/mimo-v2.5"},
-		{"opencode", "", "opencode/mimo-v2.5"},
-		{"opencode", "glm-4v", "opencode/glm-4v"},
-		{"claude", "", "claude/claude-sonnet-4-6"},
-		{"Claude", "claude-opus-4", "claude/claude-opus-4"},
+	cases := []struct{ driver, model, visionDefault, want string }{
+		{"", "", "", "opencode/mimo-v2.5-free"},
+		{"opencode", "", "opencode-go/mimo-v2.5", "opencode-go/mimo-v2.5"},
+		{"mimocode", "", "opencode/mimo-v2.5-free", "opencode/mimo-v2.5-free"},
+		{"opencode", "glm-4v", "", "opencode/glm-4v"},
+		{"opencode", "opencode-go/mimo-v2.5", "", "opencode-go/mimo-v2.5"},
+		{"claude", "", "", "claude/claude-sonnet-4-6"},
+		{"Claude", "claude-opus-4", "", "claude/claude-opus-4"},
 	}
 	for _, c := range cases {
-		if got := assistModelRef(c.driver, c.model); got != c.want {
-			t.Errorf("assistModelRef(%q,%q) = %q, want %q", c.driver, c.model, got, c.want)
+		if got := assistModelRef(c.driver, c.model, c.visionDefault); got != c.want {
+			t.Errorf("assistModelRef(%q,%q,%q) = %q, want %q", c.driver, c.model, c.visionDefault, got, c.want)
 		}
+	}
+}
+
+func TestAssistVisionCandidates(t *testing.T) {
+	execs := []ProbedExecutor{
+		{Executor: "opencode", Models: []string{
+			"deepseek/deepseek-v4-flash-free",
+			"opencode/mimo-v2.5-free",
+			"opencode-go/mimo-v2.5",
+			"opencode/mimo-v2.5-pro",
+			"opencode-go/mimo-v2.5-pro",
+			"opencode/hy3-free",
+		}},
+		{Executor: "codex", Models: []string{"opencode/mimo-v2.5"}},
+	}
+	got := assistVisionCandidates(execs)
+	want := []string{"opencode-go/mimo-v2.5", "opencode/mimo-v2.5-free"}
+	if len(got) != len(want) {
+		t.Fatalf("candidates = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("candidates[%d] = %q, want %q (full: %v)", i, got[i], want[i], got)
+		}
+	}
+
+	if got := assistVisionCandidates(nil); len(got) != 0 {
+		t.Errorf("no executors should yield no candidates, got %v", got)
 	}
 }
 

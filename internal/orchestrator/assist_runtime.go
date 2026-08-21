@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -78,20 +79,89 @@ func assistPromptText(task string, images []string) string {
 	return b.String()
 }
 
-// assistModelRef 由 driver+model 拼 opencode 模型引用（provider/modelID）。
-func assistModelRef(driver, model string) string {
+// assistModelRef 解析辅助手模型引用（provider/modelID）。model 为空时按 driver
+// 取默认：claude 用 claude 模型，opencode/mimocode 用 visionDefault（由探测
+// resolveAssistVisionModel 解析，空则回退免费档 opencode/mimo-v2.5-free）。
+// model 含 "/" 视为完整引用原样使用；裸名按 driver 拼前缀。
+func assistModelRef(driver, model, visionDefault string) string {
 	driver = strings.ToLower(strings.TrimSpace(driver))
-	if driver == "" {
+	if driver == "" || driver == "mimocode" {
 		driver = "opencode"
 	}
-	if strings.TrimSpace(model) == "" {
+	model = strings.TrimSpace(model)
+	if model == "" {
 		if driver == "claude" {
-			model = "claude-sonnet-4-6"
-		} else {
-			model = "mimo-v2.5"
+			return "claude/claude-sonnet-4-6"
 		}
+		if strings.TrimSpace(visionDefault) != "" {
+			return visionDefault
+		}
+		return "opencode/mimo-v2.5-free"
+	}
+	if strings.Contains(model, "/") {
+		return model
 	}
 	return driver + "/" + model
+}
+
+// resolveAssistVisionModel 探测本机 opencode 真实可用的视觉模型引用，作为辅助
+// 手默认。裸名 mimo-v2.5 在本机 opencode 模型库并不存在（那是 opencode-go 的
+// modelID），硬拼 opencode/mimo-v2.5 会回落无视觉默认模型；因此从 `opencode
+// models` 探测结果里筛视觉模型（探测有 60s 缓存，不会每次委派都跑 CLI）。
+// 探测失败回退免费档 opencode/mimo-v2.5-free（provider opencode 真实存在，
+// attachment:true 支持图像输入）。
+func resolveAssistVisionModel(ctx context.Context) string {
+	report := ProbeModels(ctx)
+	cands := assistVisionCandidates(report.Executors)
+	if len(cands) > 0 {
+		return cands[0]
+	}
+	return "opencode/mimo-v2.5-free"
+}
+
+// assistVisionCandidates 从探测结果筛出 opencode 系支持图像输入的模型引用
+// （provider/model 完整 ref，含 mimo-v2.5 且非 pro）。优先级：opencode-go
+// 付费路由（本机已存 key，最稳定）> opencode 免费档 > 其余按名字序。
+func assistVisionCandidates(execs []ProbedExecutor) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, pe := range execs {
+		if pe.Executor != "opencode" {
+			continue
+		}
+		for _, m := range pe.Models {
+			lm := strings.ToLower(m)
+			if !strings.Contains(m, "/") || !strings.Contains(lm, "mimo-v2.5") || strings.Contains(lm, "pro") {
+				continue
+			}
+			if !strings.HasPrefix(lm, "opencode") && !strings.HasPrefix(lm, "xiaomi") {
+				continue
+			}
+			if !seen[m] {
+				seen[m] = true
+				out = append(out, m)
+			}
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		pi, pj := assistVisionPriority(out[i]), assistVisionPriority(out[j])
+		if pi != pj {
+			return pi < pj
+		}
+		return out[i] < out[j]
+	})
+	return out
+}
+
+func assistVisionPriority(ref string) int {
+	switch {
+	case strings.HasPrefix(strings.ToLower(ref), "opencode-go/"):
+		return 0
+	case strings.HasPrefix(strings.ToLower(ref), "opencode/"):
+		return 1
+	default:
+		return 2
+	}
 }
 
 // SetOrchestratorAddr 设置编排服务对外地址（host:port），注入辅助手委派协议
@@ -113,9 +183,27 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 	}
 	driver := strings.ToLower(strings.TrimSpace(opts.Driver))
 	if driver == "" {
+		if v := strings.TrimSpace(os.Getenv("REASONIX_ASSIST_DRIVER")); v != "" {
+			driver = strings.ToLower(strings.TrimSpace(v))
+		}
+	}
+	if driver == "" {
 		driver = "opencode"
 	}
-	modelRef := assistModelRef(driver, opts.Model)
+	if driver == "mimocode" {
+		driver = "opencode"
+	}
+	model := strings.TrimSpace(opts.Model)
+	if model == "" {
+		if v := strings.TrimSpace(os.Getenv("REASONIX_ASSIST_MODEL")); v != "" {
+			model = strings.TrimSpace(v)
+		}
+	}
+	var visionDefault string
+	if driver != "claude" && !strings.Contains(model, "/") {
+		visionDefault = resolveAssistVisionModel(ctx)
+	}
+	modelRef := assistModelRef(driver, model, visionDefault)
 	timeout := opts.Timeout
 	if timeout <= 0 {
 		timeout = 90 * time.Second
@@ -136,11 +224,11 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 	if err != nil {
 		return nil, fmt.Errorf("assist: start helper runtime: %w", err)
 	}
-	s.emitAssistEvent(event.AssistStart, rt, modelRef, opts.Task, false, "")
+	s.emitAssistEvent(event.AssistStart, rt, modelRef, opts.Task, "", "")
 
 	client, err := opencodeRuntimeMgr.reserveTurn(rt)
 	if err != nil {
-		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, false, err.Error())
+		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", err.Error())
 		return nil, fmt.Errorf("assist: helper busy: %w", err)
 	}
 	dispatchCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -148,18 +236,18 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 	sessionID, err := opencodeRuntimeMgr.createSession(dispatchCtx, rt, client, spec)
 	if err != nil {
 		opencodeRuntimeMgr.finishTurn(rt, sessionID, err)
-		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, false, err.Error())
+		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", err.Error())
 		return nil, fmt.Errorf("assist: create helper session: %w", err)
 	}
 	text, promptErr := client.Prompt(dispatchCtx, sessionID, modelRef, assistDisciplinePrompt, assistPromptText(opts.Task, opts.Images), assistDenyTools())
 	opencodeRuntimeMgr.finishTurn(rt, sessionID, promptErr)
 	if promptErr != nil {
-		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, false, promptErr.Error())
+		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", promptErr.Error())
 		return nil, fmt.Errorf("assist: helper turn failed: %w", promptErr)
 	}
 	if strings.TrimSpace(text) == "" {
 		msg := "assist: helper returned empty completion"
-		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, false, msg)
+		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
 	result := &AssistDispatchResult{
@@ -169,19 +257,21 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 		Result:    text,
 		SessionID: sessionID,
 	}
-	s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, true, "")
+	s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, text, "")
 	return result, nil
 }
 
-// emitAssistEvent 广播辅助手委派事件（Text=任务摘要，Detail=JSON）。
-func (s *Store) emitAssistEvent(kind event.Kind, rt *opencodeRuntime, modelRef, task string, ok bool, errMsg string) {
+// emitAssistEvent 广播辅助手委派事件（Text=任务摘要，Detail=JSON）。result 为
+// 成功时完整结果文本（前端提供“查看完整结果”大窗），失败时为空。
+func (s *Store) emitAssistEvent(kind event.Kind, rt *opencodeRuntime, modelRef, task, result string, errMsg string) {
 	detail, _ := json.Marshal(map[string]any{
 		"runtimeID":   rt.ID,
 		"port":        rt.Port,
 		"model":       modelRef,
-		"ok":          ok,
+		"ok":          errMsg == "" && result != "",
 		"error":       errMsg,
-		"taskPreview": truncateRune(strings.TrimSpace(task), 120),
+		"result":      result,
+		"taskPreview": truncateRune(strings.TrimSpace(task), 300),
 	})
 	text := strings.TrimSpace(task)
 	if len([]rune(text)) > 120 {
