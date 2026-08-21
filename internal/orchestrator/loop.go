@@ -454,6 +454,22 @@ func NormalizeLoopConfig(cfg *LoopConfig) (LoopConfig, error) {
 	if normalized.Protocol != "loop-review-v1" {
 		return LoopConfig{}, fmt.Errorf("invalid protocol %q: must be loop-review-v1", normalized.Protocol)
 	}
+	// 回传目标：去空格、去重、去空项；全空视为未指定（传统行为）。
+	targets := make([]string, 0, len(normalized.TargetNodeIDs))
+	seenTarget := make(map[string]bool, len(normalized.TargetNodeIDs))
+	for _, id := range normalized.TargetNodeIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seenTarget[id] {
+			continue
+		}
+		seenTarget[id] = true
+		targets = append(targets, id)
+	}
+	if len(targets) == 0 {
+		normalized.TargetNodeIDs = nil
+	} else {
+		normalized.TargetNodeIDs = targets
+	}
 	if normalized.ReviewNodeID == "" {
 		return LoopConfig{}, fmt.Errorf("%s mode requires review node ID", normalized.Mode)
 	}
@@ -498,6 +514,31 @@ func ValidateLoopConfig(cfg *LoopConfig, nodes []AgentNode) error {
 	return fmt.Errorf("review node %q not found in pipeline nodes", normalized.ReviewNodeID)
 }
 
+// ValidateLoopTargets 校验回传目标：每个目标必须存在于流水线，且不能是审查者
+// 或架构者（审查者是反馈来源；架构者按设计只在第 1 轮执行、之后复用输出）。
+func ValidateLoopTargets(cfg *LoopConfig, nodes []AgentNode) error {
+	if cfg == nil || len(cfg.TargetNodeIDs) == 0 {
+		return nil
+	}
+	byID := make(map[string]AgentNode, len(nodes))
+	for _, n := range nodes {
+		byID[n.ID] = n
+	}
+	for _, id := range cfg.TargetNodeIDs {
+		n, ok := byID[id]
+		if !ok {
+			return fmt.Errorf("loop targetNodeID %q not found in pipeline nodes", id)
+		}
+		if id == cfg.ReviewNodeID || n.Type == NodeReviewer {
+			return fmt.Errorf("loop targetNodeID %q is the reviewer; feedback cannot target the reviewer itself", id)
+		}
+		if n.Type == NodeArchitect {
+			return fmt.Errorf("loop targetNodeID %q is an architect; architects run once and are never a loop target", id)
+		}
+	}
+	return nil
+}
+
 // validateLoopConfig checks that loop configuration is valid before starting
 // and also normalizes legacy fixed-mode data copied from a revision.
 func (s *Store) validateLoopConfig(run *PipelineRun, pipe *Pipeline) error {
@@ -515,6 +556,9 @@ func (s *Store) validateLoopConfig(run *PipelineRun, pipe *Pipeline) error {
 		return err
 	}
 	if err := ValidateLoopConfig(&normalized, pipe.Nodes); err != nil {
+		return err
+	}
+	if err := ValidateLoopTargets(&normalized, pipe.Nodes); err != nil {
 		return err
 	}
 
@@ -638,6 +682,30 @@ func (s *Store) executeOneIteration(ctx context.Context, run *PipelineRun, pipe 
 	return nil
 }
 
+// loopSkipsNode 报告某节点在第 N 轮（N>1）是否跳过重跑、复用最近一次成功
+// 输出：架构者始终跳过（计划一次成型）；配置了 TargetNodeIDs 时，非目标且
+// 非审查者的节点也跳过——审查反馈只回传给目标节点。审查者永不跳过。
+func loopSkipsNode(cfg *LoopConfig, node *AgentNode) bool {
+	if node == nil {
+		return false
+	}
+	if node.Type == NodeReviewer {
+		return false
+	}
+	if node.Type == NodeArchitect {
+		return true
+	}
+	if cfg == nil || len(cfg.TargetNodeIDs) == 0 {
+		return false
+	}
+	for _, id := range cfg.TargetNodeIDs {
+		if id == node.ID {
+			return false
+		}
+	}
+	return true
+}
+
 // executePipelineIteration runs the DAG for a single iteration.
 // Returns error on pipeline cycle or persistence failure during terminal state.
 func (s *Store) executePipelineIteration(ctx context.Context, run *PipelineRun, pipe *Pipeline, sessionID string, iterationID string) error {
@@ -696,13 +764,14 @@ func (s *Store) executePipelineIteration(ctx context.Context, run *PipelineRun, 
 					return
 				}
 				nodeCopy := *node
-				if iterationNumber > 1 && nodeCopy.Type == NodeArchitect {
-					// Do not create a new attempt for the architect. Release the
-					// store lock before looking up its prior attempt.
+				if iterationNumber > 1 && loopSkipsNode(&run.LoopConfig, &nodeCopy) {
+					// Do not create a new attempt for skipped nodes (architect
+					// always; non-target nodes when targetNodeIDs is set).
+					// Release the store lock before looking up prior attempts.
 					s.mu.Unlock()
 					output := s.latestSuccessfulNodeOutput(run, nodeID, iterationNumber-1)
 					if strings.TrimSpace(output) == "" {
-						errCh <- fmt.Errorf("architect node %q has no successful output to reuse in iteration %d", nodeCopy.Label, iterationNumber)
+						errCh <- fmt.Errorf("node %q has no successful output to reuse in iteration %d", nodeCopy.Label, iterationNumber)
 						cancelLevel()
 						return
 					}
@@ -1234,8 +1303,10 @@ func (s *Store) gatherInputForIteration(pipe *Pipeline, run *PipelineRun, iterat
 	if len(upstream) > 0 {
 		parts = append(parts, "## 上游节点输出 / Upstream output")
 	}
-	// Read current-iteration attempts first. If an architect was intentionally
-	// skipped after iteration 1, fall back to its latest successful output.
+	// Read current-iteration attempts first. If an upstream node was skipped
+	// this iteration (architect after round 1, or non-target nodes when
+	// targetNodeIDs is set), fall back to its latest successful output from
+	// any earlier iteration.
 	for _, e := range upstream {
 		included[e.FromID] = true
 		var latestOutput string
@@ -1249,17 +1320,15 @@ func (s *Store) gatherInputForIteration(pipe *Pipeline, run *PipelineRun, iterat
 			}
 		}
 		if latestOutput == "" {
-			if fromNode := findNode(pipe, e.FromID); fromNode != nil && fromNode.Type == NodeArchitect {
-				for _, attID := range run.NodeAttemptIDs {
-					att, ok := s.attempts[attID]
-					if !ok || att.NodeID != e.FromID || att.Status != "complete" {
-						continue
-					}
-					iter, ok := s.iterations[att.IterationID]
-					if ok && iter.Number > latestIteration {
-						latestIteration = iter.Number
-						latestOutput = att.Output
-					}
+			for _, attID := range run.NodeAttemptIDs {
+				att, ok := s.attempts[attID]
+				if !ok || att.NodeID != e.FromID || att.Status != "complete" {
+					continue
+				}
+				iter, ok := s.iterations[att.IterationID]
+				if ok && iter.Number > latestIteration {
+					latestIteration = iter.Number
+					latestOutput = att.Output
 				}
 			}
 		}

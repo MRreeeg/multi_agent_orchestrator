@@ -16,7 +16,8 @@ func TestDisabledLoopConfigIsCanonicalized(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != (LoopConfig{}) {
+	if got.Enabled || got.Mode != "" || got.MaxIterations != 0 || got.FixedIterations != 0 ||
+		got.ReviewNodeID != "" || got.Protocol != "" || len(got.TargetNodeIDs) != 0 {
 		t.Fatalf("disabled config = %+v, want zero config", got)
 	}
 }
@@ -101,7 +102,7 @@ func TestPipelineRevisionLoopConfigRoundTripAndRunCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.LoopConfig != rev.LoopConfig {
+	if !loopConfigEqual(run.LoopConfig, rev.LoopConfig) {
 		t.Fatalf("run config = %+v, revision config = %+v", run.LoopConfig, rev.LoopConfig)
 	}
 }

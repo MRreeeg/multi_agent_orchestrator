@@ -2256,6 +2256,10 @@ func (h *orchestratorHandler) createPipelineRevision(w http.ResponseWriter, r *h
 		writeErr(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if err := orchestrator.ValidateLoopTargets(cfg, body.Nodes); err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	normalized, err := orchestrator.NormalizeLoopConfig(cfg)
 	if err != nil {
 		writeErr(w, err.Error(), http.StatusBadRequest)

@@ -521,6 +521,9 @@ func (s *Store) updatePipelineRevisionWithLoopConfig(sessionID, expectedRevision
 	if err := ValidateLoopConfig(&cfg, nodes); err != nil {
 		return nil, err
 	}
+	if err := ValidateLoopTargets(&cfg, nodes); err != nil {
+		return nil, err
+	}
 	if normalized, err := NormalizeLoopConfig(&cfg); err != nil {
 		return nil, err
 	} else {
@@ -620,6 +623,14 @@ func (s *Store) updatePipelineRevisionWithLoopConfig(sessionID, expectedRevision
 }
 
 func loopConfigEqual(a, b LoopConfig) bool {
+	if len(a.TargetNodeIDs) != len(b.TargetNodeIDs) {
+		return false
+	}
+	for i := range a.TargetNodeIDs {
+		if a.TargetNodeIDs[i] != b.TargetNodeIDs[i] {
+			return false
+		}
+	}
 	return a.Enabled == b.Enabled && a.Mode == b.Mode && a.MaxIterations == b.MaxIterations &&
 		a.FixedIterations == b.FixedIterations && a.ReviewNodeID == b.ReviewNodeID && a.Protocol == b.Protocol
 }
@@ -643,6 +654,9 @@ func (s *Store) UpdatePipelineRevisionLoopConfig(sessionID, revisionID string, l
 		cfg = *loopConfig
 	}
 	if err := ValidateLoopConfig(&cfg, rev.Nodes); err != nil {
+		return err
+	}
+	if err := ValidateLoopTargets(&cfg, rev.Nodes); err != nil {
 		return err
 	}
 	normalized, err := NormalizeLoopConfig(&cfg)

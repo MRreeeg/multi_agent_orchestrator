@@ -564,6 +564,10 @@ type LoopConfig struct {
 	FixedIterations int    `json:"fixedIterations,omitempty"` // fixed: exact iteration count
 	ReviewNodeID    string `json:"reviewNodeID"`              // node ID of the reviewer
 	Protocol        string `json:"protocol"`                  // loop-review-v1
+	// TargetNodeIDs 限制审查反馈的回传对象：仅这些节点在第 2 轮起重跑（接收
+	// 上一轮审查结论），其余非审查者节点复用最近一次成功输出。空 = 传统行为
+	// （除架构师外全部重跑）。架构师与审查者不可作为目标。
+	TargetNodeIDs []string `json:"targetNodeIDs,omitempty"`
 }
 
 // Iteration status constants.
