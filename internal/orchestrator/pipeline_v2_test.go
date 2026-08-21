@@ -470,17 +470,25 @@ func TestRuntimeStatePersistsAndReloads(t *testing.T) {
 	if !ok {
 		t.Fatal("runtime state not found after reload")
 	}
-	if loadedRT.Endpoint != "http://127.0.0.1:8800" {
-		t.Errorf("endpoint = %q, want http://127.0.0.1:8800", loadedRT.Endpoint)
+	// LoadAllData deliberately sanitizes runtimes on restart: a persisted serve
+	// runtime belonged to the previous orchestrator process, so it must never
+	// surface as alive. The record is retained (for history/resume context) but
+	// its process identity (endpoint/port/PID) is cleared and status forced to
+	// stopped. Assert that contract instead of raw field round-trip.
+	if loadedRT.Status != RuntimeStopped {
+		t.Errorf("status = %q, want %q after reload (restart sanitization)", loadedRT.Status, RuntimeStopped)
 	}
-	if loadedRT.Port != 8800 {
-		t.Errorf("port = %d, want 8800", loadedRT.Port)
+	if loadedRT.Endpoint != "" {
+		t.Errorf("endpoint = %q, want empty after reload (dead endpoint must not be clickable)", loadedRT.Endpoint)
 	}
-	if loadedRT.PID != 12345 {
-		t.Errorf("pid = %d, want 12345", loadedRT.PID)
+	if loadedRT.Port != 0 {
+		t.Errorf("port = %d, want 0 after reload", loadedRT.Port)
 	}
-	if loadedRT.Status != RuntimeReady {
-		t.Errorf("status = %q, want ready", loadedRT.Status)
+	if loadedRT.PID != 0 {
+		t.Errorf("pid = %d, want 0 after reload", loadedRT.PID)
+	}
+	if loadedRT.Error == "" {
+		t.Error("error = empty, want restart explanation after reload")
 	}
 
 	// Verify session has runtime ID.

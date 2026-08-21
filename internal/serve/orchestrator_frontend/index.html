@@ -1071,7 +1071,42 @@ input,textarea,select{font:inherit;color:inherit}
 </template>
 
 <script>
-// ── 主题：尽早应用（防深色模式闪烁），右上角按钮一键切换 ──
+// ── Boot 失败兜底：任何顶层/运行时错误都不允许页面静默卡在加载遮罩 ──
+// 教训：一次顶层 TDZ 崩溃曾让 init 永不执行，页面无限停在"正在加载编排
+// 控制台"且零提示。此块必须是主脚本的第一段代码：只用原生 DOM API，
+// 不引用任何后定义的全局绑定（TDZ 安全）。
+(function () {
+  var shown = false;
+  function revealBootError(msg) {
+    if (shown) return;
+    var boot = document.getElementById('boot-loading');
+    if (!boot || boot.style.display === 'none') return; // 已加载完成则不打扰
+    shown = true;
+    var box = document.getElementById('boot-error');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'boot-error';
+      box.style.cssText = 'margin-top:14px;max-width:560px;font-size:12px;line-height:1.7;color:#ff8a8a;text-align:left;white-space:pre-wrap;word-break:break-all';
+      boot.appendChild(box);
+    }
+    box.textContent = '⚠️ 页面加载出错：' + msg + '\n请按 F12 打开控制台查看详情；若服务刚启动请稍候刷新重试。';
+  }
+  window.addEventListener('error', function (e) {
+    revealBootError((e && (e.message || e.type)) || 'unknown error');
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    revealBootError('未处理的 Promise 异常: ' + ((r && (r.message || String(r))) || 'unknown'));
+  });
+  setTimeout(function () {
+    var boot = document.getElementById('boot-loading');
+    if (boot && boot.style.display !== 'none') {
+      revealBootError('加载超过 30 秒仍未完成——可能是编排服务未就绪、端口不对或网络异常');
+    }
+  }, 30000);
+})();
+
+// ── 主题：跟随应用，深色模式避免闪烁。右上角按钮一键切换 ──
 (function () {
   try {
     const saved = localStorage.getItem('orch-theme');
