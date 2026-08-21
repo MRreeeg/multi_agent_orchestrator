@@ -1385,7 +1385,7 @@ function normalizeNode(raw) {
     mode: raw.mode || 'serve',
     executor: raw.executor || 'reasonix',
     role: raw.role || '',
-    assist: raw.assist || { enabled: true, model: defaultAssistModel(), driver: 'opencode', role: '' },
+    assist: raw.assist || { enabled: !nodeModelHasVision(raw.model), model: defaultAssistModel(), driver: 'opencode', role: '' },
     stallMaintenance: raw.stallMaintenance === false ? false : (raw.stallMaintenance || undefined),
     x: raw.x || 60,
     y: raw.y || 60,
@@ -2738,6 +2738,7 @@ $('#config-close').addEventListener('click', hideConfig);
         } else if (node.executor === 'codex' || node.executor === 'claude' || node.executor === 'dsh') {
           node.providerRoute = '';
         }
+        syncAssistForModel(node);
         $('#cfg-model').value = node.model;
         render();
         return;
@@ -2756,6 +2757,7 @@ $('#config-close').addEventListener('click', hideConfig);
       if (!isMimoModel(node.model)) {
         node.agent = '';
       }
+      syncAssistForModel(node);
     }
     if (id === 'cfg-skill') node.skill = el.value;
     if (id === 'cfg-executor') {
@@ -5717,6 +5719,35 @@ function refreshAssistDefaultModel() {
   });
   const pick = cands.find(m => m.toLowerCase().includes('mimo-v2.5') && !m.toLowerCase().includes('pro'));
   if (pick) assistDefaultModel = pick;
+}
+
+// 与后端 orchestrator.modelSupportsVision 对齐：mimo-v2.5（非 pro）/glm/claude
+// 视为具备图像输入能力；空/未知模型保守视为无视觉。供"看情况设定辅助手"
+// 的自动决策使用（模型有视觉 → 节点自己能读图，无需辅助手兜底）。
+function nodeModelHasVision(model) {
+  const m = String(model || '').toLowerCase();
+  if (!m) return false;
+  if (m.includes('mimo-v2.5') && !m.includes('pro')) return true;
+  return m.startsWith('glm') || m.startsWith('claude');
+}
+
+// 模型变更时"看情况"自动设定该节点的辅助手：模型具备视觉 → 关（节点自己
+// 能 read 图片）；无视觉/未知 → 开（Orchestrator 自动识图兜底）。用户之后
+// 仍可在配置面板手动覆盖，直到下次改模型再重新自动判定。
+function syncAssistForModel(node) {
+  if (!node) return;
+  const want = !nodeModelHasVision(node.model);
+  if (!node.assist) node.assist = {};
+  const changed = node.assist.enabled !== want;
+  node.assist.enabled = want;
+  if (state.selectedNode === node.id) {
+    const sel = $('#cfg-assist-enabled');
+    if (sel) {
+      sel.value = want ? '' : 'off';
+      ['assist-model-field', 'assist-driver-field', 'assist-role-field'].forEach(f => { const fe = $('#' + f); if (fe) fe.style.display = want ? '' : 'none'; });
+    }
+  }
+  if (changed) renderNodes();
 }
 
 // New Assist objects pass through; legacy `assistEnabled` ("off" disables)
