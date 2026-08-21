@@ -320,7 +320,7 @@ experimental_bearer_token = "<你的中转站 key>"
 ## 6. 验收命令清单
 
 ```powershell
-cd <本文件夹根目录>   # 例如 <仓库根目录>
+cd <仓库根目录>
 
 # 单测（覆盖 executor / orchestrator / serve）
 go test ./internal/executor/claude ./internal/orchestrator ./internal/serve -count=1

@@ -183,7 +183,7 @@ func TestCodexBuildArgsUsesStdinPromptSelector(t *testing.T) {
 		ResumeSessionID: "thread-resume",
 		Model:           "o3",
 		ReasoningEffort: "high",
-		Workspace:       `<仓库根目录>`,
+		Workspace:       t.TempDir(),
 		JSON:            true,
 	})
 	args = append(args, "-")
