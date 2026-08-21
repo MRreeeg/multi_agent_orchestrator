@@ -11,8 +11,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=for-the-badge)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](#contributing)
 
-<!-- TODO: 补充演示 GIF：docs/screenshots/demo.gif（输入需求→自动编排→执行→审查通过） -->
-<!-- <img src="docs/screenshots/demo.gif" alt="演示：一句话生成编排并执行" width="100%"> -->
+<p align="center"><img src="docs/screenshots/canvas-parallel.zh.png" alt="并行调研分工流水线画布" width="720"></p>
 
 </div>
 
@@ -35,6 +34,8 @@
 | 📦 **桌面应用** | WebView2 原生窗口，也可浏览器使用 |
 | 🧩 **共用 Skill** | DSH 直接复用 codex/mimo 已装 skill，不重复下载 |
 
+<p align="center"><img src="docs/screenshots/canvas-loop.zh.png" alt="Loop 运行时循环：虚线回传线与可拖拽目标" width="720"></p>
+
 ## 🚀 快速开始
 
 > 只需要 **Go 1.25+** 和 **DeepSeek API Key**；其他执行器都是可选的（装哪个用哪个，一个都不装也能跑）。
@@ -55,7 +56,8 @@ export DEEPSEEK_API_KEY="sk-..."        # macOS / Linux
 
 在首页输入框说一句话，点「✨ 生成编排」，检查自动生成的三个节点，点「▶ 执行」。
 
-<!-- TODO: 补充控制台首页截图：docs/screenshots/home.png -->
+<!-- TODO: 放入人工打码后的 selfcheck.zh.png 到 docs/screenshots/，再取消注释 -->
+<!-- <p align="center"><img src="docs/screenshots/selfcheck.zh.png" alt="程序化自检面板" width="720"></p> -->
 
 > 想要原生桌面应用？双击 `scripts\start-desktop.bat`（Windows）。
 

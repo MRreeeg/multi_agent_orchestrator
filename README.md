@@ -11,8 +11,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=for-the-badge)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](#contributing)
 
-<!-- TODO: add demo GIF at docs/screenshots/demo.gif (type requirement → auto orchestration → execute → review passed) -->
-<!-- <img src="docs/screenshots/demo.gif" alt="Demo: one sentence to orchestration and execution" width="100%"> -->
+<p align="center"><img src="docs/screenshots/canvas-parallel.en.png" alt="Parallel research pipeline on the canvas" width="720"></p>
 
 </div>
 
@@ -35,6 +34,8 @@
 | 📦 **Desktop app** | Native WebView2 window; browser works too |
 | 🧩 **Shared skills** | DSH reuses skills already installed for codex/mimo — no duplicate downloads |
 
+<p align="center"><img src="docs/screenshots/canvas-loop.en.png" alt="Loop overlay: dashed feedback line with draggable target" width="720"></p>
+
 ## 🚀 Quick Start
 
 > All you need is **Go 1.25+** and a **DeepSeek API key**; every other executor is optional (use whichever you have installed — it runs even with none of them).
@@ -55,7 +56,8 @@ export DEEPSEEK_API_KEY="sk-..."        # macOS / Linux
 
 Type one sentence into the home input, click 「✨ Generate Orchestration」, review the three generated nodes, then click 「▶ Run」.
 
-<!-- TODO: add console home screenshot at docs/screenshots/home.png -->
+<!-- TODO: drop manually-redacted selfcheck.en.png into docs/screenshots/, then uncomment -->
+<!-- <p align="center"><img src="docs/screenshots/selfcheck.en.png" alt="Programmatic self-check panel" width="720"></p> -->
 
 > Prefer a native desktop app? Double-click `scripts\start-desktop.bat` (Windows).
 
