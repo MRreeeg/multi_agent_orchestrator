@@ -11,7 +11,8 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=for-the-badge)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](#contributing)
 
-![Demo: one sentence to orchestration and execution](docs/screenshots/demo.gif "TODO: 3-second demo GIF — type a requirement → auto orchestration → execute → review passed")
+<!-- TODO: add demo GIF at docs/screenshots/demo.gif (type requirement → auto orchestration → execute → review passed) -->
+<!-- <img src="docs/screenshots/demo.gif" alt="Demo: one sentence to orchestration and execution" width="100%"> -->
 
 </div>
 
@@ -54,7 +55,7 @@ export DEEPSEEK_API_KEY="sk-..."        # macOS / Linux
 
 Type one sentence into the home input, click 「✨ Generate Orchestration」, review the three generated nodes, then click 「▶ Run」.
 
-![Console home](docs/screenshots/home.png "TODO: hero input + workspace card screenshot")
+<!-- TODO: add console home screenshot at docs/screenshots/home.png -->
 
 > Prefer a native desktop app? Double-click `scripts\start-desktop.bat` (Windows).
 

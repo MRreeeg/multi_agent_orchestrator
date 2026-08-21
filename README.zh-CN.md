@@ -11,7 +11,8 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=for-the-badge)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](#contributing)
 
-![演示：一句话生成编排并执行](docs/screenshots/demo.gif "需要补充：3 秒演示 GIF——输入需求→自动编排→执行→审查通过")
+<!-- TODO: 补充演示 GIF：docs/screenshots/demo.gif（输入需求→自动编排→执行→审查通过） -->
+<!-- <img src="docs/screenshots/demo.gif" alt="演示：一句话生成编排并执行" width="100%"> -->
 
 </div>
 
@@ -54,7 +55,7 @@ export DEEPSEEK_API_KEY="sk-..."        # macOS / Linux
 
 在首页输入框说一句话，点「✨ 生成编排」，检查自动生成的三个节点，点「▶ 执行」。
 
-![控制台首页](docs/screenshots/home.png "需要补充：首页 hero 输入框 + 工作目录卡片截图")
+<!-- TODO: 补充控制台首页截图：docs/screenshots/home.png -->
 
 > 想要原生桌面应用？双击 `scripts\start-desktop.bat`（Windows）。
 
