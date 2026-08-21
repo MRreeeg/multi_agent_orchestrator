@@ -10,7 +10,7 @@ func TestLoopSkipsNode(t *testing.T) {
 
 	targeted := &LoopConfig{Enabled: true, ReviewNodeID: "rev", TargetNodeIDs: []string{"exec2"}}
 	if !loopSkipsNode(targeted, arch) {
-		t.Fatal("architect must be skipped after round 1")
+		t.Fatal("non-target architect must be skipped after round 1")
 	}
 	if loopSkipsNode(targeted, rev) {
 		t.Fatal("reviewer must never be skipped")
@@ -20,6 +20,14 @@ func TestLoopSkipsNode(t *testing.T) {
 	}
 	if loopSkipsNode(targeted, exec2) {
 		t.Fatal("target executor must rerun every iteration")
+	}
+
+	archTargeted := &LoopConfig{Enabled: true, ReviewNodeID: "rev", TargetNodeIDs: []string{"arch"}}
+	if loopSkipsNode(archTargeted, arch) {
+		t.Fatal("architect explicitly targeted must rerun")
+	}
+	if !loopSkipsNode(archTargeted, exec1) {
+		t.Fatal("non-target executor must be skipped when only architect is targeted")
 	}
 
 	legacy := &LoopConfig{Enabled: true, ReviewNodeID: "rev"}
@@ -40,7 +48,10 @@ func TestValidateLoopTargets(t *testing.T) {
 	if err := ValidateLoopTargets(&LoopConfig{ReviewNodeID: "rev", TargetNodeIDs: []string{"exec"}}, nodes); err != nil {
 		t.Fatalf("valid target must pass: %v", err)
 	}
-	for _, bad := range []string{"rev", "arch", "missing"} {
+	if err := ValidateLoopTargets(&LoopConfig{ReviewNodeID: "rev", TargetNodeIDs: []string{"exec", "arch"}}, nodes); err != nil {
+		t.Fatalf("multiple targets incl. architect must pass: %v", err)
+	}
+	for _, bad := range []string{"rev", "missing"} {
 		cfg := &LoopConfig{ReviewNodeID: "rev", TargetNodeIDs: []string{bad}}
 		if err := ValidateLoopTargets(cfg, nodes); err == nil {
 			t.Fatalf("target %q must be rejected", bad)

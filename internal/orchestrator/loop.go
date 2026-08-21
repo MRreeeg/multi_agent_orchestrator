@@ -514,8 +514,9 @@ func ValidateLoopConfig(cfg *LoopConfig, nodes []AgentNode) error {
 	return fmt.Errorf("review node %q not found in pipeline nodes", normalized.ReviewNodeID)
 }
 
-// ValidateLoopTargets 校验回传目标：每个目标必须存在于流水线，且不能是审查者
-// 或架构者（审查者是反馈来源；架构者按设计只在第 1 轮执行、之后复用输出）。
+// ValidateLoopTargets 校验回传目标：每个目标必须存在于流水线，且不能是审查
+// 者本身（审查者是反馈来源）。架构师允许作为目标——用户可让强模型在后续轮
+// 重新规划。
 func ValidateLoopTargets(cfg *LoopConfig, nodes []AgentNode) error {
 	if cfg == nil || len(cfg.TargetNodeIDs) == 0 {
 		return nil
@@ -531,9 +532,6 @@ func ValidateLoopTargets(cfg *LoopConfig, nodes []AgentNode) error {
 		}
 		if id == cfg.ReviewNodeID || n.Type == NodeReviewer {
 			return fmt.Errorf("loop targetNodeID %q is the reviewer; feedback cannot target the reviewer itself", id)
-		}
-		if n.Type == NodeArchitect {
-			return fmt.Errorf("loop targetNodeID %q is an architect; architects run once and are never a loop target", id)
 		}
 	}
 	return nil
@@ -683,27 +681,22 @@ func (s *Store) executeOneIteration(ctx context.Context, run *PipelineRun, pipe 
 }
 
 // loopSkipsNode 报告某节点在第 N 轮（N>1）是否跳过重跑、复用最近一次成功
-// 输出：架构者始终跳过（计划一次成型）；配置了 TargetNodeIDs 时，非目标且
-// 非审查者的节点也跳过——审查反馈只回传给目标节点。审查者永不跳过。
+// 输出。规则：审查者永不跳过；显式配置了 TargetNodeIDs 时只有目标节点重跑
+// （架构师被显式指定为目标时也重跑——用户可能想让强模型重新规划）；未配置
+// 目标时保持传统行为：仅架构师跳过（计划一次成型）。
 func loopSkipsNode(cfg *LoopConfig, node *AgentNode) bool {
-	if node == nil {
+	if node == nil || node.Type == NodeReviewer {
 		return false
 	}
-	if node.Type == NodeReviewer {
-		return false
-	}
-	if node.Type == NodeArchitect {
+	if cfg != nil && len(cfg.TargetNodeIDs) > 0 {
+		for _, id := range cfg.TargetNodeIDs {
+			if id == node.ID {
+				return false
+			}
+		}
 		return true
 	}
-	if cfg == nil || len(cfg.TargetNodeIDs) == 0 {
-		return false
-	}
-	for _, id := range cfg.TargetNodeIDs {
-		if id == node.ID {
-			return false
-		}
-	}
-	return true
+	return node.Type == NodeArchitect
 }
 
 // executePipelineIteration runs the DAG for a single iteration.
