@@ -1,115 +1,125 @@
 <div align="center">
 
-# 🧭 Multi-Agent Orchestrator · 多智能体管家
+# 🧭 Multi-Agent Orchestrator
 
-**说一句话，剩下的交给管家。** 跨 Agent 协调编排控制台：架构师想、执行者做、审查者把关，随时人工介入。
+[English](README.md) · [简体中文](README.zh-CN.md)
+
+**Say one sentence — let the steward handle the rest.** A cross-agent orchestration console: the architect thinks, executors build, a reviewer gates every round, and you can step in anytime.
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=for-the-badge)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](#contributing)
 
-![演示：一句话生成编排并执行](docs/screenshots/demo.gif "需要补充：3 秒演示 GIF——输入需求→自动编排→执行→审查通过")
+![Demo: one sentence to orchestration and execution](docs/screenshots/demo.gif "TODO: 3-second demo GIF — type a requirement → auto orchestration → execute → review passed")
 
 </div>
 
 ---
 
-## 📦 特性
+## 📦 Features
 
 | | |
 |---|---|
-| 🗣 **一句话编排** | 输入需求 → 自动拆解成「架构师 → 执行者 → 审查者」DAG，支持串行/并行/汇聚 |
-| 🔄 **Loop 状态机** | `fixed` 精确 N 轮 / `review_decides` 审查决定；每轮独立 Iteration 记录，可审计可恢复 |
-| 🔌 **6 种执行器** | reasonix · mimo · codex · claude · opencode · dsh，每节点独立模型路由，混用互不干扰 |
-| 💰 **成本优先** | 规划用强模型、执行用便宜/免费模型（`deepseek-v4-flash-free` 等）、审查用轻量模型 |
-| 💬 **人工介入** | Runtime Console 发消息/打断、工具权限批准卡片、停止/恢复，人工对话不污染 Loop 历史 |
-| 🤖 **客制化 Agent** | DSH 预设（管家 等）一键选用；卡片明确标注「客制化 Agent」vs「Prompt 式」 |
-| 🔍 **程序化自检** | 纯程序化探测本机可用 Agent/模型（不烧 AI），换电脑即插即用 |
-| 📦 **桌面应用** | WebView2 原生窗口，也可浏览器使用 |
-| 🧩 **共用 Skill** | DSH 直接复用 codex/mimo 已装 skill，不重复下载 |
+| 🗣 **One-sentence orchestration** | Type a requirement → auto-decomposed into an "Architect → Executor → Reviewer" DAG, with serial / parallel / fan-in support |
+| 🔄 **Loop state machine** | `fixed` exact N rounds or `review_decides` reviewer-gated; every round is an auditable, resumable Iteration record |
+| 🎯 **Feedback targets** | Drag a dashed line from the reviewer onto any node to choose who receives review feedback — multiple parallel targets, even back to the architect for a re-think |
+| 🔌 **6 executors** | reasonix · mimo · codex · claude · opencode · dsh — independent model routing per node, mix freely |
+| 💰 **Cost-first** | Strong model plans, cheap/free models execute (`deepseek-v4-flash-free` etc.), lightweight model reviews |
+| 👀 **Auto vision fallback** | Node model can't see images? The orchestrator proactively delegates to a vision-capable helper runtime and injects the result — no prompt-hoping |
+| 🩹 **Stall auto-repair** | Watchdog detects stuck nodes → interrupt & guide (serve mode) or kill & rerun |
+| 💬 **Human in the loop** | Message/interrupt agents from the Runtime Console, approve tool calls, stop/resume runs — human chat never pollutes Loop history |
+| 🤖 **Custom agents** | DSH presets selectable per node; cards clearly mark「custom Agent」vs「prompt-based」 |
+| 🔍 **Programmatic self-check** | Probes locally available agents/models without burning AI tokens — plug-and-play on a new machine |
+| 📦 **Desktop app** | Native WebView2 window; browser works too |
+| 🧩 **Shared skills** | DSH reuses skills already installed for codex/mimo — no duplicate downloads |
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-> 只需要 **Go 1.25+** 和 **DeepSeek API Key**；其他执行器都是可选的（装哪个用哪个，一个都不装也能跑）。
+> All you need is **Go 1.25+** and a **DeepSeek API key**; every other executor is optional (use whichever you have installed — it runs even with none of them).
 
-```powershell
-# 1. 克隆
+```bash
+# 1. Clone
 git clone https://github.com/MRreeeg/multi_agent_orchestrator.git
 cd multi_agent_orchestrator
 
-# 2. 配置凭据（永不进仓库）
-$env:DEEPSEEK_API_KEY = "sk-..."
+# 2. Credentials (never committed)
+export DEEPSEEK_API_KEY="sk-..."        # macOS / Linux
+# $env:DEEPSEEK_API_KEY = "sk-..."      # Windows PowerShell
 
-# 3. 启动（自动编译并打开控制台）
-.\scripts\start-orchestrator.ps1
+# 3. Launch (auto-builds and opens the console)
+./scripts/start-orchestrator.sh         # macOS / Linux
+.\scripts\start-orchestrator.ps1        # Windows
 ```
 
-在首页输入框说一句话，点「✨ 生成编排」，检查自动生成的三个节点，点「▶ 执行」。
+Type one sentence into the home input, click 「✨ Generate Orchestration」, review the three generated nodes, then click 「▶ Run」.
 
-![控制台首页](docs/screenshots/home.png "需要补充：首页 hero 输入框 + 工作目录卡片截图")
+![Console home](docs/screenshots/home.png "TODO: hero input + workspace card screenshot")
 
-> 想要原生桌面应用？双击 `scripts\start-desktop.bat`。
+> Prefer a native desktop app? Double-click `scripts\start-desktop.bat` (Windows).
 
-## 🏗 架构
+## 🏗 Architecture
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  你的一句话                                                          │
+│  Your one sentence                                                  │
 │     │                                                               │
 │     ▼                                                               │
 │  ┌──────────┐   rewrite + DAG   ┌────────────────────────────────┐  │
-│  │ 需求分析   │ ───────────────▶ │ 流水线（架构师→执行者→审查者）      │  │
+│  │ Requirement│ ───────────────▶ │ Pipeline (architect→executor    │  │
+│  │ analysis  │                   │ →reviewer)                      │  │
 │  └──────────┘                   └────────────────────────────────┘  │
 │                                        │                            │
 │                                        ▼  executePipelineV2          │
 │  ┌──────────────┐   ┌────────────────┐   ┌──────────────────────┐   │
-│  │ 🏗 架构师     │──▶│ ⚒ 执行者       │──▶│ 🔍 审查者             │   │
-│  │ 只读·方案+验收 │   │ 实现+测试验证    │   │ pass/revise/blocked   │   │
+│  │ 🏗 Architect  │──▶│ ⚒ Executor     │──▶│ 🔍 Reviewer           │   │
+│  │ read-only plan│   │ implement+test │   │ pass/revise/blocked   │   │
 │  └──────────────┘   └────────────────┘   └──────────┬───────────┘   │
 │        ▲              ▲               revise        │ pass           │
 │        └──────────────┴─────────────────────────────┘               │
-│                          Loop 状态机（Orchestrator 控制）             │
-│  👤 你：发消息 / 打断 / 批准工具 / 停止 / 恢复（Runtime Console）       │
+│                          Loop state machine (orchestrator-driven)    │
+│  👤 You: message / interrupt / approve tools / stop / resume (Console)│
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-| 执行器 | 说明 | 典型模型 |
+| Executor | Notes | Typical models |
 |---|---|---|
-| `reasonix` | 内置多模型 Agent | deepseek-pro / deepseek-flash |
-| `mimo` | 小米 MiMo | mimo-v2.5 / mimo-v2.5-pro |
-| `codex` | OpenAI Codex CLI | ccs（中转） / deepseek-v4-flash |
-| `claude` | Claude Code | sonnet / deepseek 官方直连 |
-| `opencode` | 开源编码 Agent | **免费模型**（*-free） |
-| `dsh` | DeepSeek Harness | deepseek-v4-flash / pro + 客制化 Agent |
+| `reasonix` | Built-in multi-model agent | deepseek-pro / deepseek-flash |
+| `mimo` | Xiaomi MiMo | mimo-v2.5 / mimo-v2.5-pro |
+| `codex` | OpenAI Codex CLI | ccs (relay) / deepseek-v4-flash |
+| `claude` | Claude Code | sonnet / deepseek direct |
+| `opencode` | Open-source coding agent | **free models** (`*-free`) |
+| `dsh` | DeepSeek Harness | deepseek-v4-flash / pro + custom agents |
 
-## 🧪 测试
+## 🧪 Tests
 
-```powershell
+```bash
 go build ./...
 go test ./internal/executor/dsh ./internal/orchestrator ./internal/serve -count=1
 ```
 
-## 📚 文档
+## 📚 Docs for Humans & AI Agents
 
-- [`MULTI_AGENT_README.md`](MULTI_AGENT_README.md) — 多 Agent 编排完整说明
-- [`NEW_AGENT_QUICKSTART.zh-CN.md`](NEW_AGENT_QUICKSTART.zh-CN.md) — 新执行器接入（10 接入点）
-- [`docs/deepseek-harness/`](docs/deepseek-harness/) — DSH 执行器 / 客制化 Agent / opencode 模型接入
-- [`docs/调试记录.md`](docs/调试记录.md) — 调试与踩坑记录
+These manuals are written as **structured handover documents**: read them yourself, or hand one wholesale to your AI agent and let it perform the integration/config on its own.
+
+- [`MULTI_AGENT_README.md`](MULTI_AGENT_README.md) — full multi-agent orchestration manual
+- [`NEW_AGENT_QUICKSTART.zh-CN.md`](NEW_AGENT_QUICKSTART.zh-CN.md) — wiring up a new executor/model (10 integration points)
+- [`docs/deepseek-harness/`](docs/deepseek-harness/) — DSH executor / custom agents / opencode model access; includes ready-to-consume handover docs designed to be executed by an AI agent without further human confirmation
+- [`docs/调试记录.md`](docs/调试记录.md) — debugging & pitfall notes
 
 ## ❓ FAQ
 
-**会不会很烧钱？** 默认成本优先：执行段可切免费模型（`opencode/*-free`），每个节点独立指定模型，Token 统计实时可见。
+**Will this burn money?** Cost-first by default: the execution stage can run free models (`opencode/*-free`), each node pins its own model, and token usage is visible in real time.
 
-**中途能插手吗？** 能。给 Agent 发消息、打断当前轮、批准/拒绝工具请求、停止/恢复 Run，人工对话不会污染 Loop 历史。
+**Can I intervene mid-run?** Yes — message agents, interrupt the current round, approve/reject tool requests, stop/resume runs. Human chat never pollutes Loop history.
 
-**必须装 6 个执行器吗？** 不用。只有 DeepSeek 凭据即可跑通全流程；自检会程序化探测并自动适配你机器上的执行器与模型。
+**Do I need all 6 executors?** No. A DeepSeek credential alone runs the whole flow; self-check programmatically probes your machine and adapts to whatever executors/models exist.
 
-**API Key 安全吗？** 只走环境变量或本机凭据文件；仓库内无真实密钥（有扫描保障），`settings.yaml` 永不落盘 key。
+**Is my API key safe?** Keys live only in environment variables or local credential files; the repo contains no real secrets (enforced by scanning), and `settings.yaml` never stores keys.
 
 ## 🤝 Contributing
 
-欢迎 PR。请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)；报告问题时附上「自检面板截图」最快定位。
+PRs welcome — please read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. Attaching a self-check panel screenshot makes issue triage much faster.
 
 ## 📄 License
 
@@ -117,4 +127,4 @@ go test ./internal/executor/dsh ./internal/orchestrator ./internal/serve -count=
 
 ---
 
-<div align="center"><sub>⭐ 觉得有用请 Star；有问题开 Issue。</sub></div>
+<div align="center"><sub>⭐ Star if useful; open an Issue for problems.</sub></div>
