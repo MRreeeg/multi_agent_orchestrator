@@ -81,14 +81,10 @@ func newOrchestratorHandler(emitter event.Sink) *orchestratorHandler {
 	if err := h.store.LoadIndexData(); err != nil {
 		slog.Warn("orchestrator: failed to load session index", "err", err)
 	}
-	// 启动时自动清理非活动 runtime 目录（每个 50MB+ 的 exe 副本）：保留最近
-	// 2 个，运行中（Windows 占用）无法删除的目录保留。
-	go func() {
-		del, freed, locked := pruneOldRuntimeDirs(2)
-		if del > 0 || len(locked) > 0 {
-			slog.Info("orchestrator: pruned stale runtime dirs", "deleted", del, "freed_mb", freed>>20, "locked", locked)
-		}
-	}()
+	// 注意：启动时不再自动清理 runtime 目录。曾自动 prune 保留 2 个，但
+	// 若节点运行时（serve runtime）的 exe 路径指向被删的旧 runtime 目录，
+	// Loop 执行中会突然报"runtime 已过期 / context deadline exceeded"。
+	// 清理只由用户主动点按钮触发（cleanupRuntimes）。
 	return h
 }
 
