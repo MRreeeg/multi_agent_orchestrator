@@ -1,128 +1,129 @@
 <div align="center">
 
-# 🧭 Multi-Agent Orchestrator
+# 🧭 Multi-Agent Orchestrator · 多智能体管家
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+[English](README.en.md) · [简体中文](README.md)
 
-**Say one sentence — let the steward handle the rest.** A cross-agent orchestration console: the architect thinks, executors build, a reviewer gates every round, and you can step in anytime.
+**说一句话，剩下的交给管家。** 跨 Agent 协调编排控制台：架构师想、执行者做、审查者把关，随时人工介入。
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-555?style=for-the-badge)](#)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](#contributing)
 
-<p align="center"><img src="docs/screenshots/canvas-parallel.en.png" alt="Parallel research pipeline on the canvas" width="720"></p>
+<p align="center"><img src="docs/screenshots/canvas-parallel.zh.png" alt="并行调研分工流水线画布" width="720"></p>
 
 </div>
 
 ---
 
-## 📦 Features
+## 📦 特性
 
 | | |
 |---|---|
-| 🗣 **One-sentence orchestration** | Type a requirement → auto-decomposed into an "Architect → Executor → Reviewer" DAG, with serial / parallel / fan-in support |
-| 🔄 **Loop state machine** | `fixed` exact N rounds or `review_decides` reviewer-gated; every round is an auditable, resumable Iteration record |
-| 🎯 **Feedback targets** | Drag a dashed line from the reviewer onto any node to choose who receives review feedback — multiple parallel targets, even back to the architect for a re-think |
-| 🔌 **6 executors** | reasonix · mimo · codex · claude · opencode · dsh — independent model routing per node, mix freely |
-| 💰 **Cost-first** | Strong model plans, cheap/free models execute (`deepseek-v4-flash-free` etc.), lightweight model reviews |
-| 👀 **Auto vision fallback** | Node model can't see images? The orchestrator proactively delegates to a vision-capable helper runtime and injects the result — no prompt-hoping |
-| 🩹 **Stall auto-repair** | Watchdog detects stuck nodes → interrupt & guide (serve mode) or kill & rerun |
-| 💬 **Human in the loop** | Message/interrupt agents from the Runtime Console, approve tool calls, stop/resume runs — human chat never pollutes Loop history |
-| 🤖 **Custom agents** | DSH presets selectable per node; cards clearly mark「custom Agent」vs「prompt-based」 |
-| 🔍 **Programmatic self-check** | Probes locally available agents/models without burning AI tokens — plug-and-play on a new machine |
-| 📦 **Desktop app** | Native WebView2 window; browser works too |
-| 🧩 **Shared skills** | DSH reuses skills already installed for codex/mimo — no duplicate downloads |
+| 🗣 **一句话编排** | 输入需求 → 自动拆解成「架构师 → 执行者 → 审查者」DAG，支持串行/并行/汇聚 |
+| 🔄 **Loop 状态机** | `fixed` 精确 N 轮 / `review_decides` 审查决定；每轮独立 Iteration 记录，可审计可恢复 |
+| 🎯 **回传目标** | 从审查者拖虚线到任意节点，指定审查反馈回传给谁——支持多条并行，甚至指回架构师重新规划 |
+| 🔌 **6 种执行器** | reasonix · mimo · codex · claude · opencode · dsh，每节点独立模型路由，混用互不干扰 |
+| 💰 **成本优先** | 规划用强模型、执行用便宜/免费模型（`deepseek-v4-flash-free` 等）、审查用轻量模型 |
+| 👀 **自动识图兜底** | 节点模型看不了图？Orchestrator 主动委派视觉辅助运行时并注入结果——不靠提示词祈祷 |
+| 🩹 **卡住自动维护** | 看门狗检测卡死节点 → 中断引导（serve 模式）/ 杀掉重跑 |
+| 💬 **人工介入** | Runtime Console 发消息/打断、工具权限批准卡片、停止/恢复，人工对话不污染 Loop 历史 |
+| 🤖 **客制化 Agent** | DSH 预设（管家 等）一键选用；卡片明确标注「客制化 Agent」vs「Prompt 式」 |
+| 🔍 **程序化自检** | 纯程序化探测本机可用 Agent/模型（不烧 AI），换电脑即插即用 |
+| 📦 **桌面应用** | WebView2 原生窗口，也可浏览器使用 |
+| 🧩 **共用 Skill** | DSH 直接复用 codex/mimo 已装 skill，不重复下载 |
 
-<p align="center"><img src="docs/screenshots/canvas-loop.en.png" alt="Loop overlay: dashed feedback line with draggable target" width="720"></p>
+<p align="center"><img src="docs/screenshots/canvas-loop.zh.png" alt="Loop 运行时循环：虚线回传线与可拖拽目标" width="720"></p>
 
-## 🚀 Quick Start
+<p align="center"><img src="docs/screenshots/console-open.zh.gif" alt="点击节点端口徽章打开 Runtime Console 实时输出" width="720"></p>
 
-> All you need is **Go 1.25+** and a **DeepSeek API key**; every other executor is optional (use whichever you have installed — it runs even with none of them).
+## 🚀 快速开始
+
+> 只需要 **Go 1.25+** 和 **DeepSeek API Key**；其他执行器都是可选的（装哪个用哪个，一个都不装也能跑）。
 
 ```bash
-# 1. Clone
+# 1. 克隆
 git clone https://github.com/MRreeeg/multi_agent_orchestrator.git
 cd multi_agent_orchestrator
 
-# 2. Credentials (never committed)
+# 2. 配置凭据（永不进仓库）
 export DEEPSEEK_API_KEY="sk-..."        # macOS / Linux
 # $env:DEEPSEEK_API_KEY = "sk-..."      # Windows PowerShell
 
-# 3. Launch (auto-builds and opens the console)
+# 3. 启动（自动编译并打开控制台）
 ./scripts/start-orchestrator.sh         # macOS / Linux
 .\scripts\start-orchestrator.ps1        # Windows
 ```
 
-Type one sentence into the home input, click 「✨ Generate Orchestration」, review the three generated nodes, then click 「▶ Run」.
+在首页输入框说一句话，点「✨ 生成编排」，检查自动生成的三个节点，点「▶ 执行」。
 
-<!-- TODO: drop manually-redacted selfcheck.en.png into docs/screenshots/, then uncomment -->
-<!-- <p align="center"><img src="docs/screenshots/selfcheck.en.png" alt="Programmatic self-check panel" width="720"></p> -->
+<!-- TODO: 放入人工打码后的 selfcheck.zh.png 到 docs/screenshots/，再取消注释 -->
+<!-- <p align="center"><img src="docs/screenshots/selfcheck.zh.png" alt="程序化自检面板" width="720"></p> -->
 
-> Prefer a native desktop app? Double-click `scripts\start-desktop.bat` (Windows).
+> 想要原生桌面应用？双击 `scripts\start-desktop.bat`（Windows）。
 
-## 🏗 Architecture
+## 🏗 架构
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Your one sentence                                                  │
+│  你的一句话                                                          │
 │     │                                                               │
 │     ▼                                                               │
 │  ┌──────────┐   rewrite + DAG   ┌────────────────────────────────┐  │
-│  │ Requirement│ ───────────────▶ │ Pipeline (architect→executor    │  │
-│  │ analysis  │                   │ →reviewer)                      │  │
+│  │ 需求分析   │ ───────────────▶ │ 流水线（架构师→执行者→审查者）      │  │
 │  └──────────┘                   └────────────────────────────────┘  │
 │                                        │                            │
 │                                        ▼  executePipelineV2          │
 │  ┌──────────────┐   ┌────────────────┐   ┌──────────────────────┐   │
-│  │ 🏗 Architect  │──▶│ ⚒ Executor     │──▶│ 🔍 Reviewer           │   │
-│  │ read-only plan│   │ implement+test │   │ pass/revise/blocked   │   │
+│  │ 🏗 架构师     │──▶│ ⚒ 执行者       │──▶│ 🔍 审查者             │   │
+│  │ 只读·方案+验收 │   │ 实现+测试验证    │   │ pass/revise/blocked   │   │
 │  └──────────────┘   └────────────────┘   └──────────┬───────────┘   │
 │        ▲              ▲               revise        │ pass           │
 │        └──────────────┴─────────────────────────────┘               │
-│                          Loop state machine (orchestrator-driven)    │
-│  👤 You: message / interrupt / approve tools / stop / resume (Console)│
+│                          Loop 状态机（Orchestrator 控制）             │
+│  👤 你：发消息 / 打断 / 批准工具 / 停止 / 恢复（Runtime Console）       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-| Executor | Notes | Typical models |
+| 执行器 | 说明 | 典型模型 |
 |---|---|---|
-| `reasonix` | Built-in multi-model agent | deepseek-pro / deepseek-flash |
-| `mimo` | Xiaomi MiMo | mimo-v2.5 / mimo-v2.5-pro |
-| `codex` | OpenAI Codex CLI | ccs (relay) / deepseek-v4-flash |
-| `claude` | Claude Code | sonnet / deepseek direct |
-| `opencode` | Open-source coding agent | **free models** (`*-free`) |
-| `dsh` | DeepSeek Harness | deepseek-v4-flash / pro + custom agents |
+| `reasonix` | 内置多模型 Agent | deepseek-pro / deepseek-flash |
+| `mimo` | 小米 MiMo | mimo-v2.5 / mimo-v2.5-pro |
+| `codex` | OpenAI Codex CLI | ccs（中转） / deepseek-v4-flash |
+| `claude` | Claude Code | sonnet / deepseek 官方直连 |
+| `opencode` | 开源编码 Agent | **免费模型**（*-free） |
+| `dsh` | DeepSeek Harness | deepseek-v4-flash / pro + 客制化 Agent |
 
-## 🧪 Tests
+## 🧪 测试
 
 ```bash
 go build ./...
 go test ./internal/executor/dsh ./internal/orchestrator ./internal/serve -count=1
 ```
 
-## 📚 Docs for Humans & AI Agents
+## 📚 文档：给人看，也给 AI 用
 
-These manuals are written as **structured handover documents**: read them yourself, or hand one wholesale to your AI agent and let it perform the integration/config on its own.
+以下手册均为**结构化交接文档**：你可以自己阅读参考，也可以把整份文档直接交给你的 AI Agent，让它自行完成接入与配置——无需再向人逐步确认。
 
-- [`MULTI_AGENT_README.md`](MULTI_AGENT_README.md) — full multi-agent orchestration manual
-- [`NEW_AGENT_QUICKSTART.zh-CN.md`](NEW_AGENT_QUICKSTART.zh-CN.md) — wiring up a new executor/model (10 integration points)
-- [`docs/deepseek-harness/`](docs/deepseek-harness/) — DSH executor / custom agents / opencode model access; includes ready-to-consume handover docs designed to be executed by an AI agent without further human confirmation
-- [`docs/调试记录.md`](docs/调试记录.md) — debugging & pitfall notes
+- [`MULTI_AGENT_README.md`](MULTI_AGENT_README.md) — 多 Agent 编排完整说明
+- [`NEW_AGENT_QUICKSTART.zh-CN.md`](NEW_AGENT_QUICKSTART.zh-CN.md) — 新执行器接入（10 接入点）
+- [`docs/deepseek-harness/`](docs/deepseek-harness/) — DSH 执行器 / 客制化 Agent / opencode 模型接入；内含面向 AI 的交接文档，按清单逐项落地即可，不需要人类逐步确认
+- [`docs/调试记录.md`](docs/调试记录.md) — 调试与踩坑记录
 
 ## ❓ FAQ
 
-**Will this burn money?** Cost-first by default: the execution stage can run free models (`opencode/*-free`), each node pins its own model, and token usage is visible in real time.
+**会不会很烧钱？** 默认成本优先：执行段可切免费模型（`opencode/*-free`），每个节点独立指定模型，Token 统计实时可见。
 
-**Can I intervene mid-run?** Yes — message agents, interrupt the current round, approve/reject tool requests, stop/resume runs. Human chat never pollutes Loop history.
+**中途能插手吗？** 能。给 Agent 发消息、打断当前轮、批准/拒绝工具请求、停止/恢复 Run，人工对话不会污染 Loop 历史。
 
-**Do I need all 6 executors?** No. A DeepSeek credential alone runs the whole flow; self-check programmatically probes your machine and adapts to whatever executors/models exist.
+**必须装 6 个执行器吗？** 不用。只有 DeepSeek 凭据即可跑通全流程；自检会程序化探测并自动适配你机器上的执行器与模型。
 
-**Is my API key safe?** Keys live only in environment variables or local credential files; the repo contains no real secrets (enforced by scanning), and `settings.yaml` never stores keys.
+**API Key 安全吗？** 只走环境变量或本机凭据文件；仓库内无真实密钥（有扫描保障），`settings.yaml` 永不落盘 key。
 
 ## 🤝 Contributing
 
-PRs welcome — please read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. Attaching a self-check panel screenshot makes issue triage much faster.
+欢迎 PR。请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)；报告问题时附上「自检面板截图」最快定位。
 
 ## 📄 License
 
@@ -130,4 +131,4 @@ PRs welcome — please read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. Attachin
 
 ---
 
-<div align="center"><sub>⭐ Star if useful; open an Issue for problems.</sub></div>
+<div align="center"><sub>⭐ 觉得有用请 Star；有问题开 Issue。</sub></div>
