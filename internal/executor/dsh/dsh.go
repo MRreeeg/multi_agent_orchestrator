@@ -129,8 +129,19 @@ func (e *DshExecutor) Exec(ctx context.Context, prompt string, opts ExecOptions)
 	}
 
 	// The task is a positional argument of the headless app. DSH has no stdin
-	// task seam, so very long prompts are bounded by the OS command line
-	// (~32K on Windows); the orchestrator keeps node prompts below that.
+	// task seam, so the whole prompt travels on the Windows command line,
+	// which CreateProcess caps at 32767 UTF-16 code units. Analysis prompts
+	// that embed a full requirement document + conversation history blow past
+	// that and fail with "The filename or extension is too long" before dsh
+	// even boots. Keep head (instructions/JSON schema) and tail (most recent
+	// context) and drop the middle with an explicit marker.
+	if n := utf16Len(prompt); n > maxDshPromptUnits {
+		head := truncateToUTF16Units(prompt, maxDshPromptUnits*40/100)
+		tail := truncateTailToUTF16Units(prompt, maxDshPromptUnits*55/100)
+		dropped := n - utf16Len(head) - utf16Len(tail)
+		prompt = head + "\n\n[系统提示：任务文本过长，中间约 " + fmt.Sprint(dropped) +
+			" 字符已被截断以适配命令行长度限制；关键指令与本段之后的内容已完整保留。]\n\n" + tail
+	}
 	args = append(args, prompt)
 
 	cmd := exec.CommandContext(ctx, bin, args...)
@@ -265,6 +276,68 @@ func writeModelPatch(model string, reasoningEffort string) (string, func(), erro
 	}
 	cleanup := func() { _ = os.Remove(path) }
 	return path, cleanup, nil
+}
+
+// maxDshPromptUnits caps the prompt at 30000 UTF-16 code units, leaving head
+// room under the 32767-unit CreateProcess command-line limit for the binary
+// path, flags and patch file paths.
+const maxDshPromptUnits = 30000
+
+// utf16Len counts the UTF-16 code units of s — the unit Windows actually
+// limits a command line by (a CJK rune costs 1, an astral rune 2).
+func utf16Len(s string) int {
+	n := 0
+	for _, r := range s {
+		switch {
+		case r >= 0x10000:
+			n += 2
+		default:
+			n += 1
+		}
+	}
+	return n
+}
+
+// truncateToUTF16Units cuts s to at most max units, preserving whole runes.
+func truncateToUTF16Units(s string, max int) string {
+	if utf16Len(s) <= max {
+		return s
+	}
+	n := 0
+	for i, r := range s {
+		w := 1
+		if r >= 0x10000 {
+			w = 2
+		}
+		if n+w > max {
+			return s[:i]
+		}
+		n += w
+	}
+	return s
+}
+
+// truncateTailToUTF16Units keeps the last max units of s, preserving runes.
+func truncateTailToUTF16Units(s string, max int) string {
+	if utf16Len(s) <= max {
+		return s
+	}
+	r := []rune(s)
+	n := 0
+	cut := 0
+	for i := len(r) - 1; i >= 0; i-- {
+		w := 1
+		if r[i] >= 0x10000 {
+			w = 2
+		}
+		if n+w > max {
+			cut = i + 1
+			break
+		}
+		n += w
+	}
+	// cut is a rune index; slicing s directly would cut at a byte offset.
+	return string(r[cut:])
 }
 
 // command resolves the dsh entry point. It returns the executable and any

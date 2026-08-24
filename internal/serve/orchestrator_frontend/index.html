@@ -6366,7 +6366,9 @@ $('#rd-nodes').addEventListener('click', (ev) => {
 });
 function showRunDashboard(runID) {
     runDash.active = true;
-    runDash.runID = runID || state.runId || '';
+    const nextRunID = runID || state.runId || '';
+    if (runDash.runID !== nextRunID) rdAnalyses = []; // 换了 Run，清空上一条 Run 的分析历史
+    runDash.runID = nextRunID;
     $('#run-dash').classList.remove('hidden');
     // The run dashboard lives in the right panel; make sure it is visible
     // even when no node is selected. On narrow windows the panel stays
@@ -6426,32 +6428,76 @@ function finishRunDashboard(ok) {
   b.textContent = ok ? '✓ 全部完成' : '✕ 已停止/失败';
   runDash.active = false;
 }
+// 运行看板的执行进展分析历史：新分析压到最前，最新一条默认展开，
+// 历史条目默认收起，点击头部可展开/收缩。
+let rdAnalyses = [];
+
+function renderRdAnalyses() {
+  const box = $('#rd-analysis');
+  if (!box) return;
+  box.className = 'rd-analysis';
+  box.classList.remove('hidden');
+  if (!rdAnalyses.length) return;
+  const statusColor = { done: 'var(--muted-2)', failed: 'var(--danger)', analyzing: 'var(--warning)' };
+  box.innerHTML = '<div class="rd-analysis__head">' + T('rd.analysisTitle') + '</div>' +
+    rdAnalyses.map((a, i) => {
+      const collapsed = a.collapsed;
+      const time = a.at ? new Date(a.at).toLocaleTimeString() : '';
+      const head = escHtml(a.title || '') + (time ? ' · ' + time : '');
+      let body = '';
+      if (a.error) {
+        body = '<div style="color:var(--danger)">' + T('rd.analysisFail') + escHtml(a.error) + '</div>';
+      } else if (a.analyzing) {
+        body = '<div class="rd-analysis__loading">' + escHtml(a.title || T('rd.analyzing')) + '</div>';
+      } else {
+        const blocking = (Array.isArray(a.blocking) && a.blocking.length)
+          ? '<div class="rd-analysis__blocking"><b>' + T('rd.blocking') + '</b>' + a.blocking.map(escHtml).join('；') + '</div>'
+          : '<div class="rd-analysis__blocking" style="color:var(--success)">' + T('rd.noBlocking') + '</div>';
+        const sugg = (Array.isArray(a.suggestions) && a.suggestions.length)
+          ? '<div class="rd-analysis__sugg"><b>' + T('rd.suggest') + '</b>' + a.suggestions.map(escHtml).join('；') + '</div>' : '';
+        body = '<div class="rd-analysis__summary">' + escHtml(a.summary || '') + '</div>' +
+          (a.progress ? '<div class="rd-analysis__progress">' + escHtml(a.progress) + '</div>' : '') +
+          blocking + sugg;
+      }
+      return '<div class="rd-analysis-item" data-idx="' + i + '">' +
+        '<div class="rd-analysis-item__head" data-toggle-idx="' + i + '" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 0;font-size:12px;color:' + (statusColor[a.state] || 'var(--muted-2)') + '">' +
+        '<span class="rd-analysis-item__arrow" style="display:inline-block;transition:transform .15s;transform:rotate(' + (collapsed ? '-90' : '0') + 'deg)">▼</span>' +
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + head + '</span></div>' +
+        '<div class="rd-analysis-item__body" style="' + (collapsed ? 'display:none' : '') + ';padding:0 0 6px 14px">' + body + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+document.addEventListener('click', function (ev) {
+  const headEl = ev.target.closest && ev.target.closest('.rd-analysis-item__head');
+  if (!headEl) return;
+  const idx = Number(headEl.getAttribute('data-toggle-idx'));
+  if (!Number.isInteger(idx) || !rdAnalyses[idx]) return;
+  rdAnalyses[idx].collapsed = !rdAnalyses[idx].collapsed;
+  renderRdAnalyses();
+});
+
 $('#rd-analyze').addEventListener('click', async () => {
   const runID = runDash.runID || state.runId;
   if (!runID) { toast(T('rd.noRun'), 'error'); return; }
-  const box = $('#rd-analysis');
-  box.className = 'rd-analysis';
-  box.classList.remove('hidden');
-  box.innerHTML = '<div class="rd-analysis__loading">' + T('rd.analyzing') + '</div>';
+  // 历史条目全部收起，本次分析置顶并展开
+  rdAnalyses.forEach(a => { a.collapsed = true; a.analyzing = false; });
+  const entry = { at: Date.now(), state: 'analyzing', analyzing: true, title: T('rd.analyzing'), collapsed: false };
+  rdAnalyses.unshift(entry);
+  renderRdAnalyses();
   try {
     const res = await apiPost('/runs/' + encodeURIComponent(runID) + '/analysis', {
       executor: $('#rd-executor').value || '',
       model: $('#rd-model') ? $('#rd-model').value || '' : '',
       agent: $('#rd-agent') ? $('#rd-agent').value || '' : ''
     });
-    const a = res || {};
-    const blocking = (Array.isArray(a.blocking) && a.blocking.length)
-      ? '<div class="rd-analysis__blocking"><b>' + T('rd.blocking') + '</b>' + a.blocking.map(escHtml).join('；') + '</div>'
-      : '<div class="rd-analysis__blocking" style="color:var(--success)">' + T('rd.noBlocking') + '</div>';
-    const sugg = (Array.isArray(a.suggestions) && a.suggestions.length)
-      ? '<div class="rd-analysis__sugg"><b>' + T('rd.suggest') + '</b>' + a.suggestions.map(escHtml).join('；') + '</div>' : '';
-    box.innerHTML = '<div class="rd-analysis__head">' + T('rd.analysisTitle') + '</div>' +
-      '<div class="rd-analysis__summary">' + escHtml(a.summary || '') + '</div>' +
-      (a.progress ? '<div class="rd-analysis__progress">' + escHtml(a.progress) + '</div>' : '') +
-      blocking + sugg;
+    Object.assign(entry, res || {}, { at: Date.now(), state: 'done', analyzing: false, title: (res && res.summary) || T('rd.analysisTitle') });
+    // 新结果出来后收起其它历史条目，保持看板紧凑
+    rdAnalyses.forEach(a => { if (a !== entry) a.collapsed = true; });
   } catch (err) {
-    box.innerHTML = '<div style="color:var(--danger)">' + T('rd.analysisFail') + escHtml(err.message || err) + '</div>';
+    Object.assign(entry, { state: 'failed', analyzing: false, error: String(err.message || err), title: T('rd.analysisFail') });
   }
+  renderRdAnalyses();
 });
 $('#rd-stop').addEventListener('click', () => {
   if (runDash.runID) { cancelOrchRun(runDash.runID); finishRunDashboard(false); }
@@ -6520,6 +6566,12 @@ function renderRuns() {
     return;
   }
   const statusIcons = { running: '⏳', complete: '✅', failed: '❌', canceled: '🚫', blocked: '⛔', interrupted: '⏸️' };
+  // 列表按时间倒序（最新在最上），但「第 N 次执行」的 N 必须按真实时间先后
+  // 编号：最早 = 第 1 次，最新 = 第 N 次。否则最新一张卡顶着"第 1 次执行"
+  // 出现在最上面，看起来就像顺序反了。
+  const chronoIndex = {};
+  (runs.slice().sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))))
+    .forEach((r, i) => { chronoIndex[r.id] = i + 1; });
   list.innerHTML = runs.map((r, idx) => {
     const icon = statusIcons[r.status] || '⏳';
     const taskPreview = (r.task || '').substring(0, 60);
@@ -6535,8 +6587,8 @@ function renderRuns() {
     const max = mode === 'fixed' ? (cfg.fixedIterations || cfg.maxIterations || 0) : (cfg.maxIterations || 0);
     const current = r.currentIteration || (iterations.length ? iterations[iterations.length - 1].number : 0);
     const finalDecision = r.finalReview?.decision || (iterations.length ? iterations[iterations.length - 1].decision : '');
-    // 友好编号：第 N 次执行（run id 保留在副行与悬停提示）
-    const friendlyLabel = T('run.execLabel').replace('{n}', String(idx + 1));
+    // 友好编号：第 N 次执行（N = 时间先后顺序，run id 保留在副行与悬停提示）
+    const friendlyLabel = T('run.execLabel').replace('{n}', String(chronoIndex[r.id] || (idx + 1)));
     const resumeButton = r.status === 'interrupted' && cfg.enabled
       ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">${T('run.resume')}</button>` : '';
     const cancelButton = r.status === 'running'
