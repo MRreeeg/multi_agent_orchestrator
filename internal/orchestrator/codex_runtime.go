@@ -447,7 +447,12 @@ func (m *CodexRuntimeManager) recordEvent(rt *codexRuntime, event codexclient.Ap
 	if strings.Contains(event.Method, "error") {
 		level = "error"
 	}
-	rt.events = append(rt.events, RuntimeConsoleEvent{At: event.At, Level: level, Method: event.Method, Text: event.Text, Payload: payload})
+	cat := ""
+	if strings.Contains(event.Method, "manual_turn") {
+		// 人工介入消息在 Console 里按用户侧样式渲染（👤）。
+		cat = "user"
+	}
+	rt.events = append(rt.events, RuntimeConsoleEvent{At: event.At, Level: level, Method: event.Method, Text: event.Text, Payload: payload, Category: cat})
 	if len(rt.events) > 300 {
 		rt.events = append([]RuntimeConsoleEvent(nil), rt.events[len(rt.events)-300:]...)
 	}

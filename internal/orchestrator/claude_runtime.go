@@ -478,7 +478,13 @@ func (m *ClaudeRuntimeManager) recordEvent(rt *claudeRuntime, event claudeclient
 	if text == "" {
 		text = event.Reasoning
 	}
-	rt.events = append(rt.events, RuntimeConsoleEvent{At: event.At, Level: level, Method: event.Type + "/" + event.Subtype, Text: text, Payload: event.Payload})
+	cat := ""
+	method := event.Type + "/" + event.Subtype
+	if strings.Contains(method, "manual_turn") {
+		// 人工介入消息在 Console 里按用户侧样式渲染（👤）。
+		cat = "user"
+	}
+	rt.events = append(rt.events, RuntimeConsoleEvent{At: event.At, Level: level, Method: method, Text: text, Payload: event.Payload, Category: cat})
 	if len(rt.events) > 300 {
 		rt.events = append([]RuntimeConsoleEvent(nil), rt.events[len(rt.events)-300:]...)
 	}

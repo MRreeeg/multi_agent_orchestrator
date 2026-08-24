@@ -953,6 +953,13 @@ func (m *OpenCodeRuntimeManager) SendMessage(runtimeID, text string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+	// Echo the operator's message into the console event stream BEFORE the
+	// turn runs: without this the sent text is invisible (only the eventual
+	// streamed reply shows up), which reads as "the send did nothing".
+	if target.stream != nil {
+		target.stream.append("manual_turn", "", "user", text)
+		m.notify(target)
+	}
 	out, err := client.Prompt(ctx, sessionID, model, "", text, nil)
 	if err != nil {
 		return err

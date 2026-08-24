@@ -180,6 +180,20 @@ input,textarea,select{font:inherit;color:inherit}
 .chat-bubble__inner table{border-collapse:collapse;margin:6px 0;font-size:13px;width:100%}
 .chat-bubble__inner th,.chat-bubble__inner td{border:1px solid var(--border);padding:5px 9px;text-align:left}
 .chat-bubble__inner th{background:var(--bg-2);font-weight:600}
+/* md-body：聊天气泡之外的 markdown 渲染容器（执行详情/节点详情/审查卡/分析进展/放大输出），排版与聊天一致 */
+.md-body h2,.md-body h3,.md-body h4,.md-body h1{margin:8px 0 4px;font-weight:700;line-height:1.35}
+.md-body h1{font-size:15.5px}.md-body h2{font-size:15px}.md-body h3{font-size:14px}.md-body h4{font-size:13.5px}
+.md-body p{margin:4px 0}
+.md-body ul,.md-body ol{margin:4px 0;padding-left:22px}
+.md-body li{margin:2px 0}
+.md-body code{background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 4px;font-size:12px;font-family:var(--mono)}
+.md-body pre{margin:6px 0;padding:8px 10px;background:var(--bg-1);border:1px solid var(--border);border-radius:8px;overflow:auto;font-size:12px;line-height:1.5}
+.md-body pre code{border:none;background:none;padding:0}
+.md-body a{color:var(--accent)}
+.md-body blockquote{margin:6px 0;padding:6px 12px;border-left:3px solid var(--accent);background:var(--bg-2);border-radius:0 6px 6px 0;color:var(--muted)}
+.md-body table{border-collapse:collapse;margin:6px 0;font-size:12.5px;width:100%}
+.md-body th,.md-body td{border:1px solid var(--border);padding:5px 9px;text-align:left}
+.md-body th{background:var(--bg-2);font-weight:600}
 .chat-bubble__meta{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:4px;padding:0 4px}
 .chat-bubble--user .chat-bubble__meta{text-align:right}
 .chat__input-bar{border-top:1px solid var(--border);padding:14px 20px 18px;background:var(--bg)}
@@ -5093,7 +5107,7 @@ async function openRunDetail(runId) {
         '<button class="rd-detail-zoom" data-text="' + escHtml(output) + '" title="大窗口显示完整内容">⤢ 放大输出</button>' +
         (output.length > 600 ? '<span style="font-size:10.5px;color:var(--muted-2)">完整 ' + output.length + ' 字</span>' : '') +
         '</div>' +
-        '<div style="font-size:12px;color:var(--fg-2);margin-top:4px;white-space:pre-wrap;word-break:break-word;max-height:96px;overflow:auto;background:var(--bg-2);border-radius:6px;padding:8px" title="' + escHtml(output) + '">' + escHtml(output.length > 600 ? output.slice(0, 600) + '…' : output) + '</div>' : '') +
+        '<div class="md-body" style="font-size:12px;color:var(--fg-2);margin-top:4px;word-break:break-word;max-height:96px;overflow:auto;background:var(--bg-2);border-radius:6px;padding:8px">' + renderMarkdown(output.length > 600 ? output.slice(0, 600) + '…' : output) + '</div>' : '') +
         (errText ? '<div style="display:flex;align-items:center;gap:8px;margin-top:6px">' +
           '<button class="rd-detail-zoom" data-text="' + escHtml(errText) + '" title="大窗口显示完整错误">⤢ 放大错误</button>' +
           '</div>' +
@@ -5202,7 +5216,7 @@ async function showNodeDetail(node) {
     html += `
       <div style="margin-bottom:12px">
         <div style="font-size:13px;color:var(--muted-2);margin-bottom:4px;font-weight:600">${T('nd.output')}</div>
-        <pre style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:13px;font-family:var(--mono);white-space:pre-wrap;max-height:400px;overflow-y:auto">${escHtml(output.output)}</pre>
+        <div class="md-body" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:13px;max-height:400px;overflow-y:auto">${renderMarkdown(output.output)}</div>
       </div>
     `;
   }
@@ -5320,12 +5334,12 @@ function showOutputPreview(text) {
   const m = document.createElement('div');
   m.className = 'modal modal--win';
   m.style.cssText = 'width:min(860px,94vw);height:min(640px,86vh)';
-  m.innerHTML = '<div class="modal__head modal__head--drag"><span style="font-size:13px;font-weight:600">输出 / 结果（Markdown 原文）</span>' +
+  m.innerHTML = '<div class="modal__head modal__head--drag"><span style="font-size:13px;font-weight:600">输出 / 结果</span>' +
     '<span class="modal__close" title="关闭" style="margin-left:auto">&times;</span></div>' +
-    '<div class="modal__body" style="flex:1;min-height:0;overflow:auto;margin:0 14px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;color:var(--fg-2);font:12.5px/1.55 var(--mono);white-space:pre-wrap"></div>';
+    '<div class="modal__body md-body" style="flex:1;min-height:0;overflow:auto;margin:0 14px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;color:var(--fg-2);font-size:13px;line-height:1.6"></div>';
   m.querySelector('.modal__close').addEventListener('click', () => ov.remove());
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  m.querySelector('.modal__body').textContent = text;
+  m.querySelector('.modal__body').innerHTML = renderMarkdown(text);
   ov.appendChild(m);
   document.body.appendChild(ov);
   makeModalDraggable(m);
@@ -5468,6 +5482,15 @@ function runtimeEventHtml(e) {
   // renderRuntimeEvents).
   const reasoning = e.category === 'reasoning';
   const assistant = e.category === 'assistant';
+  const user = e.category === 'user';
+  if (user) {
+    // 人工介入消息：醒目的用户侧样式，与后续的回答事件形成对话感。
+    return '<div style="padding:6px 4px;border-bottom:1px solid rgba(15,23,42,.07);background:var(--accent-soft);border-radius:8px;margin:3px 0">' +
+      '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
+      '<span style="color:var(--accent);font-weight:600">👤 人工消息</span>' +
+      (detail ? '<div class="chat-bubble__inner rc-md" style="margin-top:3px">' + renderMarkdown(detail) + '</div>' : '') +
+      '</div>';
+  }
   const color = e.level === 'error' ? '#d1242f' : assistant ? '#0969da' : '#57606a';
   const prefix = reasoning ? '🧠 推理 · ' : assistant ? '💬 回答 · ' : '';
   const label = (reasoning || assistant) ? prefix + (e.method || 'text') : (e.method || 'event');
@@ -6411,13 +6434,13 @@ function showReviewCard(review) {
   box.className = 'rd-review ' + cls;
   let changes = '';
   if (Array.isArray(review.requiredChanges) && review.requiredChanges.length) {
-    changes = '<div class="rd-review__changes"><b>需修改：</b>' + review.requiredChanges.map(escHtml).join('；') + '</div>';
+    changes = '<div class="rd-review__changes"><b>需修改：</b>' + review.requiredChanges.map(c => renderMarkdown(c)).join('；') + '</div>';
   }
   box.innerHTML = '<div class="rd-review__head"><span class="rd-review__tag">' + label + '</span>' +
     '<span class="rd-review__conf">置信 ' + (review.confidence ?? '-') + '</span></div>' +
-    '<div class="rd-review__summary">' + escHtml(review.summary || '') + '</div>' +
+    '<div class="rd-review__summary md-body">' + renderMarkdown(review.summary || '') + '</div>' +
     changes +
-    (review.nextTask ? '<div class="rd-review__next"><b>下一轮：</b>' + escHtml(review.nextTask) + '</div>' : '');
+    (review.nextTask ? '<div class="rd-review__next"><b>下一轮：</b>' + renderMarkdown(review.nextTask) + '</div>' : '');
   box.classList.remove('hidden');
 }
 
@@ -6451,12 +6474,12 @@ function renderRdAnalyses() {
         body = '<div class="rd-analysis__loading">' + escHtml(a.title || T('rd.analyzing')) + '</div>';
       } else {
         const blocking = (Array.isArray(a.blocking) && a.blocking.length)
-          ? '<div class="rd-analysis__blocking"><b>' + T('rd.blocking') + '</b>' + a.blocking.map(escHtml).join('；') + '</div>'
+          ? '<div class="rd-analysis__blocking"><b>' + T('rd.blocking') + '</b>' + a.blocking.map(x => renderMarkdown(x)).join('；') + '</div>'
           : '<div class="rd-analysis__blocking" style="color:var(--success)">' + T('rd.noBlocking') + '</div>';
         const sugg = (Array.isArray(a.suggestions) && a.suggestions.length)
-          ? '<div class="rd-analysis__sugg"><b>' + T('rd.suggest') + '</b>' + a.suggestions.map(escHtml).join('；') + '</div>' : '';
-        body = '<div class="rd-analysis__summary">' + escHtml(a.summary || '') + '</div>' +
-          (a.progress ? '<div class="rd-analysis__progress">' + escHtml(a.progress) + '</div>' : '') +
+          ? '<div class="rd-analysis__sugg"><b>' + T('rd.suggest') + '</b>' + a.suggestions.map(x => renderMarkdown(x)).join('；') + '</div>' : '';
+        body = '<div class="rd-analysis__summary md-body">' + renderMarkdown(a.summary || '') + '</div>' +
+          (a.progress ? '<div class="rd-analysis__progress md-body">' + renderMarkdown(a.progress) + '</div>' : '') +
           blocking + sugg;
       }
       return '<div class="rd-analysis-item" data-idx="' + i + '">' +
