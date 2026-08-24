@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -43,6 +42,7 @@ type opencodeRuntime struct {
 	lastErr   string
 	events    []RuntimeConsoleEvent
 	stream    *consoleStreamCoalescer
+	clock     *activityClock
 	sseCancel context.CancelFunc
 	partLast  map[string]int
 	partType  map[string]string
@@ -279,6 +279,7 @@ func (m *OpenCodeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onSt
 		partLast:     make(map[string]int),
 		partType:     make(map[string]string),
 		pendingPerms: make(map[string]PermissionRequestInfo),
+		clock:        newActivityClock(),
 	}
 	m.runtimes[key] = rt
 	m.mu.Unlock()
@@ -624,6 +625,9 @@ func opencodeSleepAbort(ctx context.Context, d time.Duration) bool {
 // carries the accumulated text (fed as the suffix not yet streamed), which
 // also reveals the part type (text vs reasoning).
 func (m *OpenCodeRuntimeManager) handleSSEEvent(rt *opencodeRuntime, ev opencodeSSEEvent) {
+	// Any event from the provider is a liveness signal for the turn watchdog,
+	// even categories the console filters out below.
+	rt.clock.touch()
 	if rt.stream == nil {
 		return
 	}
@@ -740,20 +744,26 @@ func (m *OpenCodeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onS
 		m.finishTurn(rt, sessionID, err)
 		return m.execResult(rt, "", sessionID), err
 	}
-	budget := opencodeDiscipline{}.turnBudget()
+	// Turn governance is activity-based: the watchdog cancels the turn only
+	// when the provider event stream goes silent (stall) or the turn exceeds
+	// its ceiling. spec.TurnTimeout, when set, acts as a per-node total cap;
+	// otherwise the global default ceiling applies. A legitimately busy turn
+	// can run for hours without being killed.
+	total := turnMaxDurationDefault
 	if spec.TurnTimeout > 0 {
-		budget = spec.TurnTimeout
+		total = spec.TurnTimeout
 	}
-	turnCtx, cancel := context.WithTimeout(ctx, budget)
-	defer cancel()
+	turnCtx, cancelTurn, wd := watchTurnActivity(ctx, rt.clock, turnIdleTimeoutDefault, total)
+	defer cancelTurn()
 	turnStart := time.Now()
 	discipline := opencodeDiscipline{}
 	denyTools := discipline.denyTools(spec)
 	text, promptErr := client.Prompt(turnCtx, sessionID, spec.ModelRef, discipline.system(spec.ToolsReadOnly), spec.Prompt, denyTools)
-	// Only a budget expiry (not a transport/API error) is recoverable: the
-	// model may have streamed a usable partial document before the deadline.
-	// Any other failure aborts nothing and surfaces as-is.
-	if promptErr != nil && ctx.Err() == nil && errors.Is(turnCtx.Err(), context.DeadlineExceeded) {
+	// Only a watchdog expiry (stall or ceiling), not a transport/API error
+	// and not the parent schedule dying, is recoverable: the model may have
+	// streamed a usable partial document before the turn was cut. Any other
+	// failure aborts nothing and surfaces as-is.
+	if promptErr != nil && ctx.Err() == nil && wd.fired.Load() {
 		// Abort so the runtime is left usable and the pipeline fails fast
 		// instead of stalling on the wedged turn.
 		abortCtx, abortCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -1031,9 +1041,6 @@ func executeOpencodeRun(ctx context.Context, spec ExecSpec, onLine func(line str
 // against the runaway "explore forever" loop that previously stalled
 // orchestrator pipelines until the HTTP client timed out (10 minutes).
 type opencodeDiscipline struct{}
-
-// turnBudget is the hard per-turn deadline before the turn is aborted.
-func (opencodeDiscipline) turnBudget() time.Duration { return 300 * time.Second }
 
 // denyTools returns the serve-API tools map for the given spec: nil keeps the
 // server default; a named deny list keeps read-only exploration while blocking

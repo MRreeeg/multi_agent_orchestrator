@@ -31,8 +31,12 @@ func TestOpenCodeDisciplineDenyTools(t *testing.T) {
 }
 
 func TestOpenCodeDisciplineTurnBudgetOverride(t *testing.T) {
-	d := opencodeDiscipline{}
-	if got := d.turnBudget(); got != 5*time.Minute {
-		t.Fatalf("default turn budget = %v, want 5m", got)
+	// The old fixed 5m budget is gone; the default now comes from the
+	// activity-watchdog package knobs.
+	if got := turnIdleTimeoutDefault; got != 5*time.Minute {
+		t.Fatalf("default idle timeout = %v, want 5m", got)
+	}
+	if got := turnMaxDurationDefault; got != 2*time.Hour {
+		t.Fatalf("default max duration = %v, want 2h", got)
 	}
 }

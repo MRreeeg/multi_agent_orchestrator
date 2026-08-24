@@ -14,13 +14,16 @@ import (
 
 const (
 	// A provider/tool call must not be able to leave a pipeline node in running
-	// forever. These defaults are deliberately generous for coding tasks while
-	// still making a hung serve/runtime recoverable through Resume.
-	loopNodeExecutionTimeout = 10 * time.Minute
-	// Review is a single bounded judgment. A runaway reviewer must become a
-	// resumable interruption instead of consuming the whole iteration budget.
-	loopReviewerExecutionTimeout  = 3 * time.Minute
-	loopIterationExecutionTimeout = 30 * time.Minute
+	// forever. These values are pure backstops against scheduler-level bugs:
+	// the per-turn activity watchdog (watchdog.go) already cuts stalled turns
+	// after the idle silence window, so these caps only matter if execution
+	// never returns at all. Long-horizon coding tasks legitimately run for
+	// hours — do not lower these back under the turn ceilings.
+	loopNodeExecutionTimeout = 4 * time.Hour
+	// Review is a single bounded judgment; the watchdog still catches stalls
+	// within it via the 30m per-role TurnTimeout ceiling.
+	loopReviewerExecutionTimeout  = 45 * time.Minute
+	loopIterationExecutionTimeout = 12 * time.Hour
 )
 
 // loopStart defines where the loop begins. Used for both fresh starts and resume.

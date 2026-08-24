@@ -61,6 +61,7 @@ type codexRuntime struct {
 	mu       sync.Mutex
 	client   *codexclient.AppServerClient
 	threadID string
+	clock    *activityClock
 	turnID   string
 	status   RuntimeStatus
 	output   string
@@ -300,6 +301,7 @@ func (m *CodexRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart
 		LastUsedAt:    time.Now(),
 		done:          make(chan struct{}),
 		status:        RuntimeStarting,
+		clock:         newActivityClock(),
 	}
 	m.runtimes[key] = rt
 	m.mu.Unlock()
@@ -428,6 +430,8 @@ func (m *CodexRuntimeManager) watchRuntime(key string, rt *codexRuntime) {
 }
 
 func (m *CodexRuntimeManager) recordEvent(rt *codexRuntime, event codexclient.AppServerEvent) {
+	// Any app-server event is a liveness signal for the turn watchdog.
+	rt.clock.touch()
 	// Stream the tiny token deltas into a consolidated block so the console
 	// shows one readable entry per message instead of one row per fragment.
 	if rt.stream != nil {
@@ -514,7 +518,27 @@ func (m *CodexRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onStar
 	rt.threadID = threadID
 	rt.turnID = turnID
 	rt.mu.Unlock()
-	text, err := client.WaitTurn(ctx, turnID)
+	// Turn governance is activity-based: a legitimately streaming turn can
+	// run for hours; only silence (stall) or the ceiling cuts it. A watchdog
+	// cut surfaces as ErrTurnIdleTimeout/ErrTurnMaxDuration — deliberately
+	// NOT a context error, so loop.go keeps the retained runtime alive.
+	total := turnMaxDurationDefault
+	if spec.TurnTimeout > 0 {
+		total = spec.TurnTimeout
+	}
+	turnCtx, cancelTurn, wd := watchTurnActivity(ctx, rt.clock, turnIdleTimeoutDefault, total)
+	defer cancelTurn()
+	text, err := client.WaitTurn(turnCtx, turnID)
+	if err != nil && ctx.Err() == nil {
+		if stall := wd.Err(); stall != nil {
+			// Abort the server-side turn so the provider stops working into a
+			// cancelled wait; the retained Thread stays usable.
+			abortCtx, abortCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer abortCancel()
+			_ = client.InterruptTurn(abortCtx, threadID, turnID)
+			err = fmt.Errorf("%w (turn %s)", stall, turnID)
+		}
+	}
 	if err == nil && strings.TrimSpace(text) == "" {
 		err = fmt.Errorf("codex app-server turn completed without assistant output")
 	}

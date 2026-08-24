@@ -79,8 +79,10 @@ type ExecSpec struct {
 	// task/web/*). Used when the node must inspect the codebase before
 	// producing its deliverable, without the risk of a runaway tool loop.
 	ToolsReadOnly bool
-	// TurnTimeout is the hard per-turn budget for the opencode serve turn.
-	// Zero uses the runtime default (5 minutes).
+	// TurnTimeout is an optional total-duration ceiling for one provider
+	// turn, applied on top of the activity watchdog (which renews on every
+	// stream event and only fires when the turn goes silent). Zero means no
+	// per-role ceiling: the global default ceiling (watchdog.go) governs.
 	TurnTimeout time.Duration
 	// DshPreset names a locally authored DSH agent preset for dsh executor
 	// nodes (mirrors AgentNode.DshPreset).

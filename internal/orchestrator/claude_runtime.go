@@ -44,6 +44,7 @@ type claudeRuntime struct {
 	sessionID string
 	turnID    string
 	status    RuntimeStatus
+	clock     *activityClock
 	output    string
 	lastErr   string
 	events    []RuntimeConsoleEvent
@@ -283,6 +284,7 @@ func (m *ClaudeRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStar
 		LastUsedAt:    time.Now(),
 		done:          make(chan struct{}),
 		status:        RuntimeStarting,
+		clock:         newActivityClock(),
 	}
 	m.runtimes[key] = rt
 	m.mu.Unlock()
@@ -456,6 +458,8 @@ func (m *ClaudeRuntimeManager) watchRuntime(key string, rt *claudeRuntime) {
 }
 
 func (m *ClaudeRuntimeManager) recordEvent(rt *claudeRuntime, event claudeclient.Event) {
+	// Any SDK stream event is a liveness signal for the turn watchdog.
+	rt.clock.touch()
 	// Agent SDK stream deltas (text/thinking) are coalesced into one readable
 	// console block per session; everything else is a flush boundary.
 	if rt.stream != nil {
@@ -526,7 +530,22 @@ func (m *ClaudeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onSta
 		m.finishTurn(rt, sessionID, err)
 		return m.execResult(rt, "", sessionID), err
 	}
-	result, promptErr := client.Prompt(ctx, spec.Prompt)
+	// Turn governance is activity-based; a watchdog cut surfaces as
+	// ErrTurnIdleTimeout/ErrTurnMaxDuration (not a context error) so the
+	// retained SDK session stays registered for resume/manual inspection.
+	total := turnMaxDurationDefault
+	if spec.TurnTimeout > 0 {
+		total = spec.TurnTimeout
+	}
+	turnCtx, cancelTurn, wd := watchTurnActivity(ctx, rt.clock, turnIdleTimeoutDefault, total)
+	defer cancelTurn()
+	result, promptErr := client.Prompt(turnCtx, spec.Prompt)
+	if promptErr != nil && ctx.Err() == nil && wd.fired.Load() {
+		// Interrupt the server-side turn so the provider stops working into a
+		// cancelled wait; the control-protocol interrupt keeps the session.
+		_ = client.Interrupt()
+		promptErr = wd.Err()
+	}
 	// The first user message triggers the CLI's init event; capture the
 	// session id that arrives with it.
 	if sessionID == "" {

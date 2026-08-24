@@ -3280,19 +3280,20 @@ func (s *Store) executeNodeWithLoopProtocolAtWorkspace(ctx context.Context, node
 		// Per-role serve-mode tuning: the architect gets read-only tools so
 		// it can inspect the codebase without a write/execute exploration
 		// loop; the executor reads the codebase and writes the real
-		// deliverable, so it gets the longest budget. A budget timeout still
-		// recovers partial output from session history (see
-		// OpenCodeRuntimeManager.Execute). For dsh the read-only flag maps to
-		// DSH_PERMISSION_MODE=read-only (hard sandbox); TurnTimeout is not
-		// consumed by the one-shot headless runner.
+		// deliverable, so it historically got the longest budget. These
+		// TurnTimeout values are total-duration ceilings on top of the
+		// activity watchdog (watchdog.go), which already renews on every
+		// provider event and only fires when the stream goes silent — so a
+		// legitimately streaming turn is never cut mid-work. 0 = no per-role
+		// ceiling; the global turnMaxDurationDefault governs instead.
 		switch node.Type {
 		case NodeArchitect:
 			spec.ToolsReadOnly = true
-			spec.TurnTimeout = 5 * time.Minute
+			spec.TurnTimeout = 30 * time.Minute
 		case NodeReviewer:
-			spec.TurnTimeout = 5 * time.Minute
+			spec.TurnTimeout = 30 * time.Minute
 		case NodeExecutor:
-			spec.TurnTimeout = 15 * time.Minute
+			spec.TurnTimeout = 0
 		}
 	}
 	// Select executor.

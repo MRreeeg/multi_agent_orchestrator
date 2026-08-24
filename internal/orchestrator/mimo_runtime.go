@@ -39,6 +39,7 @@ type mimoRuntime struct {
 
 	mu        sync.Mutex
 	client    *mimoclient.AcpClient
+	clock     *activityClock
 	sessionID string
 	turnID    string
 	status    RuntimeStatus
@@ -300,6 +301,7 @@ func (m *MimoRuntimeManager) ensure(ctx context.Context, spec ExecSpec, onStart 
 		LastUsedAt:   time.Now(),
 		done:         make(chan struct{}),
 		status:       RuntimeStarting,
+		clock:        newActivityClock(),
 	}
 	m.runtimes[key] = rt
 	m.mu.Unlock()
@@ -442,6 +444,8 @@ func (m *MimoRuntimeManager) watchRuntime(key string, rt *mimoRuntime) {
 }
 
 func (m *MimoRuntimeManager) recordEvent(rt *mimoRuntime, event mimoclient.AcpEvent) {
+	// Any ACP event is a liveness signal for the turn watchdog.
+	rt.clock.touch()
 	// ACP streams reasoning/assistant text as tiny agent_*_chunk updates.
 	// Coalesce them into one readable console block per message; everything
 	// else (tool calls, part completion, usage) is a flush boundary.
@@ -495,7 +499,23 @@ func (m *MimoRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onStart
 		m.finishTurn(rt, sessionID, err)
 		return m.execResult(rt, "", sessionID), err
 	}
-	result, promptErr := client.Prompt(ctx, sessionID, spec.Prompt)
+	// Turn governance is activity-based; a watchdog cut surfaces as
+	// ErrTurnIdleTimeout/ErrTurnMaxDuration (not a context error) so the
+	// retained ACP session stays registered for resume/manual inspection.
+	total := turnMaxDurationDefault
+	if spec.TurnTimeout > 0 {
+		total = spec.TurnTimeout
+	}
+	turnCtx, cancelTurn, wd := watchTurnActivity(ctx, rt.clock, turnIdleTimeoutDefault, total)
+	defer cancelTurn()
+	result, promptErr := client.Prompt(turnCtx, sessionID, spec.Prompt)
+	if promptErr != nil && ctx.Err() == nil && wd.fired.Load() {
+		// Cancel the server-side turn so the provider stops working into a
+		// cancelled wait; session/cancel keeps the session itself. Cancel is
+		// a plain stdin write (no ctx seam) and must not block the pipeline.
+		_ = client.Cancel(sessionID)
+		promptErr = wd.Err()
+	}
 	rt.mu.Lock()
 	if result != nil {
 		rt.output = result.Text
