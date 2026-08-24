@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 
 	"reasonix/internal/proc"
 )
@@ -131,8 +133,42 @@ func isExecutableCandidate(path string) bool {
 	return header[0] == 'M' && header[1] == 'Z'
 }
 
+// maxStepsProbes caches the per-binary result of the --max-steps support
+// probe. opencode v1.x removed the flag; passing it to a newer CLI makes
+// yargs print the run help text and exit non-zero, which surfaced as node
+// attempts "failing" with the whole help message as the error text.
+var (
+	maxStepsMu     sync.Mutex
+	maxStepsProbes = map[string]bool{}
+)
+
+// SupportsMaxSteps reports whether the opencode binary at bin still accepts
+// --max-steps (`opencode run --help` lists it). Probed once per binary path
+// and cached for the process lifetime; on probe failure (CLI missing, help
+// unavailable) the flag is treated as unsupported — losing the tool-round
+// bound is recoverable via the caller's turn timeout, whereas passing an
+// unknown flag fails every single call.
+func SupportsMaxSteps(bin string) bool {
+	maxStepsMu.Lock()
+	defer maxStepsMu.Unlock()
+	if supported, ok := maxStepsProbes[bin]; ok {
+		return supported
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "run", "--help")
+	proc.HideWindow(cmd)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	supported := cmd.Run() == nil && strings.Contains(out.String(), "--max-steps")
+	maxStepsProbes[bin] = supported
+	return supported
+}
+
 // Execute runs one `opencode run` call and parses the JSON event stream.
 func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string) (*ExecutorResult, error) {
+	bin := e.opencodeBin()
 	args := []string{"run"}
 	if opts.ResumeSessionID != "" {
 		args = append(args, "--session", opts.ResumeSessionID)
@@ -140,7 +176,7 @@ func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string)
 	if opts.Model != "" {
 		args = append(args, "-m", opts.Model)
 	}
-	if opts.MaxSteps > 0 {
+	if opts.MaxSteps > 0 && SupportsMaxSteps(bin) {
 		args = append(args, "--max-steps", fmt.Sprint(opts.MaxSteps))
 	}
 	if opts.AutoApprove {
@@ -151,7 +187,6 @@ func (e *Executor) Execute(ctx context.Context, opts ExecOptions, prompt string)
 	}
 	args = append(args, "--format", "json", prompt)
 
-	bin := e.opencodeBin()
 	cmd := exec.CommandContext(ctx, bin, args...)
 	// One-shot opencode run must not flash a console window on Windows.
 	proc.HideWindow(cmd)

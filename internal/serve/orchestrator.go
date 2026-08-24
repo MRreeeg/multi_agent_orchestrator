@@ -862,23 +862,93 @@ Run ID: %s
 	h.emitAnalyzeProgress("done", int(time.Since(start).Seconds()), 1, "")
 
 	var result map[string]any
-	scanner := bufio.NewScanner(strings.NewReader(stdout))
-	var lastJSON string
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "{") && json.Valid([]byte(line)) {
-			lastJSON = line
+	payload, ok := extractLastJSONObject(stdout)
+	if !ok {
+		head := stdout
+		if len(head) > 800 {
+			head = head[:800]
 		}
-	}
-	if lastJSON == "" {
+		slog.Error("analyzeRunProgress: no JSON object in analysis output", "run", id, "output_len", len(stdout), "output_head", head)
 		writeErr(w, "analysis produced no JSON", http.StatusInternalServerError)
 		return
 	}
-	if err := json.Unmarshal([]byte(lastJSON), &result); err != nil {
+	if err := json.Unmarshal(payload, &result); err != nil {
 		writeErr(w, "analysis JSON invalid: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, result)
+}
+
+// extractLastJSONObject pulls the last parseable JSON object out of an LLM
+// answer. The analysis prompt asks for a bare single-line JSON object, but
+// models — especially under a chatty agent persona or a long task document —
+// sometimes wrap it in markdown fences, pretty-print it over multiple lines,
+// or prepend explanation text. The old line-based scan ("one whole line that
+// starts with { and is valid JSON") rejected all of those shapes and turned a
+// perfectly good analysis into "analysis produced no JSON". The scan is
+// string-aware so braces inside quoted text do not break the balance count.
+func extractLastJSONObject(s string) ([]byte, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, false
+	}
+	if strings.HasPrefix(s, "{") && json.Valid([]byte(s)) {
+		return []byte(s), true
+	}
+	// Drop markdown code fences; keep the content between them.
+	if strings.Contains(s, "```") {
+		var kept []string
+		for _, line := range strings.Split(s, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "```") {
+				continue
+			}
+			kept = append(kept, line)
+		}
+		s = strings.TrimSpace(strings.Join(kept, "\n"))
+		if strings.HasPrefix(s, "{") && json.Valid([]byte(s)) {
+			return []byte(s), true
+		}
+	}
+	// Scan for balanced {...} regions and keep the last valid one.
+	var found []byte
+	start, depth, inStr, esc := -1, 0, false, false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inStr {
+			switch {
+			case esc:
+				esc = false
+			case c == '\\':
+				esc = true
+			case c == '"':
+				inStr = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inStr = true
+		case '{':
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+				if depth == 0 && start >= 0 {
+					if cand := []byte(s[start : i+1]); json.Valid(cand) {
+						found = cand
+					}
+					start = -1
+				}
+			}
+		}
+	}
+	if found != nil {
+		return found, true
+	}
+	return nil, false
 }
 
 func (h *orchestratorHandler) listAgents(w http.ResponseWriter, _ *http.Request) {
