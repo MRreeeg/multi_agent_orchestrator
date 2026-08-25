@@ -247,6 +247,7 @@ input,textarea,select{font:inherit;color:inherit}
 .hero__input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 8px 24px -8px oklch(0% 0 0/.2)}
 .hero__input::placeholder{color:var(--muted-2)}
 .hero__attach-btn{position:absolute;right:58px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:1px solid var(--border);border-radius:10px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.hero__mode{position:absolute;right:96px;top:50%;transform:translateY(-50%);height:34px;border:1px solid var(--border);border-radius:10px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:11.5px;line-height:1;padding:0 4px;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center}
 .hero__attach-btn:hover{background:var(--bg-3, var(--bg))}
 .hero__send{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:none;border-radius:12px;background:var(--accent-strong);color:oklch(99% 0 0);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.16,1,.3,1),background .18s,box-shadow .2s}
 .hero__send:hover{transform:translateY(-50%) scale(1.05)}
@@ -627,6 +628,11 @@ input,textarea,select{font:inherit;color:inherit}
               <div class="hero__attachments" id="hero-attachments" style="display:none"></div>
               <textarea class="hero__input" id="hero-input" rows="2" placeholder="描述你的任务，例如：实现端口范围解析函数并补测试"></textarea>
               <button class="hero__attach-btn" id="hero-attach-btn" title="添加图片">＋</button>
+              <select class="hero__mode" id="hero-mode" title="选择发送模式：编排=生成/修改流水线；问情况=向管家提问当前运行（支持附图）；闲聊=纯对话不改流水线">
+                <option value="requirement">编排</option>
+                <option value="ask">问情况</option>
+                <option value="chat">闲聊</option>
+              </select>
               <button class="hero__send" id="hero-send" title="生成编排"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="flex-shrink:0"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></button>
             </div>
             <div class="hero__chips">
@@ -3577,7 +3583,7 @@ function addChatMessage(role, text, meta, persist = true, images) {
   `;
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
-  if (!persist) return;
+  if (!persist) return div;
   state.chatMessages.push({ role, text, meta, images: images || [] });
   // Categorize: requirement messages vs pipeline logs
   const isPipelineLog = meta === '流水线' || meta === '工具' || meta === '工具结果' || meta === '通知';
@@ -3586,6 +3592,7 @@ function addChatMessage(role, text, meta, persist = true, images) {
   } else {
     state.pipelineMessages.push({ role, text, meta, images: images || [] });
   }
+  return div;
 }
 
 // updateAnalyzingProgress live-updates the "分析中" placeholder message with
@@ -3833,6 +3840,19 @@ async function sendChat() {
   // 用户消息持久化（含本次图片）
   addChatMessage('user', text, '', true, pendingImages);
 
+  // 发送模式分流：问情况 → 运行分析（回答进主聊天）；编排/闲聊 → 需求分析。
+  const chatMode = (heroModeEl && heroModeEl.value) || 'requirement';
+  if (chatMode === 'ask') {
+    try {
+      await askRunStatusInChat(text, allImages, () => $('#chat-executor').value || '', () => $('#chat-model').value || '', () => $('#chat-agent').value || '');
+    } catch (err) {
+      addChatMessage('ai', '提问失败: ' + (err.message || err), '错误');
+    } finally {
+      restoreSend();
+    }
+    return;
+  }
+
   // Ensure we have an orchestration session
   if (!state.sessionID) {
     try {
@@ -3870,12 +3890,13 @@ async function sendChat() {
   }
 
   try {
-    addChatMessage('ai', '⏳ 正在分析需求...', '分析中');
+    addChatMessage('ai', chatMode === 'chat' ? '⏳ 思考中...' : '⏳ 正在分析需求...', '分析中');
     const analysis = await apiPost('/requirements/analyze', {
       text,
       history,
       pipelineInfo,
       lang: currentLang || 'zh',
+      mode: chatMode === 'chat' ? 'chat' : 'requirement',
       executor: $('#chat-executor').value || '',
       model: $('#chat-model').value || '',
       agent: $('#chat-agent').value || '',
@@ -3897,11 +3918,15 @@ async function sendChat() {
 
     // 显示分析结果
     if (generated.analysis) {
-      addChatMessage('ai', '📋 **需求分析**\n\n' + generated.analysis, 'Flash');
+      if (chatMode === 'chat') {
+        // 闲聊模式：analysis 即对话正文，原样展示；不显示需求分析/改写头。
+        addChatMessage('ai', generated.analysis, 'Flash');
+      } else {
+        addChatMessage('ai', '📋 **需求分析**\n\n' + generated.analysis, 'Flash');
+      }
     }
-
     // 保存改写后的需求（供确认弹窗使用）
-    if (generated.rewritten) {
+    if (generated.rewritten && chatMode !== 'chat') {
       state.rewrittenTask = generated.rewritten;
       addChatMessage('ai', '📝 **需求已改写**\n\n' + generated.rewritten, 'Flash');
     }
@@ -4013,6 +4038,39 @@ async function sendChat() {
   restoreSend();
 }
 
+// 「问情况」模式：把用户自由提问（可带附图）发给当前/最近一次运行的分析
+// 接口，回答渲染到主聊天流。看板「分析进展」按钮保持原有默认问题不变。
+async function askRunStatusInChat(text, images, getExecutor, getModel, getAgent) {
+  const runID = runDash.runID || state.runId;
+  if (!runID) {
+    toast('没有正在运行或最近的任务；请切回「编排」模式描述你的任务', 'error');
+    addChatMessage('ai', '当前没有可提问的运行记录。要开始一个任务，请把模式切回 **编排** 再发送需求。', '提示');
+    return;
+  }
+  const msgEl = addChatMessage('ai', '⏳ 正在查看运行情况...', '分析中');
+  const res = await apiPost('/runs/' + encodeURIComponent(runID) + '/analysis', {
+    question: text,
+    executor: (getExecutor && getExecutor()) || '',
+    model: (getModel && getModel()) || '',
+    agent: (getAgent && getAgent()) || '',
+    images: images || []
+  });
+  // 组装 Markdown 回答：优先 answer（对用户问题的直接回答），再补充进展概要。
+  let md = '';
+  if (res && res.answer) md += res.answer + '\n\n';
+  if (res && res.summary) md += '**进展**：' + res.summary + '\n\n';
+  if (res && res.progress && res.progress !== res.answer) md += res.progress + '\n\n';
+  if (res && Array.isArray(res.blocking) && res.blocking.length) {
+    md += '**卡点**\n' + res.blocking.map(b => '- ⛔ ' + b).join('\n') + '\n\n';
+  }
+  if (res && Array.isArray(res.suggestions) && res.suggestions.length) {
+    md += '**建议**\n' + res.suggestions.map(s => '- 💡 ' + s).join('\n');
+  }
+  const finalMd = md.trim() || '（分析完成，但没有返回内容）';
+  if (msgEl && msgEl.remove) msgEl.remove();
+  addChatMessage('ai', finalMd, 'Flash');
+}
+
 // 拓扑布局：计算每个节点的层级，同层垂直排列，不同层水平排列
 function layoutPipeline() {
   if (state.nodes.length === 0) return;
@@ -4087,6 +4145,16 @@ const heroSend = $('#hero-send');
 if (heroSend) heroSend.addEventListener('click', sendChat);
 const heroInputEl = $('#hero-input');
 if (heroInputEl) heroInputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+// 发送模式（编排/问情况/闲聊）：placeholder 随模式切换，模式选择由 <select> 自身记忆。
+const heroModeEl = $('#hero-mode');
+const heroModePlaceholders = {
+  requirement: '描述你的任务，例如：实现端口范围解析函数并补测试',
+  ask: '问当前运行的情况，例如：第2轮为什么判 revise？（可贴报错图）',
+  chat: '和管家随便聊聊，不会改动流水线',
+};
+if (heroModeEl) heroModeEl.addEventListener('change', () => {
+  if (heroInputEl && heroModePlaceholders[heroModeEl.value]) heroInputEl.placeholder = heroModePlaceholders[heroModeEl.value];
+});
 $$('.hero__chip').forEach(chip => chip.addEventListener('click', () => {
   const h = $('#hero-input');
   if (!h) return;

@@ -780,6 +780,11 @@ func (h *orchestratorHandler) analyzeRunProgress(w http.ResponseWriter, r *http.
 		Executor string `json:"executor"`
 		Model    string `json:"model"`
 		Agent    string `json:"agent"`
+		Question string `json:"question"` // 用户自定义提问（"问情况"模式）；空 = 默认进展分析
+		Images   []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"images"` // 附图（如报错截图），经视觉转述注入提示词
 	}
 	json.NewDecoder(r.Body).Decode(&body) // optional; empty body keeps defaults
 	attempts := h.store.ListAttempts(id)
@@ -817,6 +822,27 @@ func (h *orchestratorHandler) analyzeRunProgress(w http.ResponseWriter, r *http.
 		reviewText = fmt.Sprintf("decision=%s confidence=%v summary=%s", rv.Decision, rv.Confidence, rv.Summary)
 	}
 
+	questionText := ""
+	if strings.TrimSpace(body.Question) != "" {
+		questionText = "\n用户特别关心的问题: " + strings.TrimSpace(body.Question) + "\n（请在 answer 字段直接回答该问题，并结合上述运行信息给出依据）"
+	}
+	// 附图：与需求分析同构——注入附件绝对路径清单供有视觉的模型 read 直读。
+	imageText := ""
+	if len(body.Images) > 0 {
+		var paths []string
+		for _, img := range body.Images {
+			if !validImageID(img.ID) {
+				continue
+			}
+			if matches, err := filepath.Glob(filepath.Join(imageAttachmentDir(), img.ID+".*")); err == nil && len(matches) > 0 {
+				paths = append(paths, matches[0])
+			}
+		}
+		if len(paths) > 0 {
+			imageText = "\n用户附图（本机绝对路径，可用 read 工具读取）:\n" + strings.Join(paths, "\n")
+		}
+	}
+
 	prompt := fmt.Sprintf(`你是多Agent编排控制台的运行状态分析助手。以下是当前 Loop 运行的信息，请用中文分析执行进展，并给出卡点与下一步建议。
 
 Run ID: %s
@@ -827,10 +853,11 @@ Run ID: %s
 
 节点执行情况:
 %s
-
+%s
+%s
 请只输出一个 JSON 对象（不要 Markdown 代码围栏、不要解释），字段：
-{"summary":"一句话进展","progress":"较详细的进展描述","blocking":["卡点1","卡点2"],"suggestions":["建议1","建议2"]}
-若没有卡点，blocking 给空数组。`, id, run.Task, run.Status, iterText, reviewText, strings.Join(nodesText, "\n"))
+{"summary":"一句话进展","progress":"较详细的进展描述","blocking":["卡点1","卡点2"],"suggestions":["建议1","建议2"],"answer":"对用户问题的直接回答（仅当提供了用户问题时填写）"}
+若没有卡点，blocking 给空数组。`, id, run.Task, run.Status, iterText, reviewText, strings.Join(nodesText, "\n"), questionText, imageText)
 
 	bin := "reasonix"
 	workDir := "."
@@ -1589,6 +1616,7 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 		Executor     string `json:"executor"`
 		Model        string `json:"model"`
 		Agent        string `json:"agent"`
+		Mode         string `json:"mode"` // "requirement"(默认) | "chat"（纯对话，禁生成流水线）
 		Images       []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
@@ -1623,7 +1651,7 @@ func (h *orchestratorHandler) analyzeRequirement(w http.ResponseWriter, r *http.
 	if lang != "en" {
 		lang = "zh"
 	}
-	prompt := buildAnalysisPrompt(lang, skillCatalog, h.analysisCapabilitySummary(), historyText)
+	prompt := buildAnalysisPrompt(lang, skillCatalog, h.analysisCapabilitySummary(), historyText, body.Mode)
 
 	bin := "reasonix"
 	workDir := "."
@@ -1816,12 +1844,15 @@ func (h *orchestratorHandler) analysisCapabilitySummary() string {
 // UI language. The model must reply in that language; casual/greeting messages
 // are handled conversationally (no fabricated requirements), like a concierge
 // would: ask follow-up questions step by step and keep it friendly.
-func buildAnalysisPrompt(lang, skillCatalog, capability, historyText string) string {
+//
+// mode: "requirement"（默认，生成流水线 JSON）| "chat"（纯对话模式：禁止生成
+// steps，analysis 即对话正文；仍输出同构 JSON 以复用现有解析器）。
+func buildAnalysisPrompt(lang, skillCatalog, capability, historyText, mode string) string {
 	jsonSpec := `{
   "analysis": "one-line summary of the user's request",
   "rewritten": "structured requirement document (background, goals, constraints, acceptance criteria)",
   "steps": [
-    {"id": "s1", "step": "step description", "agent": "architect/executor/reviewer", "model": "model name", "executor": "reasonix or mimo", "mode": "serve or run", "skill": "optional skill name, empty if none", "roleDesc": "detailed duty of this agent, including input/output format"}
+    {"id": "s1", "step": "step description", "agent": "architect/executor/reviewer", "model": "model name", "executor": "pick the best executor from the capability list below for this task", "mode": "serve or run", "skill": "optional skill name, empty if none", "roleDesc": "detailed duty of this agent, including input/output format"}
   ],
   "edges": [
     {"from": "s1", "to": "s2"},
@@ -1839,6 +1870,28 @@ func buildAnalysisPrompt(lang, skillCatalog, capability, historyText string) str
     "protocol": "loop-review-v1"
   }
 }`
+	if mode == "chat" {
+		// 纯对话模式：不生成流水线。仍要求 JSON（steps 恒为空数组），
+		// 前端解析器按"含 analysis 键的 JSON"取正文，零改动复用。
+		if lang == "en" {
+			return `You are the orchestration console's chat companion. The user selected CHAT mode: reply conversationally.
+Rules:
+1. Use the conversation history for context; answer questions, explain concepts, give opinions, chat casually.
+2. You may reference the currently configured pipeline if relevant, but NEVER generate steps or a pipeline.
+3. Output strictly this JSON (no markdown fences): {"analysis":"<your full conversational reply>","rewritten":"","steps":[],"edges":[],"suggestion":"","loopConfig":{"enabled":false,"mode":"review_decides","maxIterations":3,"fixedIterations":0,"reviewNodeID":"","protocol":"loop-review-v1"}}
+
+Conversation history:
+` + historyText
+		}
+		return `你是多Agent编排控制台的聊天管家。用户选择了【闲聊】模式：请像朋友一样对话。
+规则：
+1. 结合对话历史回答问题、解释概念、给出看法、自然闲聊。
+2. 可以谈论当前已配置的流水线和 Loop 运行情况，但绝对不要生成任何步骤或流水线方案。
+3. 严格输出以下JSON（不要 markdown 代码块）：{"analysis":"<你的完整对话回复>","rewritten":"","steps":[],"edges":[],"suggestion":"","loopConfig":{"enabled":false,"mode":"review_decides","maxIterations":3,"fixedIterations":0,"reviewNodeID":"","protocol":"loop-review-v1"}}
+
+完整对话历史：
+` + historyText
+	}
 	// Shared rules expressed in the UI language; the JSON schema stays fixed.
 	if lang == "en" {
 		return `You are the orchestration console's conversational requirement analyst (a concierge, not a robot).
@@ -1858,13 +1911,14 @@ Full conversation history:
 Output strictly the JSON below (no markdown fences, raw JSON only):
 ` + jsonSpec + `
 
-Model selection (cost-first):
-- architect: deepseek-pro (only when strong reasoning is required)
-- executor: xiaomi/mimo-v2.5 (best value) or deepseek-flash (light tasks)
-- reviewer: deepseek-flash (cheapest, enough for review)
-- Never default everything to pro.
-
-Executor mapping: deepseek models -> executor "reasonix"; xiaomi models -> executor "mimo".
+Executor & model selection (pick per task traits, from the capability list above — never default to one executor):
+- heavy reasoning / architecture: deepseek-pro (executor reasonix)
+- heavy hands-on coding, repo-wide refactors: codex or claude executors
+- general implementation, docs, scripts: xiaomi/mimo-v2.5 (executor mimo) or deepseek-flash (reasonix)
+- vision needed (reading screenshots/images): an opencode/mimo-v2.5 vision model or opencode executor
+- lightweight review: deepseek-flash (reasonix)
+- a locally customized agent persona is required: dsh executor (+ agent preset id)
+Cost-first: avoid pro for everything; match the cheapest executor that fits the task traits.
 
 Mode: prefer "serve"; use "run" only for one-shot stateless tasks.
 
@@ -1912,13 +1966,14 @@ IMPORTANT LANGUAGE RULE: every piece of output text — analysis, rewritten, sug
 请严格输出以下JSON格式（不要加markdown代码块标记，直接输出JSON）：
 ` + jsonSpec + `
 
-模型选择原则（成本优先）：
-- 架构师：deepseek-pro（需要强推理时才用）
-- 执行者：xiaomi/mimo-v2.5（性价比最高）或 deepseek-flash（轻量任务）
-- 审查者：deepseek-flash（最便宜，审查足够）
-- 不要默认全用 pro
-
-执行器映射：deepseek 模型 → executor "reasonix"；xiaomi 模型 → executor "mimo"。
+执行器与模型选型（按任务特征从上方系统能力清单中选择，禁止所有步骤固定同一个执行器）：
+- 复杂推理/架构设计：deepseek-pro（executor reasonix）
+- 重度编码、大范围重构：codex 或 claude 执行器
+- 一般实现、文档、脚本：xiaomi/mimo-v2.5（executor mimo）或 deepseek-flash（reasonix）
+- 需要视觉（读截图/图片）：opencode/mimo-v2.5 视觉模型或 opencode 执行器
+- 轻量审查：deepseek-flash（reasonix）
+- 需要本地客制化 agent 人设：dsh 执行器（配 agent 预设 id）
+成本优先：不要全用 pro；为每一步匹配满足任务特征的最低成本执行器。
 
 运行模式：默认优先 serve；只有一次性、无状态任务才用 run。
 
