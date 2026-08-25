@@ -2525,7 +2525,25 @@ func (h *orchestratorHandler) listOrchIterations(w http.ResponseWriter, _ *http.
 	if iterations == nil {
 		iterations = []orchestrator.LoopIteration{}
 	}
-	writeJSON(w, iterations)
+	// Loop 分轮视图：按 IterationID 归组返回每轮的节点执行尝试，
+	// 前端一次请求即可渲染"第 N 轮 → 该轮审查结论 + 各 Agent 执行情况"，
+	// 避免 N+1 查询。无 Loop 的 run 返回空数组。
+	attempts := h.store.ListAttempts(runID)
+	type iterationWithAttempts struct {
+		orchestrator.LoopIteration
+		Attempts []orchestrator.NodeAttempt `json:"attempts,omitempty"`
+	}
+	out := make([]iterationWithAttempts, 0, len(iterations))
+	for _, iter := range iterations {
+		item := iterationWithAttempts{LoopIteration: iter, Attempts: []orchestrator.NodeAttempt{}}
+		for _, a := range attempts {
+			if a.IterationID == iter.ID {
+				item.Attempts = append(item.Attempts, a)
+			}
+		}
+		out = append(out, item)
+	}
+	writeJSON(w, out)
 }
 
 // validImageRefs 过滤掉非法附件 id（glob 元字符/路径穿越不得进入文件解析），

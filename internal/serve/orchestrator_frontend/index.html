@@ -1416,6 +1416,9 @@ const state = {
   stats: null,
   runs: [],
   runIterations: {},
+  // 用户按节点类型手动选择过的执行器（会话级记忆）：管家重新生成 pipeline
+  // 且 step 未带 executor 时优先继承，而不是写死 reasonix。
+  executorPrefs: {},
   agents: [],
   sseConnection: null,
   nextNodeId: 4,
@@ -2819,6 +2822,9 @@ $('#config-close').addEventListener('click', hideConfig);
     if (id === 'cfg-skill') node.skill = el.value;
     if (id === 'cfg-executor') {
       node.executor = el.value;
+      // 会话级记忆：用户手动选过一次执行器，按节点类型记住，
+      // 供管家重新生成 pipeline 时继承（不再默认 reasonix）。
+      if (node.type) state.executorPrefs[node.type] = el.value;
       if ((node.executor === 'codex' || node.executor === 'claude') && !node.model) {
         node.model = 'ccs';
         node.providerRoute = 'ccswitch';
@@ -3903,6 +3909,11 @@ async function sendChat() {
     // 自动配置流水线节点和DAG拓扑
     console.log('[sendChat] steps:', generated.steps, 'edges:', generated.edges);
     if (generated.steps && generated.steps.length > 0) {
+      // ④b：重建前按节点类型快照辅助手开关——用户手动关过辅助手的，
+      // 重新生成后保持关闭，不再被默认值重置为开。
+      const assistEnabledByType = {};
+      state.nodes.forEach(n => { if (n && n.type && n.assist) assistEnabledByType[n.type] = !!n.assist.enabled; });
+
       state.nodes = [];
       state.edges = [];
       state.nextNodeId = 1;
@@ -3915,11 +3926,19 @@ async function sendChat() {
         node.name = step.agent;
         node.role = step.roleDesc;
         node.model = step.model || '';
-        node.executor = step.executor || 'reasonix';
+        // ④a：执行器继承链——step 显式指定 > 用户会话内选过的同类型偏好 >
+        // 按模型推断；都不命中才落 reasonix（createNode 的类型默认）。
+        node.executor = step.executor
+          || state.executorPrefs[nodeType]
+          || inferExecutorFromModel(step.model)
+          || node.executor;
         node.mode = step.mode || 'serve';
         node.agent = step.agentProfile || '';
         node.skill = canonicalSkillForNode(step.skill || '', nodeType, text, step.roleDesc || step.step || '');
         enforceNodeConstraints(node);
+        if (node.assist && Object.prototype.hasOwnProperty.call(assistEnabledByType, nodeType)) {
+          node.assist.enabled = assistEnabledByType[nodeType];
+        }
         stepIdMap[step.id] = node.id;
       }
 
@@ -5089,12 +5108,17 @@ async function openRunDetail(runId) {
     }
     // 3) 各 Agent 节点执行情况
     const typeLbl = { architect: T('node.architect'), executor: T('node.executor'), reviewer: T('node.reviewer') };
-    const renderNode = (node, st) => {
+    const renderNode = (node, st, opts) => {
       st = st || {};
+      opts = opts || {};
       const stIcon = statusIcons[st.status] || '⏳';
       const dur = (st.startedAt && st.doneAt) ? (new Date(st.doneAt) - new Date(st.startedAt)) : 0;
       const output = String(st.output || '').trim();
       const errText = String(st.error || '').trim();
+      // Obsidian 风格：输出/错误为可折叠的全文 markdown 区块（<details>），
+      // 不再截断 600 字。默认展开条件：节点失败、或属于当前查看轮的最新
+      // 尝试（opts.open）；其余折叠保留全文可展开。
+      const outOpen = errText ? true : (opts.open !== false);
       return '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
         '<span style="font-size:15px">' + stIcon + '</span>' +
@@ -5103,24 +5127,94 @@ async function openRunDetail(runId) {
         '<span style="font-size:11px;color:var(--muted-2);font-family:var(--mono)">' + escHtml(node.executor || '') + (node.model ? ' / ' + escHtml(node.model) : '') + '</span>' +
         '<span style="margin-left:auto;font-size:11px;color:var(--muted-2)">' + escHtml(st.status || '-') + (dur ? ' · ' + formatDuration(dur) : '') + (st.tokenUsage && st.tokenUsage.totalTokens ? ' · ' + formatNumber(st.tokenUsage.totalTokens) + ' tok' : '') + '</span>' +
         '</div>' +
-        (output ? '<div style="display:flex;align-items:center;gap:8px;margin-top:7px">' +
-        '<button class="rd-detail-zoom" data-text="' + escHtml(output) + '" title="大窗口显示完整内容">⤢ 放大输出</button>' +
-        (output.length > 600 ? '<span style="font-size:10.5px;color:var(--muted-2)">完整 ' + output.length + ' 字</span>' : '') +
-        '</div>' +
-        '<div class="md-body" style="font-size:12px;color:var(--fg-2);margin-top:4px;word-break:break-word;max-height:96px;overflow:auto;background:var(--bg-2);border-radius:6px;padding:8px">' + renderMarkdown(output.length > 600 ? output.slice(0, 600) + '…' : output) + '</div>' : '') +
-        (errText ? '<div style="display:flex;align-items:center;gap:8px;margin-top:6px">' +
-          '<button class="rd-detail-zoom" data-text="' + escHtml(errText) + '" title="大窗口显示完整错误">⤢ 放大错误</button>' +
-          '</div>' +
-          '<div style="font-size:11.5px;color:var(--danger);margin-top:4px">' + escHtml(errText.length > 300 ? errText.slice(0, 300) + '…' : errText) + '</div>' : '') +
+        (output ? '<details class="rd-node-sec"' + (outOpen ? ' open' : '') + ' style="margin-top:7px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2)">' +
+          '<summary style="cursor:pointer;padding:6px 10px;font-size:11.5px;color:var(--muted-2);user-select:none">📄 输出' + (output.length > 0 ? ' · ' + output.length + ' 字' : '') + '</summary>' +
+          '<div class="md-body" style="font-size:12px;color:var(--fg-2);word-break:break-word;padding:4px 12px 10px">' + renderMarkdown(output) + '</div>' +
+          '</details>' +
+          '<button class="rd-detail-zoom" data-text="' + escHtml(output) + '" title="大窗口显示完整内容" style="margin-top:5px;font-size:11px;color:var(--accent);padding:3px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer">⤢ 放大输出</button>' : '') +
+        (errText ? '<details class="rd-node-sec" open style="margin-top:7px;border:1px solid var(--danger);border-radius:6px;background:var(--bg-2)">' +
+          '<summary style="cursor:pointer;padding:6px 10px;font-size:11.5px;color:var(--danger);user-select:none">⚠ 错误</summary>' +
+          '<div style="font-size:11.5px;color:var(--danger);padding:0 12px 10px;white-space:pre-wrap;word-break:break-word">' + escHtml(errText) + '</div>' +
+          '</details>' +
+          '<button class="rd-detail-zoom" data-text="' + escHtml(errText) + '" title="大窗口显示完整错误" style="margin-top:5px;font-size:11px;color:var(--danger);padding:3px 8px;border:1px solid var(--danger);border-radius:4px;background:none;cursor:pointer">⤢ 放大错误</button>' : '') +
+        (!output && !errText ? '<div style="margin-top:6px;font-size:11.5px;color:var(--muted-2)">（无输出记录）</div>' : '') +
         '</div>';
     };
-    html += '<div style="font-weight:600;font-size:12.5px;margin:2px 0 6px">' + T('rd.agents') + '</div>';
-    if (nodes.length) {
-      nodes.forEach(node => { html += renderNode(node, ns[String(node.id)]); });
-    } else {
-      Object.keys(ns).forEach(id => { html += renderNode({ id: id, type: '', name: '#' + id }, ns[id]); });
-    }
+    // 各 Agent 执行情况区：默认总览（最新聚合状态）；Loop run 额外提供
+    // 分轮时间线，点击第 N 轮切换为该轮的审查结论 + 该轮各节点尝试。
+    html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 6px">' +
+      '<span style="font-weight:600;font-size:12.5px">' + T('rd.agents') + '</span>' +
+      '<span id="rd-view-label" style="font-size:11px;color:var(--muted-2)">（总览 · 最新聚合状态）</span>' +
+      '</div>';
+    if (cfg.enabled) html += '<div id="rd-round-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>';
+    html += '<div id="rd-agents-area"></div>';
     $('#run-detail-body').innerHTML = html;
+
+    const renderAgents = (inner) => {
+      const area = document.getElementById('rd-agents-area');
+      if (area) area.innerHTML = inner || '<div style="color:var(--muted-2);font-size:12px">（无节点执行记录）</div>';
+    };
+    const renderOverview = () => {
+      const label = document.getElementById('rd-view-label');
+      if (label) label.textContent = '（总览 · 最新聚合状态）';
+      let inner = '';
+      if (nodes.length) nodes.forEach(node => { inner += renderNode(node, ns[String(node.id)], { open: false }); });
+      else Object.keys(ns).forEach(id => { inner += renderNode({ id: id, type: '', name: '#' + id }, ns[id], { open: false }); });
+      renderAgents(inner);
+    };
+    renderOverview();
+
+    if (cfg.enabled && run.sessionId) {
+      const chipsBox = document.getElementById('rd-round-chips');
+      apiGet('/orch-sessions/' + encodeURIComponent(run.sessionId) + '/runs/' + encodeURIComponent(runId) + '/iterations')
+        .then(iterations => {
+          if (!chipsBox || !Array.isArray(iterations) || !iterations.length) return;
+          const dIcons = { pass: '✅', revise: '🔁', blocked: '⛔' };
+          const chipLabel = (it) => {
+            const icon = dIcons[it.decision] || (it.status === 'failed' ? '❌' : it.status === 'running' ? '⏳' : '·');
+            return '第' + it.number + '轮 ' + icon + (it.decision ? ' ' + it.decision : '');
+          };
+          chipsBox.innerHTML =
+            '<button class="rd-round-chip" data-view="overview" style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);cursor:pointer">总览</button>' +
+            iterations.map((it, idx) =>
+              '<button class="rd-round-chip" data-iter="' + idx + '" style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--fg-2);cursor:pointer">' + escHtml(chipLabel(it)) + '</button>'
+            ).join('');
+          const setActive = (sel) => chipsBox.querySelectorAll('.rd-round-chip').forEach(b => {
+            const on = (b.dataset.view || '') === sel || (b.dataset.iter || '') === sel;
+            b.style.background = on ? 'var(--accent-soft)' : 'var(--card)';
+            b.style.color = on ? 'var(--accent)' : 'var(--fg-2)';
+            b.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+          });
+          const renderRound = (it) => {
+            const label = document.getElementById('rd-view-label');
+            if (label) label.textContent = '（第 ' + it.number + ' 轮' + (it.decision ? ' · 审查 ' + it.decision : '') + '）';
+            let inner = '';
+            const metaBits = [];
+            if (it.decision) metaBits.push('审查结论：<b>' + escHtml(it.decision) + '</b>');
+            if (it.nextTask) metaBits.push('下一轮整改要点：' + escHtml(String(it.nextTask).slice(0, 200)));
+            if (it.error) metaBits.push('<span style="color:var(--danger)">本轮错误：' + escHtml(it.error) + '</span>');
+            if (metaBits.length) inner += '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--fg-2)">' + metaBits.join('<br>') + '</div>';
+            const attempts = Array.isArray(it.attempts) ? it.attempts : [];
+            if (!attempts.length) {
+              inner += '<div style="color:var(--muted-2);font-size:12px">（该轮无节点尝试记录）</div>';
+            } else {
+              attempts.forEach(a => {
+                const nodeDef = nodes.find(n => n.id === a.nodeID) || { id: a.nodeID, type: '', name: '#' + String(a.nodeID).slice(0, 10) };
+                const st = { status: a.status, output: a.output, error: a.error, startedAt: a.startedAt, doneAt: a.finishedAt, tokenUsage: a.tokenUsage };
+                inner += renderNode(nodeDef, st, { open: true });
+              });
+            }
+            renderAgents(inner);
+          };
+          chipsBox.querySelectorAll('.rd-round-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+              if ((btn.dataset.view || '') === 'overview') { setActive('overview'); renderOverview(); }
+              else { const idx = Number(btn.dataset.iter); setActive(String(idx)); renderRound(iterations[idx]); }
+            });
+          });
+        })
+        .catch(() => {}); // 分轮数据拉取失败不影响总览展示
+    }
   } catch (err) {
     $('#run-detail-body').innerHTML = '<div style="color:var(--danger);padding:20px;text-align:center;font-size:13px">' + escHtml(err.message || err) + '</div>';
   }
@@ -5375,7 +5469,7 @@ async function openRuntimeConsole(runtimeID) {
   const viewBtn = modal.querySelector('.rc-view-output');
   if (viewBtn) viewBtn.addEventListener('click', () => {
     const out = modal.querySelector('.rc-output');
-    const text = out ? (out.textContent || '').trim() : '';
+    const text = out ? (out.dataset.raw || (out.textContent || '')).trim() : '';
     if (!text) { toast('当前没有可查看的输出', 'error'); return; }
     showOutputPreview(text);
   });
@@ -5440,7 +5534,30 @@ function renderRuntimeConsole(runtimeID, data) {
     : (rt.status === 'busy' ? 'Runtime 正在执行，完成后可发送' : 'Runtime 不可用（空闲后可发送）');
   interrupt.disabled = !data.canInterrupt;
   interrupt.title = data.canInterrupt ? '中断当前 Turn（保留 Runtime 与会话）' : '当前无活动 Turn 可中断';
-  modal.querySelector('.rc-output').textContent = data.output || data.error || '等待该 Runtime 的输出…';
+  // 输出/结果：本次运行的最终输出用 Obsidian 风格 markdown 渲染；空态区分
+  // "进行中"与"暂无"。原文存 dataset.raw 供"新窗口查看"使用。后端已在
+  // reserveTurn 清空旧值，这里不会再出现上一次运行残留的内容。
+  const outBox = modal.querySelector('.rc-output');
+  const outText = String(data.output || '').trim();
+  const errTextRc = String(data.error || '').trim();
+  if (outText) {
+    outBox.classList.add('md-body');
+    outBox.style.whiteSpace = 'normal';
+    outBox.innerHTML = renderMarkdown(outText);
+  } else if (errTextRc) {
+    outBox.classList.remove('md-body');
+    outBox.style.whiteSpace = 'pre-wrap';
+    outBox.innerHTML = '<span style="color:var(--danger)">⚠ ' + escHtml(errTextRc) + '</span>';
+  } else if ((rt.status || '') === 'busy') {
+    outBox.classList.remove('md-body');
+    outBox.style.whiteSpace = 'pre-wrap';
+    outBox.textContent = '⏳ 本次运行进行中，等待输出…';
+  } else {
+    outBox.classList.remove('md-body');
+    outBox.style.whiteSpace = 'pre-wrap';
+    outBox.textContent = '（暂无输出）';
+  }
+  outBox.dataset.raw = outText || errTextRc;
   // Parked tool-approval prompts ("ask" approval mode): one card per request
   // with allow-once / allow-always / reject actions.
   const perms = (rt.permissionRequests || []).filter(Boolean);

@@ -845,6 +845,11 @@ func (m *OpenCodeRuntimeManager) reserveTurn(rt *opencodeRuntime) (*opencodeclie
 	}
 	rt.status = RuntimeBusy
 	rt.turnID = fmt.Sprintf("turn_%d", time.Now().UnixNano())
+	// 干净开局：新 turn 不得残留上一次的输出/错误，否则重跑节点时
+	// Runtime Console 会把旧错误误显示为本次结果（其余三个执行器
+	// 的 reserveTurn 均已清零，此处补齐对齐）。
+	rt.output = ""
+	rt.lastErr = ""
 	return rt.client, nil
 }
 
