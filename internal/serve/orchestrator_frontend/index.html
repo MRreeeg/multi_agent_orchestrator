@@ -205,8 +205,8 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__attach-chip img{width:36px;height:36px;object-fit:cover;border-radius:4px}
 .chat__attach-chip .chat__attach-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .chat__attach-chip .chat__attach-del{cursor:pointer;border:none;background:none;color:var(--fg-2, #999);font-size:14px;line-height:1}
-.chat__attach-btn{position:absolute;right:58px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.chat__mode{position:absolute;right:96px;top:50%;transform:translateY(-50%);height:34px;border:1px solid var(--border);border-radius:9px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:11.5px;line-height:1;padding:0 4px;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center;z-index:2}
+.chat__attach-btn{position:absolute;right:58px;bottom:9px;width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.chat__mode{position:absolute;right:96px;bottom:9px;height:34px;border:1px solid var(--border);border-radius:9px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:11.5px;line-height:1;padding:0 4px;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center;z-index:2}
 .chat__attach-btn:hover{background:var(--bg-3, var(--bg))}
 .chat__composer.is-dragging{outline:2px dashed var(--accent, #4a9eff);outline-offset:-4px;border-radius:10px}
 /* 工作目录卡片：位于输入框上方，小按钮卡片式（不再是顶栏里的文本框） */
@@ -3824,6 +3824,8 @@ async function sendChat() {
   if (state.analyzing) { toast('已有需求分析进行中，请稍候', 'error'); return; }
   state.analyzing = true;
   chatInput.value = '';
+  // 清空后立即回落高度：否则发送后输入框停留在撑大状态，按钮位置也错。
+  if (typeof growChatInput === 'function') growChatInput();
   if (heroInput) heroInput.value = '';
   const heroSendBtn = $('#hero-send');
   if (heroSendBtn) { heroSendBtn.disabled = true; heroSendBtn.classList.add('is-loading'); }
@@ -4145,7 +4147,8 @@ function centerPipelineGraph() {
 
 chatSend.addEventListener('click', sendChat);
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
-const growChatInput = () => { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 132) + 'px'; };
+// 自适应高度：输入增长时撑高（上限 132px），删除/清空后回落到内容实际高度。
+const growChatInput = () => { chatInput.style.height = 'auto'; chatInput.style.height = Math.max(chatInput.scrollHeight, 52) + 'px'; };
 chatInput.addEventListener('input', growChatInput);
 const heroSend = $('#hero-send');
 if (heroSend) heroSend.addEventListener('click', sendChat);
@@ -5728,7 +5731,20 @@ function runtimeEventHtml(e) {
 // are kept (so expanded <details> survive refreshes); only new events are
 // appended, and the scroll position is only advanced when the user is already
 // at the bottom.
-function renderRuntimeEvents(container, events, modal) {
+function renderRuntimeEvents(container, rawEvents, modal) {
+  // 合并连续的推理碎片：慢速免费模型逐字输出会产生大量只有几个字母的
+  // reasoning 行（后端按 partID 合并兜不住的旧数据/其他执行器），渲染前
+  // 把相邻同类合并为一条，可读性优先。
+  const events = [];
+  for (const ev of (rawEvents || [])) {
+    const last = events[events.length - 1];
+    if (ev && ev.category === 'reasoning' && last && last.category === 'reasoning') {
+      const mergedText = String(last.text || last.payload || '') + String(ev.text || ev.payload || '');
+      events[events.length - 1] = Object.assign({}, last, { text: mergedText });
+    } else {
+      events.push(ev);
+    }
+  }
   const prev = modal._rcEvents || [];
   const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
 

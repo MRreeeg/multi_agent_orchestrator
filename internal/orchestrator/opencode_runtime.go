@@ -643,7 +643,15 @@ func (m *OpenCodeRuntimeManager) handleSSEEvent(rt *opencodeRuntime, ev opencode
 			category = "reasoning"
 		}
 		rt.mu.Unlock()
-		rt.stream.append("message", partID, category, ev.Properties.Delta)
+		key := partID
+		if category == "reasoning" {
+			// 推理碎片按稳定 key 合并：部分免费模型给每个推理碎块分配新
+			// partID，若按 partID 分组，合并器会视为"换了消息"逐条刷出，
+			// Console 被几个字母的碎行刷屏。统一 key 让整段推理合并为一个
+			// 持续增长的事件块（静默 400ms 或边界事件时才落一条）。
+			key = "reasoning"
+		}
+		rt.stream.append("message", key, category, ev.Properties.Delta)
 	case "message.part.updated":
 		p := ev.Properties.Part
 		if p.ID == "" {
@@ -662,7 +670,11 @@ func (m *OpenCodeRuntimeManager) handleSSEEvent(rt *opencodeRuntime, ev opencode
 		last := rt.partLast[p.ID]
 		rt.mu.Unlock()
 		if len(p.Text) > last {
-			rt.stream.append("message", p.ID, category, p.Text[last:])
+			key := p.ID
+			if category == "reasoning" {
+				key = "reasoning" // 与 delta 路径一致：推理按稳定 key 合并
+			}
+			rt.stream.append("message", key, category, p.Text[last:])
 			rt.mu.Lock()
 			rt.partLast[p.ID] = len(p.Text)
 			rt.mu.Unlock()
