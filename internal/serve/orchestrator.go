@@ -294,6 +294,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.uploadImage(w, r)
 	case path == "/orch-assist/dispatch" && r.Method == http.MethodPost:
 		h.dispatchOrchAssist(w, r)
+	case path == "/orch-assist/history" && r.Method == http.MethodGet:
+		h.assistHistory(w, r)
 	case strings.HasPrefix(path, "/images/") && r.Method == http.MethodGet:
 		h.serveImage(w, r)
 	case path == "/requirements/analyze" && r.Method == http.MethodPost:
@@ -1498,6 +1500,23 @@ func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Re
 // 视觉能力）用 curl 调用：任务文本 + 图片绝对路径（同机文件系统），响应统一
 // 为 JSON {"ok":true,"result":...} 或 {"ok":false,"error":...}（HTTP 恒 200，
 // 便于执行者按 JSON 判定）。
+// assistHistory 返回辅助手委派历史（时间倒序），供前端在重启后恢复展示
+// 上次退出前的委派状态。?limit=N 控制条数（默认 50）。
+func (h *orchestratorHandler) assistHistory(w http.ResponseWriter, r *http.Request) {
+	limit := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+	recs, err := h.store.AssistHistory(limit)
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "records": recs})
+}
+
 func (h *orchestratorHandler) dispatchOrchAssist(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Task       string   `json:"task"`

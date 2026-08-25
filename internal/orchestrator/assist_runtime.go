@@ -211,6 +211,17 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 	if timeout > 300*time.Second {
 		timeout = 300 * time.Second
 	}
+	// 委派历史落盘：成功/失败各出口统一经 assistFinish 记录，
+	// 重启后可回看上次退出前的委派状态。
+	baseRec := AssistHistoryRecord{
+		Task:   opts.Task,
+		Images: opts.Images,
+		ModelRef: modelRef,
+		Driver:  driver,
+	}
+	assistFinish := func(rec AssistHistoryRecord) {
+		_ = appendAssistHistory(rec) // 持久化故障不阻塞主链路
+	}
 
 	spec := ExecSpec{
 		Workspace:    detectWorkspace(),
@@ -222,13 +233,18 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 	}
 	rt, err := opencodeRuntimeMgr.ensure(ctx, spec, nil)
 	if err != nil {
+		baseRec.Error = fmt.Errorf("assist: start helper runtime: %w", err).Error()
+		assistFinish(baseRec)
 		return nil, fmt.Errorf("assist: start helper runtime: %w", err)
 	}
 	s.emitAssistEvent(event.AssistStart, rt, modelRef, opts.Task, "", "")
+	baseRec.RuntimeID = rt.ID
 
 	client, err := opencodeRuntimeMgr.reserveTurn(rt)
 	if err != nil {
 		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", err.Error())
+		baseRec.Error = fmt.Sprintf("assist: helper busy: %v", err)
+		assistFinish(baseRec)
 		return nil, fmt.Errorf("assist: helper busy: %w", err)
 	}
 	dispatchCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -237,17 +253,26 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 	if err != nil {
 		opencodeRuntimeMgr.finishTurn(rt, sessionID, err)
 		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", err.Error())
+		baseRec.SessionID = sessionID
+		baseRec.Error = fmt.Sprintf("assist: create helper session: %v", err)
+		assistFinish(baseRec)
 		return nil, fmt.Errorf("assist: create helper session: %w", err)
 	}
 	text, promptErr := client.Prompt(dispatchCtx, sessionID, modelRef, assistDisciplinePrompt, assistPromptText(opts.Task, opts.Images), assistDenyTools())
 	opencodeRuntimeMgr.finishTurn(rt, sessionID, promptErr)
 	if promptErr != nil {
 		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", promptErr.Error())
+		baseRec.SessionID = sessionID
+		baseRec.Error = fmt.Sprintf("assist: helper turn failed: %v", promptErr)
+		assistFinish(baseRec)
 		return nil, fmt.Errorf("assist: helper turn failed: %w", promptErr)
 	}
 	if strings.TrimSpace(text) == "" {
 		msg := "assist: helper returned empty completion"
 		s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, "", msg)
+		baseRec.SessionID = sessionID
+		baseRec.Error = msg
+		assistFinish(baseRec)
 		return nil, fmt.Errorf("%s", msg)
 	}
 	result := &AssistDispatchResult{
@@ -258,6 +283,10 @@ func (s *Store) AssistDispatch(ctx context.Context, opts AssistDispatchOptions) 
 		SessionID: sessionID,
 	}
 	s.emitAssistEvent(event.AssistDone, rt, modelRef, opts.Task, text, "")
+	baseRec.SessionID = sessionID
+	baseRec.OK = true
+	baseRec.Result = text
+	assistFinish(baseRec)
 	return result, nil
 }
 
