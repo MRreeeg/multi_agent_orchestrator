@@ -80,6 +80,38 @@ func TestConsoleStreamCoalescerQuietFlush(t *testing.T) {
 	}
 }
 
+// 推理块体积分段：长思考不再涨成一大坨——攒满阈值立即落一条，后续开新块。
+func TestConsoleStreamCoalescerReasoningSplitsBySize(t *testing.T) {
+	flushed, flush := collectFlushed(8)
+	c := newConsoleStreamCoalescer(time.Hour, flush) // 无静默、无边界的持续流
+	defer c.stop()
+
+	chunk := strings.Repeat("思", 1000)
+	for i := 0; i < 7; i++ { // 累计 7000 字符 ≥ 阈值 3000 → 至少分段两次
+		c.append("agent_thought", "reasoning", "reasoning", chunk)
+	}
+	got := 0
+	var sizes []int
+drain:
+	for {
+		select {
+		case evt := <-flushed:
+			got++
+			sizes = append(sizes, len([]rune(evt.Text)))
+		default:
+			break drain
+		}
+	}
+	if got < 2 {
+		t.Fatalf("reasoning stream of 7000 chars should split into >=2 blocks, got %d (%v)", got, sizes)
+	}
+	for _, s := range sizes[:got-1] { // 除最后一块外都应接近阈值（非巨型块）
+		if s > consoleReasoningMaxChars+1000 {
+			t.Fatalf("block oversized: %d chars", s)
+		}
+	}
+}
+
 func TestConsoleStreamCoalescerStopDropsPending(t *testing.T) {
 	flushed, flush := collectFlushed(2)
 	c := newConsoleStreamCoalescer(100*time.Millisecond, flush)

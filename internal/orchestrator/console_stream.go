@@ -14,6 +14,11 @@ import (
 	"time"
 )
 
+// consoleReasoningMaxChars 是单个推理事件块的体积分段阈值。稳定 key 合并后，
+// 持续流式会让"静默 400ms 才落盘"永不触发，整段思考会涨成一大坨；按体积
+// 强制分段，让 Console 呈现为多个可折叠的中等段落而非一条巨型记录。
+const consoleReasoningMaxChars = 3000
+
 // consoleStreamCoalescer buffers streaming text deltas into a single
 // RuntimeConsoleEvent. The flush callback is invoked exactly once per
 // consolidated block and must not call back into the coalescer.
@@ -62,6 +67,18 @@ func (c *consoleStreamCoalescer) append(method, key, category, text string) {
 		c.method, c.key, c.category, c.at = method, key, category, time.Now()
 	}
 	c.text.WriteString(text)
+	// 推理块体积分段：攒满阈值立即落一条（解锁后 flush，避免自锁），
+	// 后续推理内容开新块。
+	overflow := category == "reasoning" && c.text.Len() >= consoleReasoningMaxChars
+	if overflow {
+		if c.timer != nil {
+			c.timer.Stop()
+			c.timer = nil
+		}
+		c.mu.Unlock()
+		c.flushNow()
+		return
+	}
 	if c.timer == nil {
 		c.timer = time.AfterFunc(c.flushAfter, c.flushNow)
 	} else {

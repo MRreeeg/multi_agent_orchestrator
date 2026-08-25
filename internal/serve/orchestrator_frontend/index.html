@@ -5732,13 +5732,15 @@ function runtimeEventHtml(e) {
 // appended, and the scroll position is only advanced when the user is already
 // at the bottom.
 function renderRuntimeEvents(container, rawEvents, modal) {
-  // 合并连续的推理碎片：慢速免费模型逐字输出会产生大量只有几个字母的
-  // reasoning 行（后端按 partID 合并兜不住的旧数据/其他执行器），渲染前
-  // 把相邻同类合并为一条，可读性优先。
+  // 兜底合并连续的推理碎片：仅当上一条还是"小碎片"（<120 字符，慢速模型
+  // 逐字输出的遗留形态）时才并入；后端已按体积分段（~3000 字符/块），
+  // 大块保持独立，避免把分段结果重新粘成一整坨。
+  const reasonFragLimit = 120;
   const events = [];
   for (const ev of (rawEvents || [])) {
     const last = events[events.length - 1];
-    if (ev && ev.category === 'reasoning' && last && last.category === 'reasoning') {
+    if (ev && ev.category === 'reasoning' && last && last.category === 'reasoning' &&
+        String(last.text || last.payload || '').length < reasonFragLimit) {
       const mergedText = String(last.text || last.payload || '') + String(ev.text || ev.payload || '');
       events[events.length - 1] = Object.assign({}, last, { text: mergedText });
     } else {
