@@ -625,9 +625,17 @@ func opencodeSleepAbort(ctx context.Context, d time.Duration) bool {
 // carries the accumulated text (fed as the suffix not yet streamed), which
 // also reveals the part type (text vs reasoning).
 func (m *OpenCodeRuntimeManager) handleSSEEvent(rt *opencodeRuntime, ev opencodeSSEEvent) {
-	// Any event from the provider is a liveness signal for the turn watchdog,
-	// even categories the console filters out below.
-	rt.clock.touch()
+	// Liveness policy: only CONTENT-BEARING events feed the turn watchdog.
+	// opencode also emits invisible lifecycle/status frames (session.status,
+	// time pings, …); feeding those kept the idle detector asleep while a
+	// wedged turn sat silent for hours — the stall fired only via the 2h
+	// ceiling. Real progress = streaming deltas/updates and tool-permission
+	// traffic; everything else must NOT renew the idle window.
+	switch ev.Type {
+	case "message.part.delta", "message.part.updated", "message.part.removed",
+		"permission.updated", "permission.replied":
+		rt.clock.touch()
+	}
 	if rt.stream == nil {
 		return
 	}
@@ -802,6 +810,11 @@ func (m *OpenCodeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onS
 	}
 	rt.mu.Unlock()
 	if promptErr != nil {
+		// 看门狗开枪（静默/总长超限）且没能恢复出部分产出时，把真实原因
+		// 包进错误——否则用户只看到裸的 "context canceled"，无从调参。
+		if werr := wd.Err(); werr != nil {
+			promptErr = fmt.Errorf("%w（看门狗中断：静默窗口=%v 总长上限=%v，可经 REASONIX_TURN_IDLE_TIMEOUT / REASONIX_TURN_MAX_DURATION 调整）", werr, turnIdleTimeoutDefault, turnMaxDurationDefault)
+		}
 		m.finishTurn(rt, sessionID, promptErr)
 		return m.execResult(rt, "", sessionID), promptErr
 	}

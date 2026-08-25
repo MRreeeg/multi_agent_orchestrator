@@ -566,6 +566,9 @@ func (m *ClaudeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onSta
 		promptErr = fmt.Errorf("claude turn failed: %s", result.Error)
 	}
 	if promptErr != nil {
+		if werr := wd.Err(); werr != nil {
+			promptErr = fmt.Errorf("%w（看门狗中断：静默窗口=%v 总长上限=%v，可经 REASONIX_TURN_IDLE_TIMEOUT / REASONIX_TURN_MAX_DURATION 调整）", werr, turnIdleTimeoutDefault, turnMaxDurationDefault)
+		}
 		m.finishTurn(rt, sessionID, promptErr)
 		return m.execResult(rt, "", sessionID), promptErr
 	}

@@ -32,9 +32,12 @@ func TestOpenCodeDisciplineDenyTools(t *testing.T) {
 
 func TestOpenCodeDisciplineTurnBudgetOverride(t *testing.T) {
 	// The old fixed 5m budget is gone; the default now comes from the
-	// activity-watchdog package knobs.
-	if got := turnIdleTimeoutDefault; got != 5*time.Minute {
-		t.Fatalf("default idle timeout = %v, want 5m", got)
+	// activity-watchdog package knobs. Idle default is 15m: long silent
+	// tool calls must not trip the stall, while wedged turns (no content
+	// events at all — lifecycle pings no longer feed the clock) are still
+	// caught well before the absolute ceiling.
+	if got := turnIdleTimeoutDefault; got != 15*time.Minute {
+		t.Fatalf("default idle timeout = %v, want 15m", got)
 	}
 	if got := turnMaxDurationDefault; got != 2*time.Hour {
 		t.Fatalf("default max duration = %v, want 2h", got)

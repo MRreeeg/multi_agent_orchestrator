@@ -20,12 +20,14 @@ import (
 // Two knobs, both env-overridable:
 //
 //	REASONIX_TURN_IDLE_TIMEOUT   silence window that marks a turn stalled
+//	                             (default 15m; tolerates long silent tool
+//	                             calls while still catching wedged turns)
 //	                             (default 5m)
 //	REASONIX_TURN_MAX_DURATION   absolute ceiling for one turn regardless of
 //	                             activity (default 2h; spec.TurnTimeout may
 //	                             override per node)
 var (
-	turnIdleTimeoutDefault = envDuration("REASONIX_TURN_IDLE_TIMEOUT", 5*time.Minute)
+	turnIdleTimeoutDefault = envDuration("REASONIX_TURN_IDLE_TIMEOUT", 15*time.Minute)
 	turnMaxDurationDefault = envDuration("REASONIX_TURN_MAX_DURATION", 2*time.Hour)
 )
 
