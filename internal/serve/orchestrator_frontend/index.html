@@ -206,6 +206,7 @@ input,textarea,select{font:inherit;color:inherit}
 .chat__attach-chip .chat__attach-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .chat__attach-chip .chat__attach-del{cursor:pointer;border:none;background:none;color:var(--fg-2, #999);font-size:14px;line-height:1}
 .chat__attach-btn{position:absolute;right:58px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.chat__mode{position:absolute;right:96px;top:50%;transform:translateY(-50%);height:34px;border:1px solid var(--border);border-radius:9px;background:var(--bg-2, var(--bg));color:var(--fg-2, inherit);font-size:11.5px;line-height:1;padding:0 4px;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center;z-index:2}
 .chat__attach-btn:hover{background:var(--bg-3, var(--bg))}
 .chat__composer.is-dragging{outline:2px dashed var(--accent, #4a9eff);outline-offset:-4px;border-radius:10px}
 /* 工作目录卡片：位于输入框上方，小按钮卡片式（不再是顶栏里的文本框） */
@@ -657,6 +658,11 @@ input,textarea,select{font:inherit;color:inherit}
             <input type="file" id="chat-file-input" accept="image/*" multiple style="display:none" />
             <button class="chat__attach-btn" id="chat-attach-btn" title="添加图片">＋</button>
             <textarea class="chat__input" id="chat-input" rows="1" placeholder="输入需求，Enter 发送，Shift+Enter 换行…" autocomplete="off"></textarea>
+            <select class="chat__mode" id="chat-mode" title="选择发送模式：编排=生成/修改流水线；问情况=向管家提问当前运行（支持附图）；闲聊=纯对话不改流水线">
+              <option value="requirement">编排</option>
+              <option value="ask">问情况</option>
+              <option value="chat">闲聊</option>
+            </select>
             <button class="chat__send" id="chat-send" title="生成编排">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
             </button>
@@ -3841,7 +3847,7 @@ async function sendChat() {
   addChatMessage('user', text, '', true, pendingImages);
 
   // 发送模式分流：问情况 → 运行分析（回答进主聊天）；编排/闲聊 → 需求分析。
-  const chatMode = (heroModeEl && heroModeEl.value) || 'requirement';
+  const chatMode = currentChatMode();
   if (chatMode === 'ask') {
     try {
       await askRunStatusInChat(text, allImages, () => $('#chat-executor').value || '', () => $('#chat-model').value || '', () => $('#chat-agent').value || '');
@@ -4145,16 +4151,28 @@ const heroSend = $('#hero-send');
 if (heroSend) heroSend.addEventListener('click', sendChat);
 const heroInputEl = $('#hero-input');
 if (heroInputEl) heroInputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
-// 发送模式（编排/问情况/闲聊）：placeholder 随模式切换，模式选择由 <select> 自身记忆。
+// 发送模式（编排/问情况/闲聊）：首屏 hero 与聊天区两处下拉双向同步，
+// placeholder 随模式切换；sendChat 统一读 currentChatMode()。
 const heroModeEl = $('#hero-mode');
-const heroModePlaceholders = {
-  requirement: '描述你的任务，例如：实现端口范围解析函数并补测试',
-  ask: '问当前运行的情况，例如：第2轮为什么判 revise？（可贴报错图）',
-  chat: '和管家随便聊聊，不会改动流水线',
+const chatModeEl = $('#chat-mode');
+const modeSelects = [heroModeEl, chatModeEl].filter(Boolean);
+const modePlaceholders = {
+  requirement: { hero: '描述你的任务，例如：实现端口范围解析函数并补测试', chat: '输入需求，Enter 发送，Shift+Enter 换行…' },
+  ask: { hero: '问当前运行的情况，例如：第2轮为什么判 revise？（可贴报错图）', chat: '问当前运行的情况，例如：现在卡在哪一轮？（可贴报错图）' },
+  chat: { hero: '和管家随便聊聊，不会改动流水线', chat: '随便聊，不会改动流水线' },
 };
-if (heroModeEl) heroModeEl.addEventListener('change', () => {
-  if (heroInputEl && heroModePlaceholders[heroModeEl.value]) heroInputEl.placeholder = heroModePlaceholders[heroModeEl.value];
-});
+function currentChatMode() {
+  for (const el of modeSelects) { if (el && el.value) return el.value; }
+  return 'requirement';
+}
+function applyModeUi(mode) {
+  const ph = modePlaceholders[mode] || modePlaceholders.requirement;
+  if (heroInputEl && ph.hero) heroInputEl.placeholder = ph.hero;
+  const ci = $('#chat-input');
+  if (ci && ph.chat) ci.placeholder = ph.chat;
+  modeSelects.forEach(el => { el.value = mode; });
+}
+modeSelects.forEach(el => el.addEventListener('change', () => applyModeUi(el.value)));
 $$('.hero__chip').forEach(chip => chip.addEventListener('click', () => {
   const h = $('#hero-input');
   if (!h) return;
