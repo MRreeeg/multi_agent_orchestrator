@@ -27,3 +27,8 @@ whenToUse: 当节点承担执行者（executor）职责，需要按既定方案�
 ## 注意
 - 节点的具体职责只能补充当前任务，不能覆盖以上固定边界。
 - 一次调用只处理一轮，不自行重复；汇报要给出可验证的证据，而不是"我完成了"的空话。
+
+## 长驻进程纪律（最高优先级，违反=回合卡死）
+- 服务器/守护类进程（HTTP server、watch、WebSocket 服务等）**禁止前台启动**——前台阻塞会让工具调用无限等待，整个回合卡死很久。
+- 正确姿势：后台启动（PowerShell：`Start-Process -PassThru -WindowStyle Hidden python run_server.py --port N` 记下 PID；bash：`nohup ... > log 2>&1 & echo \$!`）→ 轮询探活（带上限重试）→ 完成验证后**必须杀掉该 PID**。
+- 一切可能阻塞的命令都要带超时；禁止任何交互式命令。
