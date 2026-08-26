@@ -607,6 +607,8 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /orchestrator/api/runtimes/", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/runtimes/", s.orchestratorAPI)
 	mux.HandleFunc("POST /orchestrator/api/runtime/open", s.orchestratorAPI)
+	mux.HandleFunc("GET /orchestrator/api/nodes/memory", s.orchestratorAPI)
+	mux.HandleFunc("POST /orchestrator/api/nodes/reset-session", s.orchestratorAPI)
 	// New Orchestration Session API routes
 	mux.HandleFunc("POST /orchestrator/api/orch-sessions", s.orchestratorAPI)
 	mux.HandleFunc("GET /orchestrator/api/orch-sessions", s.orchestratorAPI)

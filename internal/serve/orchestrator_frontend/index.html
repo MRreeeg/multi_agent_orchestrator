@@ -3947,48 +3947,108 @@ async function sendChat() {
       const assistEnabledByType = {};
       state.nodes.forEach(n => { if (n && n.type && n.assist) assistEnabledByType[n.type] = !!n.assist.enabled; });
 
-      state.nodes = [];
-      state.edges = [];
-      state.nextNodeId = 1;
+      // ── 增量编排：nodeID 就是 agent 记忆的身份键（binding 按 session+nodeID
+      //    查找、ProviderSession 挂在其上）。能保留 nodeID 就保留——否则每次
+      //    管家分配都相当于给所有 agent 换了新脑子。──
+      const newTypeSeq = generated.steps.map(s => generatedStepNodeType(s));
+      const curTypeSeq = state.nodes.map(n => n.type);
+      const sameSeq = state.nodes.length > 0 &&
+        newTypeSeq.length === curTypeSeq.length &&
+        newTypeSeq.every((t, i) => t === curTypeSeq[i]);
 
-      // 步骤1：创建节点，记录 stepId → nodeId 映射
+      let applyMode = 'replace'; // replace | inplace | merge
+      if (state.nodes.length > 0) {
+        if (sameSeq) {
+          applyMode = 'inplace';
+        } else {
+          const keepMemory = await confirmDialog({
+            title: '管道结构有变化',
+            message: '新需求的节点结构与当前画布不一致。<br>' +
+              '<b>就地更新职责</b>：按位置覆盖职责描述，尽量保留各 Agent 已积累的会话记忆（推荐）；<br>' +
+              '<b>整体替换</b>：清空画布重建，所有 Agent 将从全新会话开始。',
+            okText: '就地更新职责',
+            danger: false
+          });
+          applyMode = keepMemory ? 'merge' : 'replace';
+        }
+      }
+
       const stepIdMap = {};
-      for (const step of generated.steps) {
-        const nodeType = generatedStepNodeType(step);
-        const node = createNode(nodeType, 0, 0);
+      const applyStepFields = (node, step) => {
         node.name = step.agent;
         node.role = step.roleDesc;
         node.model = step.model || '';
         // ④a：执行器继承链——step 显式指定 > 用户会话内选过的同类型偏好 >
         // 按模型推断；都不命中才落 reasonix（createNode 的类型默认）。
         node.executor = step.executor
-          || state.executorPrefs[nodeType]
+          || state.executorPrefs[node.type]
           || inferExecutorFromModel(step.model)
           || node.executor;
         node.mode = step.mode || 'serve';
         node.agent = step.agentProfile || '';
-        node.skill = canonicalSkillForNode(step.skill || '', nodeType, text, step.roleDesc || step.step || '');
+        node.skill = canonicalSkillForNode(step.skill || '', node.type, text, step.roleDesc || step.step || '');
         enforceNodeConstraints(node);
-        if (node.assist && Object.prototype.hasOwnProperty.call(assistEnabledByType, nodeType)) {
-          node.assist.enabled = assistEnabledByType[nodeType];
+        if (node.assist && Object.prototype.hasOwnProperty.call(assistEnabledByType, node.type)) {
+          node.assist.enabled = assistEnabledByType[node.type];
         }
-        stepIdMap[step.id] = node.id;
-      }
-
-      // 步骤2：根据 edges 创建连接
-      if (generated.edges && generated.edges.length > 0) {
-        for (const edge of generated.edges) {
-          const fromId = stepIdMap[edge.from];
-          const toId = stepIdMap[edge.to];
-          if (fromId !== undefined && toId !== undefined) {
-            state.edges.push({ from: fromId, to: toId });
+      };
+      const rebuildEdges = () => {
+        state.edges = [];
+        if (generated.edges && generated.edges.length > 0) {
+          for (const edge of generated.edges) {
+            const fromId = stepIdMap[edge.from];
+            const toId = stepIdMap[edge.to];
+            if (fromId !== undefined && toId !== undefined) {
+              state.edges.push({ from: fromId, to: toId });
+            }
+          }
+        } else {
+          for (let i = 1; i < state.nodes.length; i++) {
+            state.edges.push({ from: state.nodes[i - 1].id, to: state.nodes[i].id });
           }
         }
-      } else {
-        // 无 edges 时退化为串行
-        for (let i = 1; i < state.nodes.length; i++) {
-          state.edges.push({ from: state.nodes[i - 1].id, to: state.nodes[i].id });
+      };
+
+      if (applyMode === 'inplace') {
+        // 类型序列完全一致：逐位置覆盖任务相关字段，nodeID/位置/执行状态全保留。
+        generated.steps.forEach((step, i) => {
+          const node = state.nodes[i];
+          applyStepFields(node, step);
+          stepIdMap[step.id] = node.id;
+        });
+        rebuildEdges();
+      } else if (applyMode === 'merge') {
+        // 结构不一致但用户选择保记忆：前 min(len) 个按位置覆盖（nodeID 保留），
+        // 多出的 steps 追加新节点并串接；多余的旧节点连同关联边移除。
+        const k = Math.min(state.nodes.length, generated.steps.length);
+        for (let i = 0; i < k; i++) {
+          const node = state.nodes[i];
+          const newType = newTypeSeq[i];
+          if (newType && node.type !== newType) node.type = newType; // 类型也随位置走
+          applyStepFields(node, generated.steps[i]);
+          stepIdMap[generated.steps[i].id] = node.id;
         }
+        let lastId = k > 0 ? state.nodes[k - 1].id : null;
+        for (let i = k; i < generated.steps.length; i++) {
+          const node = createNode(newTypeSeq[i], 0, 0);
+          applyStepFields(node, generated.steps[i]);
+          stepIdMap[generated.steps[i].id] = node.id;
+          if (lastId) state.edges.push({ from: lastId, to: node.id });
+          lastId = node.id;
+        }
+        const removed = state.nodes.splice(k);
+        removed.forEach(n => { state.edges = state.edges.filter(e => e.from !== n.id && e.to !== n.id); });
+        rebuildEdges();
+      } else {
+        state.nodes = [];
+        state.edges = [];
+        state.nextNodeId = 1;
+        for (const step of generated.steps) {
+          const node = createNode(generatedStepNodeType(step), 0, 0);
+          applyStepFields(node, step);
+          stepIdMap[step.id] = node.id;
+        }
+        rebuildEdges();
       }
 
       // Loop 配置只引用这一轮基础 DAG 中唯一的 Reviewer。
@@ -5469,8 +5529,57 @@ async function showNodeDetail(node) {
       </div>
     `;
   }
+  // 记忆区块占位：异步填充（承接会话 + 累计执行次数 + 重置按钮）。
+  if (state.sessionID && node.id) {
+    html += '<div id="nd-memory"></div>';
+  }
   $('#node-detail-body').innerHTML = html;
   $('#node-detail-modal').style.display = 'flex';
+  if (state.sessionID && node.id) {
+    const memBox = document.getElementById('nd-memory');
+    apiGet('/nodes/memory?session=' + encodeURIComponent(state.sessionID) + '&node=' + encodeURIComponent(node.id))
+      .then(mem => {
+        if (!memBox) return;
+        const anchor = mem.externalSessionID
+          ? '<span class="mono" style="font-size:10.5px">' + escHtml(mem.externalSessionID) + '</span>'
+          : '<span style="color:var(--muted-2)">（尚无会话，下次执行将新建）</span>';
+        const runs = Number(mem.completedRuns) || 0;
+        memBox.innerHTML =
+          '<div style="margin-bottom:12px;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)">' +
+          '<div style="font-size:12px;font-weight:600;margin-bottom:6px">🧠 会话记忆</div>' +
+          '<div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center">' +
+          '<span style="color:var(--muted-2)">承接会话</span><span>' + anchor + '</span>' +
+          '<span style="color:var(--muted-2)">累计执行</span><span>' + runs + ' 次已完成</span>' +
+          '</div>' +
+          '<div style="margin-top:8px"><button id="nd-reset-session" class="rc-btn" style="font-size:11px;color:var(--danger);border-color:var(--danger)"' +
+          (runs === 0 && !mem.externalSessionID ? ' disabled title="暂无会话可重置"' : ' title="解绑当前 provider 会话，下次执行全新开始"') +
+          '>🧹 重置该节点会话</button></div>' +
+          '</div>';
+        const resetBtn = document.getElementById('nd-reset-session');
+        if (resetBtn && !resetBtn.disabled) {
+          resetBtn.addEventListener('click', async () => {
+            if (resetBtn.disabled) return;
+            const okGo = await confirmDialog({
+              title: '重置该节点会话',
+              message: '将解绑此节点当前的 provider 会话，<b>该 Agent 的全部历史对话记忆将被清空</b>，下次执行从全新会话开始。此操作不可撤销。',
+              okText: '确认重置',
+              danger: true
+            });
+            if (!okGo) return;
+            resetBtn.disabled = true;
+            try {
+              await apiPost('/nodes/reset-session', { session: state.sessionID, node: node.id });
+              toast('该节点会话已重置，下次执行将从新会话开始', 'success');
+              showNodeDetail(node);
+            } catch (err) {
+              toast('重置失败: ' + (err.message || err), 'error');
+              resetBtn.disabled = false;
+            }
+          });
+        }
+      })
+      .catch(() => { if (memBox) memBox.innerHTML = ''; });
+  }
 }
 
 // 回填 runtime 到各节点：遍历 state.runtimeStates，按 nodeID 找到对应 node 设置 node.runtime
@@ -6950,9 +7059,9 @@ function renderRuns() {
       ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">${T('run.resume')}</button>` : '';
     const cancelButton = r.status === 'running'
       ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">${T('run.stop')}</button>` : '';
-    // 恢复入口：failed 一律可「⤴ 重试」（自动选第一个失败节点）；interrupted
-    // 非 Loop run 没有「继续 Loop」入口，也提供重试。
-    const retryButton = (r.status === 'failed' || (r.status === 'interrupted' && !cfg.enabled))
+    // 恢复入口：failed/canceled 一律可「⤴ 重试」（自动选第一个失败节点）；
+    // interrupted 非 Loop run 没有「继续 Loop」入口，也提供重试。
+    const retryButton = (r.status === 'failed' || r.status === 'canceled' || (r.status === 'interrupted' && !cfg.enabled))
       ? `<button class="run-retry-btn" data-retry-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px" title="从第一个失败/中断节点起新 Run，上游输出沿用">⤴ ${T('run.retry')}</button>` : '';
     return `
     <div class="run-card" data-run-id="${escHtml(r.id)}" style="cursor:pointer;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px" title="${escHtml(r.id)}">

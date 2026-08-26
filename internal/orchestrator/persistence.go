@@ -1039,13 +1039,25 @@ func (s *Store) FindOrCreateBinding(sessionID, nodeID string, node AgentNode) (*
 	return s.CreateBinding(sessionID, nodeID, node)
 }
 
-// bindingMatchesNode checks if an existing binding matches the node's current config.
+// bindingMatchesNode reports whether an existing binding can keep serving a
+// node whose config drifted. Matching is graded by memory value:
+//
+//   - Executor / Agent / Skill changed → false. A different engine or persona
+//     cannot meaningfully continue the old conversation.
+//   - Only Model / Mode (run↔serve) changed → true. Provider sessions support
+//     switching models mid-conversation, so a cost tweak or mode flip no longer
+//     costs the agent its entire memory (the historical strict match detached
+//     the binding and silently reset every provider session).
+//
+// Callers must persist the new Model/Mode onto the binding when this returns
+// true with changed fields (see findOrCreateBindingLocked).
 func bindingMatchesNode(b *AgentBinding, node AgentNode) bool {
-	return b.Executor == string(node.Executor) &&
-		b.Model == node.Model &&
-		b.Agent == node.Agent &&
-		b.Skill == node.Skill &&
-		b.Mode == node.Mode
+	if b.Executor != string(node.Executor) ||
+		b.Agent != node.Agent ||
+		b.Skill != node.Skill {
+		return false
+	}
+	return true
 }
 
 // UpdateBinding updates a binding via a mutation function.
@@ -1249,6 +1261,18 @@ func (s *Store) findOrCreateBindingLocked(sessionID, nodeID string, node AgentNo
 	for _, id := range sess.AgentBindingIDs {
 		if b, ok := s.bindings[id]; ok && b.NodeID == nodeID && b.Status == "active" {
 			if bindingMatchesNode(b, node) {
+				// Graded match: keep the binding (and its ProviderSession /
+				// conversation memory) even when Model or Mode drifted, but
+				// record the new values so the UI and future matches see them.
+				if b.Model != node.Model || b.Mode != node.Mode {
+					b.Model = node.Model
+					b.Mode = node.Mode
+					b.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+					bindingDir := filepath.Join(sessionDir(sessionID), "agents")
+					if err := saveSessionJSON(bindingDir, b.ID+".json", b); err != nil {
+						return nil, fmt.Errorf("persist binding model/mode update: %w", err)
+					}
+				}
 				return b, nil
 			}
 			// Mismatch — detach old binding

@@ -190,7 +190,10 @@ func TestV2BindingReuse(t *testing.T) {
 	_ = run2
 }
 
-// TestV2BindingOnConfigChange verifies new binding when node config changes.
+// TestV2BindingOnConfigChange verifies graded binding behavior when node
+// config changes: a model-only drift KEEPS the binding and its provider
+// session (conversation memory survives cost tweaks), while an executor swap
+// detaches it and starts fresh.
 func TestV2BindingOnConfigChange(t *testing.T) {
 	store := NewStore()
 	sess, _ := store.CreateOrchSession("test", "/tmp")
@@ -219,37 +222,55 @@ func TestV2BindingOnConfigChange(t *testing.T) {
 		}
 	}
 
-	// Modify node model
+	// Modify node model only — the binding must SURVIVE with its session.
 	nodes[0].Model = "deepseek-pro"
 	rev2, _ := store.UpdatePipelineRevision(sess.ID, nodes, []Edge{}, "manual_edit")
 
-	// Run 2 with model B
 	store.ExecutePipelineV2(ctx, sess.ID, rev2.ID, "task", "", ExecutionOptions{Trigger: "manual"})
 	time.Sleep(2 * time.Second)
 
 	bindings2 := store.ListBindings(sess.ID)
 	activeCount := 0
+	modelKept := false
 	for _, b := range bindings2 {
 		if b.NodeID == "n1" && b.Status == "active" {
 			activeCount++
 			if b.ID == bindingID1 {
-				t.Error("binding should have changed after model update")
+				modelKept = true
+			}
+			if b.Model != "deepseek-pro" {
+				t.Errorf("kept binding should record the new model, got %q", b.Model)
 			}
 		}
 	}
 	if activeCount != 1 {
 		t.Errorf("active bindings for n1 = %d, want 1", activeCount)
 	}
+	if !modelKept {
+		t.Error("binding must be kept across a model-only change (graded match)")
+	}
 
-	// Old binding should be detached (check bindings2, not bindings1).
+	// Swap the executor — that must detach the old binding and create a new one.
+	nodes[0].Model = "deepseek-pro"
+	nodes[0].Executor = ExecutorOpencode
+	executorOC := stubExecutor{name: "opencode", result: &ExecResult{FinalText: "ok"}}
+	oldOC := executors[ExecutorOpencode]
+	executors[ExecutorOpencode] = executorOC
+	defer func() { executors[ExecutorOpencode] = oldOC }()
+	rev3, _ := store.UpdatePipelineRevision(sess.ID, nodes, []Edge{}, "manual_edit")
+
+	store.ExecutePipelineV2(ctx, sess.ID, rev3.ID, "task", "", ExecutionOptions{Trigger: "manual"})
+	time.Sleep(2 * time.Second)
+
+	bindings3 := store.ListBindings(sess.ID)
 	detachedCount := 0
-	for _, b := range bindings2 {
-		if b.NodeID == "n1" && b.Status == "detached" {
+	for _, b := range bindings3 {
+		if b.NodeID == "n1" && b.Status == "detached" && b.Executor == string(ExecutorReasonix) {
 			detachedCount++
 		}
 	}
 	if detachedCount == 0 {
-		t.Error("old binding not detached")
+		t.Error("executor swap should detach the reasonix binding")
 	}
 }
 

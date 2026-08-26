@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 )
 
@@ -100,4 +101,86 @@ func (s *Store) FirstBrokenNodeID(runID string) string {
 		}
 	}
 	return ""
+}
+
+// ResetNodeSession detaches every active binding's ProviderSession for one
+// node, so the next execution starts a brand-new provider conversation. This
+// is the operator's manual escape hatch: memory continuity is the default,
+// forgetting is a deliberate act. Returns how many sessions were detached.
+func (s *Store) ResetNodeSession(sessionID, nodeID string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess, ok := s.orchSessions[sessionID]
+	if !ok {
+		return 0, fmt.Errorf("session %q not found", sessionID)
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	count := 0
+	for _, id := range sess.AgentBindingIDs {
+		b, ok := s.bindings[id]
+		if !ok || b.NodeID != nodeID || b.Status != "active" || b.ProviderSessionID == "" {
+			continue
+		}
+		if ps, ok := s.providerSessions[b.ProviderSessionID]; ok {
+			ps.Status = "reset"
+			ps.UpdatedAt = now
+			psDir := filepath.Join(sessionDir(sessionID), "provider-sessions")
+			if err := saveSessionJSON(psDir, ps.ID+".json", ps); err != nil {
+				return count, fmt.Errorf("persist provider session reset: %w", err)
+			}
+		}
+		b.ProviderSessionID = ""
+		b.UpdatedAt = now
+		bDir := filepath.Join(sessionDir(sessionID), "agents")
+		if err := saveSessionJSON(bDir, b.ID+".json", b); err != nil {
+			return count, fmt.Errorf("persist binding after reset: %w", err)
+		}
+		count++
+	}
+	return count, nil
+}
+
+// NodeSessionMemory describes what an operator sees in the node detail view:
+// which provider conversation this node will continue and how many completed
+// executions already feed it.
+type NodeSessionMemory struct {
+	BindingID         string `json:"bindingID,omitempty"`
+	ProviderSessionID string `json:"providerSessionID,omitempty"`
+	ExternalSessionID string `json:"externalSessionID,omitempty"`
+	CompletedRuns     int    `json:"completedRuns"`
+}
+
+// NodeSessionMemory reports the live conversation anchor for a node. Empty
+// ExternalSessionID means the next execution will start a fresh conversation
+// (no provider turn has completed yet).
+func (s *Store) NodeSessionMemory(sessionID, nodeID string) NodeSessionMemory {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := NodeSessionMemory{}
+	sess, ok := s.orchSessions[sessionID]
+	if !ok {
+		return out
+	}
+	for _, id := range sess.AgentBindingIDs {
+		b, ok := s.bindings[id]
+		if !ok || b.NodeID != nodeID || b.Status != "active" {
+			continue
+		}
+		out.BindingID = b.ID
+		if ps, ok := s.providerSessions[b.ProviderSessionID]; ok {
+			out.ProviderSessionID = ps.ID
+			out.ExternalSessionID = ps.ExternalSessionID
+		}
+		break
+	}
+	runIDs := make(map[string]bool, len(sess.RunIDs))
+	for _, rid := range sess.RunIDs {
+		runIDs[rid] = true
+	}
+	for _, att := range s.attempts {
+		if att.NodeID == nodeID && att.Status == "complete" && runIDs[att.RunID] {
+			out.CompletedRuns++
+		}
+	}
+	return out
 }

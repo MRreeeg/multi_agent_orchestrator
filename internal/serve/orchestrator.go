@@ -268,6 +268,10 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.cancelRun(w, r, id)
 	case strings.HasSuffix(path, "/retry") && strings.Count(path, "/") == 3 && strings.HasPrefix(path, "/runs/") && r.Method == http.MethodPost:
 		h.retryRunFromNode(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/retry"))
+	case path == "/nodes/memory" && r.Method == http.MethodGet:
+		h.nodeSessionMemory(w, r)
+	case path == "/nodes/reset-session" && r.Method == http.MethodPost:
+		h.resetNodeSession(w, r)
 	case strings.HasSuffix(path, "/analysis") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/analysis")
 		h.analyzeRunProgress(w, r, id)
@@ -814,6 +818,38 @@ func (h *orchestratorHandler) retryRunFromNode(w http.ResponseWriter, r *http.Re
 	}
 	h.save()
 	writeJSON(w, map[string]string{"runID": newRun.ID, "parentRunID": src.ID, "retryFromNode": nodeID})
+}
+
+// nodeSessionMemory reports the conversation anchor a node will continue:
+// provider session id + how many completed executions feed it.
+func (h *orchestratorHandler) nodeSessionMemory(w http.ResponseWriter, r *http.Request) {
+	sessionID := strings.TrimSpace(r.URL.Query().Get("session"))
+	nodeID := strings.TrimSpace(r.URL.Query().Get("node"))
+	if sessionID == "" || nodeID == "" {
+		writeErr(w, "session and node query params are required", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, h.store.NodeSessionMemory(sessionID, nodeID))
+}
+
+// resetNodeSession detaches the node's ProviderSession — the manual escape
+// hatch when an operator wants a node to forget everything and start clean.
+func (h *orchestratorHandler) resetNodeSession(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Session string `json:"session"`
+		Node    string `json:"node"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Session) == "" || strings.TrimSpace(body.Node) == "" {
+		writeErr(w, "session and node are required", http.StatusBadRequest)
+		return
+	}
+	count, err := h.store.ResetNodeSession(strings.TrimSpace(body.Session), strings.TrimSpace(body.Node))
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	h.save()
+	writeJSON(w, map[string]any{"reset": count})
 }
 
 // analyzeRunProgress returns an AI summary of the current Loop execution:
