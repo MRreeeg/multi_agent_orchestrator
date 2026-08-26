@@ -1829,13 +1829,16 @@ func (s *Store) ExecutePipelineV2(ctx context.Context, sessionID, pipelineRevID,
 
 	// Node-level retry: seed the new run with the source run's completed
 	// upstream outputs BEFORE execution starts, so seeded nodes are skipped
-	// and downstream inputs come from the seeded attempts.
+	// and downstream inputs come from the seeded attempts. Pending operator
+	// continuation notes move with the retry — exactly one run ever injects
+	// them.
 	if opts.RetryFromNodeID != "" && opts.SeedSourceRunID != "" {
 		if src, ok := s.runs[opts.SeedSourceRunID]; ok {
 			if err := s.SeedRetryRun(run, src, pipeCopy, opts.RetryFromNodeID); err != nil {
 				cancel()
 				return nil, fmt.Errorf("seed retry run: %w", err)
 			}
+			s.MovePendingContinuationNotes(src, run)
 			runDir := filepath.Join(sessionDir(sessionID), "runs")
 			if err := saveSessionJSON(runDir, runID+".json", run); err != nil {
 				cancel()
@@ -2618,15 +2621,33 @@ func (s *Store) executePipelineV2(ctx context.Context, run *PipelineRun, pipe *P
 func (s *Store) gatherInputV2(pipe *Pipeline, run *PipelineRun, nodeID string) string {
 	node := findNode(pipe, nodeID)
 	upstream := upstreamEdges(pipe, nodeID)
+	// 暂停期补充说明只在"继续起点"（执行者节点）的输入里消费一次。
+	pendingNotes := ""
+	if node != nil && node.Type == NodeExecutor {
+		s.mu.Lock()
+		pendingNotes = s.takePendingContinuationNotesLocked(run, nodeID)
+		s.mu.Unlock()
+	}
 	if len(upstream) == 0 {
 		if run.Task != "" {
 			if node != nil && node.RoleDesc != "" {
-				return fmt.Sprintf("## 节点职责\n%s\n\n## 原始任务\n%s", node.RoleDesc, run.Task)
+				out := fmt.Sprintf("## 节点职责\n%s\n\n## 原始任务\n%s", node.RoleDesc, run.Task)
+				if pendingNotes != "" {
+					out += "\n\n---\n\n" + continuationNoteHeader + pendingNotes
+				}
+				return out
+			}
+			if pendingNotes != "" {
+				return run.Task + "\n\n---\n\n" + continuationNoteHeader + pendingNotes
 			}
 			return run.Task
 		}
 		if node != nil && node.RoleDesc != "" {
-			return fmt.Sprintf("你是一个%s。你的任务是：%s。请开始工作。", node.Label, node.RoleDesc)
+			out := fmt.Sprintf("你是一个%s。你的任务是：%s。请开始工作。", node.Label, node.RoleDesc)
+			if pendingNotes != "" {
+				out += "\n\n" + continuationNoteHeader + pendingNotes
+			}
+			return out
 		}
 		return fmt.Sprintf("请完成你的角色任务。角色：%s", node.Label)
 	}
@@ -2660,6 +2681,9 @@ func (s *Store) gatherInputV2(pipe *Pipeline, run *PipelineRun, nodeID string) s
 			}
 			parts = append(parts, fmt.Sprintf("### %s\n%s", label, latestOutput))
 		}
+	}
+	if pendingNotes != "" {
+		parts = append(parts, continuationNoteHeader+pendingNotes)
 	}
 	return strings.Join(parts, "\n\n---\n\n")
 }

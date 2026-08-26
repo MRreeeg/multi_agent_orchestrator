@@ -225,6 +225,12 @@ type PipelineRun struct {
 	// consumes the seeded attempt outputs as downstream input; Loop removes
 	// entries after the first round so later revise rounds re-run the node.
 	SeededNodes map[string]bool `json:"seededNodes,omitempty"`
+	// ContinuationNotes records operator guidance captured while the run was
+	// paused/stopped ("补充说明并继续"). Pending notes are injected verbatim
+	// into the input of the next EXECUTOR-node start (the continuation point)
+	// and consumed exactly once — they never leak into reviewer prompts or
+	// later rounds.
+	ContinuationNotes []ContinuationNote `json:"continuationNotes,omitempty"`
 	CurrentNodeID     string              `json:"currentNodeID,omitempty"`
 	CreatedAt          string              `json:"createdAt"`
 	StartedAt          string              `json:"startedAt,omitempty"`
@@ -569,6 +575,16 @@ type ExecutionOptions struct {
 }
 
 // ── Loop Types (P7) ──
+
+// ContinuationNote is one piece of operator guidance captured while a run was
+// paused or after it stopped. Pending notes are consumed exactly once, by the
+// next executor node that assembles its input (the continuation point).
+type ContinuationNote struct {
+	Text             string `json:"text"`
+	CreatedAt        string `json:"createdAt"`
+	Consumed         bool   `json:"consumed"`
+	ConsumedByNodeID string `json:"consumedByNodeID,omitempty"`
+}
 
 // LoopConfig configures loop behavior for a pipeline.
 type LoopConfig struct {

@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -183,4 +184,91 @@ func (s *Store) NodeSessionMemory(sessionID, nodeID string) NodeSessionMemory {
 		}
 	}
 	return out
+}
+
+const continuationNoteHeader = "## 人工补充指令（暂停期间由操作者给出）\n"
+
+// AppendContinuationNote records one piece of operator guidance on the run.
+// Allowed in any run state: notes captured after a stop/cancel are exactly
+// the ones a later continue must carry.
+func (s *Store) AppendContinuationNote(runID, text string) error {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return fmt.Errorf("note text is empty")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	run, ok := s.runs[runID]
+	if !ok {
+		return fmt.Errorf("run %q not found", runID)
+	}
+	run.ContinuationNotes = append(run.ContinuationNotes, ContinuationNote{
+		Text:      text,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	})
+	run.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := saveSessionJSON(filepath.Join(sessionDir(run.SessionID), "runs"), run.ID+".json", run); err != nil {
+		return fmt.Errorf("persist note: %w", err)
+	}
+	return nil
+}
+
+// takePendingContinuationNotes consumes every pending note and returns the
+// joined text for injection into one executor-node input. Must be called with
+// s.mu held; persists the consumption marker.
+func (s *Store) takePendingContinuationNotesLocked(run *PipelineRun, nodeID string) string {
+	var texts []string
+	now := time.Now().UTC().Format(time.RFC3339)
+	for i := range run.ContinuationNotes {
+		n := &run.ContinuationNotes[i]
+		if n.Consumed {
+			continue
+		}
+		n.Consumed = true
+		n.ConsumedByNodeID = nodeID
+		texts = append(texts, n.Text)
+	}
+	if len(texts) == 0 {
+		return ""
+	}
+	run.UpdatedAt = now
+	if err := saveSessionJSON(filepath.Join(sessionDir(run.SessionID), "runs"), run.ID+".json", run); err != nil {
+		// Consumption markers are advisory; losing the persist must not lose
+		// the injected text itself.
+		return strings.Join(texts, "\n\n")
+	}
+	return strings.Join(texts, "\n\n")
+}
+
+// MovePendingContinuationNotes transfers unconsumed notes from the source run
+// to the destination (a retry child run), marking them consumed at the source
+// so exactly one run ever injects them.
+func (s *Store) MovePendingContinuationNotes(src, dst *PipelineRun) int {
+	moved := 0
+	now := time.Now().UTC().Format(time.RFC3339)
+	for i := range src.ContinuationNotes {
+		if src.ContinuationNotes[i].Consumed {
+			continue
+		}
+		dst.ContinuationNotes = append(dst.ContinuationNotes, ContinuationNote{
+			Text:      src.ContinuationNotes[i].Text,
+			CreatedAt: src.ContinuationNotes[i].CreatedAt,
+		})
+		src.ContinuationNotes[i].Consumed = true
+		src.ContinuationNotes[i].ConsumedByNodeID = "moved:" + dst.ID
+		moved++
+	}
+	if moved > 0 {
+		src.UpdatedAt = now
+		dst.UpdatedAt = now
+		if err := saveSessionJSON(filepath.Join(sessionDir(src.SessionID), "runs"), src.ID+".json", src); err != nil {
+			// Source persistence failure must not block the retry; the child
+			// already carries the notes.
+			return moved
+		}
+		if err := saveSessionJSON(filepath.Join(sessionDir(dst.SessionID), "runs"), dst.ID+".json", dst); err != nil {
+			return moved
+		}
+	}
+	return moved
 }

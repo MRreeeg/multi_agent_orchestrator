@@ -268,6 +268,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.cancelRun(w, r, id)
 	case strings.HasSuffix(path, "/retry") && strings.Count(path, "/") == 3 && strings.HasPrefix(path, "/runs/") && r.Method == http.MethodPost:
 		h.retryRunFromNode(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/retry"))
+	case strings.HasSuffix(path, "/notes") && strings.Count(path, "/") == 3 && strings.HasPrefix(path, "/runs/") && r.Method == http.MethodPost:
+		h.appendRunNote(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/notes"))
 	case path == "/nodes/memory" && r.Method == http.MethodGet:
 		h.nodeSessionMemory(w, r)
 	case path == "/nodes/reset-session" && r.Method == http.MethodPost:
@@ -818,6 +820,36 @@ func (h *orchestratorHandler) retryRunFromNode(w http.ResponseWriter, r *http.Re
 	}
 	h.save()
 	writeJSON(w, map[string]string{"runID": newRun.ID, "parentRunID": src.ID, "retryFromNode": nodeID})
+}
+
+// appendRunNote records operator guidance captured while a run was paused or
+// after it stopped. Pending notes are injected verbatim into the input of the
+// next executor-node start when the run is continued (resume or retry).
+func (h *orchestratorHandler) appendRunNote(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Text) == "" {
+		writeErr(w, "text is required", http.StatusBadRequest)
+		return
+	}
+	if _, ok := h.store.GetRun(id); !ok {
+		writeErr(w, fmt.Sprintf("run %q not found", id), http.StatusNotFound)
+		return
+	}
+	if err := h.store.AppendContinuationNote(id, body.Text); err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	h.save()
+	run, _ := h.store.GetRun(id)
+	pending := 0
+	for _, n := range run.ContinuationNotes {
+		if !n.Consumed {
+			pending++
+		}
+	}
+	writeJSON(w, map[string]any{"ok": true, "pendingNotes": pending})
 }
 
 // nodeSessionMemory reports the conversation anchor a node will continue:

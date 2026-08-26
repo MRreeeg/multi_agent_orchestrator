@@ -1460,6 +1460,13 @@ func (s *Store) gatherInputForIteration(pipe *Pipeline, run *PipelineRun, iterat
 		}
 		return "请完成你的角色任务。"
 	}
+	// 暂停期补充说明只在执行者节点的输入里消费一次（继续场景的起点几乎总是
+	// 执行者；审查者/架构者不吞这条指令）。
+	if node != nil && node.Type == NodeExecutor {
+		if pendingNotes := s.takePendingContinuationNotesLocked(run, nodeID); pendingNotes != "" {
+			parts = append(parts, continuationNoteHeader+pendingNotes)
+		}
+	}
 	return strings.Join(parts, "\n\n---\n\n")
 }
 
