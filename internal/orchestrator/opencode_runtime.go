@@ -866,7 +866,7 @@ func (m *OpenCodeRuntimeManager) reserveTurn(rt *opencodeRuntime) (*opencodeclie
 		return nil, fmt.Errorf("opencode runtime lost its connection")
 	}
 	if rt.status == RuntimeBusy {
-		return nil, fmt.Errorf("opencode runtime already has an active turn")
+		return nil, fmt.Errorf("%w: already has an active turn", ErrRuntimeBusy)
 	}
 	rt.status = RuntimeBusy
 	rt.turnID = fmt.Sprintf("turn_%d", time.Now().UnixNano())
@@ -977,9 +977,16 @@ func (m *OpenCodeRuntimeManager) SendMessage(runtimeID, text string) error {
 	client := target.client
 	sessionID := target.sessionID
 	model := target.ModelRef
+	busy := target.status == RuntimeBusy
 	target.mu.Unlock()
 	if client == nil || sessionID == "" {
 		return fmt.Errorf("opencode runtime has no session")
+	}
+	if busy {
+		// Firing a manual prompt into a server mid-node-turn either queues it
+		// invisibly or errors much later; refuse fast so the console can offer
+		// interrupt-and-send / queue-until-idle instead.
+		return fmt.Errorf("%w: opencode node turn active", ErrRuntimeBusy)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()

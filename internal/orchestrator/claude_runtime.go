@@ -615,7 +615,7 @@ func (m *ClaudeRuntimeManager) reserveTurn(rt *claudeRuntime) (*claudeclient.Sdk
 	}
 	if rt.status == RuntimeBusy {
 		rt.mu.Unlock()
-		return nil, fmt.Errorf("claude runtime already has an active turn")
+		return nil, fmt.Errorf("%w: claude runtime already has an active turn", ErrRuntimeBusy)
 	}
 	if rt.status == RuntimeStopped {
 		rt.mu.Unlock()

@@ -1827,6 +1827,23 @@ func (s *Store) ExecutePipelineV2(ctx context.Context, sessionID, pipelineRevID,
 
 	s.mu.Unlock()
 
+	// Node-level retry: seed the new run with the source run's completed
+	// upstream outputs BEFORE execution starts, so seeded nodes are skipped
+	// and downstream inputs come from the seeded attempts.
+	if opts.RetryFromNodeID != "" && opts.SeedSourceRunID != "" {
+		if src, ok := s.runs[opts.SeedSourceRunID]; ok {
+			if err := s.SeedRetryRun(run, src, pipeCopy, opts.RetryFromNodeID); err != nil {
+				cancel()
+				return nil, fmt.Errorf("seed retry run: %w", err)
+			}
+			runDir := filepath.Join(sessionDir(sessionID), "runs")
+			if err := saveSessionJSON(runDir, runID+".json", run); err != nil {
+				cancel()
+				return nil, fmt.Errorf("persist seeded run: %w", err)
+			}
+		}
+	}
+
 	go s.ExecuteLoop(runCtx, run, pipeCopy, sessionID)
 	return run, nil
 }
@@ -2320,6 +2337,19 @@ func (s *Store) executePipelineV2(ctx context.Context, run *PipelineRun, pipe *P
 				}
 				node := findNode(pipe, nodeID)
 				if node == nil {
+					s.mu.Unlock()
+					return
+				}
+				// Node-level retry seed: the output was copied from a source
+				// run — mark complete without executing (zero tokens).
+				if run.SeededNodes[nodeID] {
+					delete(run.SeededNodes, nodeID)
+					state := run.NodeStates[nodeID]
+					if state.Status != NodeComplete {
+						state.Status = NodeComplete
+						run.NodeStates[nodeID] = state
+					}
+					run.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 					s.mu.Unlock()
 					return
 				}

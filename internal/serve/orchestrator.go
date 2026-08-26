@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -265,6 +266,8 @@ func (h *orchestratorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	case strings.HasSuffix(path, "/cancel") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/cancel")
 		h.cancelRun(w, r, id)
+	case strings.HasSuffix(path, "/retry") && strings.Count(path, "/") == 3 && strings.HasPrefix(path, "/runs/") && r.Method == http.MethodPost:
+		h.retryRunFromNode(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/retry"))
 	case strings.HasSuffix(path, "/analysis") && r.Method == http.MethodPost:
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/runs/"), "/analysis")
 		h.analyzeRunProgress(w, r, id)
@@ -765,6 +768,52 @@ func (h *orchestratorHandler) cancelRun(w http.ResponseWriter, _ *http.Request, 
 	}
 	h.save()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// retryRunFromNode starts a NEW run from the same revision that seeds the
+// completed upstream outputs of the source run and begins execution at the
+// requested node. Long-horizon Loop runs recover from a stuck/failed executor
+// without re-running — or re-paying for — the successful prefix. An empty
+// nodeID auto-picks the first failed/interrupted node in topological order.
+func (h *orchestratorHandler) retryRunFromNode(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		NodeID string `json:"nodeID"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	src, ok := h.store.GetRun(id)
+	if !ok {
+		writeErr(w, fmt.Sprintf("run %q not found", id), http.StatusNotFound)
+		return
+	}
+	if src.SessionID == "" || src.PipelineRevisionID == "" {
+		writeErr(w, "run is missing session or revision; cannot retry", http.StatusBadRequest)
+		return
+	}
+	if src.Status != "failed" && src.Status != "interrupted" && src.Status != "canceled" {
+		writeErr(w, fmt.Sprintf("cannot retry run in status %q; only failed/interrupted/canceled runs can be retried", src.Status), http.StatusConflict)
+		return
+	}
+	nodeID := strings.TrimSpace(body.NodeID)
+	if nodeID == "" {
+		nodeID = h.store.FirstBrokenNodeID(id)
+		if nodeID == "" {
+			writeErr(w, "no failed/interrupted node found in this run", http.StatusBadRequest)
+			return
+		}
+	}
+	newRun, err := h.store.ExecutePipelineV2(r.Context(), src.SessionID, src.PipelineRevisionID, src.Task, src.RewrittenTask, orchestrator.ExecutionOptions{
+		Trigger:         "retry",
+		ParentRunID:     src.ID,
+		RetryFromNodeID: nodeID,
+		SeedSourceRunID: src.ID,
+		ContextPolicy:   src.ExecOptions.ContextPolicy,
+	})
+	if err != nil {
+		writeErr(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	h.save()
+	writeJSON(w, map[string]string{"runID": newRun.ID, "parentRunID": src.ID, "retryFromNode": nodeID})
 }
 
 // analyzeRunProgress returns an AI summary of the current Loop execution:
@@ -1483,26 +1532,46 @@ func (h *orchestratorHandler) sendRuntimeMessage(w http.ResponseWriter, r *http.
 		writeErr(w, "text is required", http.StatusBadRequest)
 		return
 	}
-	turnID, err := orchestrator.SendMimoRuntimeMessage(r.Context(), id, body.Text)
-	if err == nil {
-		writeJSON(w, map[string]string{"turnID": turnID})
+	busy := false
+	var lastErr error
+	// send tries one executor backend; on success it writes the response and
+	// returns true. Errors are remembered so a total failure can report the
+	// most relevant cause.
+	send := func(fn func() (string, error)) bool {
+		turnID, err := fn()
+		if err == nil {
+			writeJSON(w, map[string]string{"turnID": turnID})
+			return true
+		}
+		if errors.Is(err, orchestrator.ErrRuntimeBusy) {
+			busy = true
+		}
+		lastErr = err
+		return false
+	}
+	ok := send(func() (string, error) { return orchestrator.SendMimoRuntimeMessage(r.Context(), id, body.Text) }) ||
+		send(func() (string, error) { return orchestrator.SendCodexRuntimeMessage(r.Context(), id, body.Text) }) ||
+		send(func() (string, error) { return orchestrator.SendClaudeRuntimeMessage(r.Context(), id, body.Text) })
+	if !ok {
+		err := orchestrator.SendOpencodeRuntimeMessage(id, body.Text)
+		if err == nil {
+			writeJSON(w, map[string]string{"turnID": "manual"})
+			return
+		}
+		if errors.Is(err, orchestrator.ErrRuntimeBusy) {
+			busy = true
+		}
+		lastErr = err
+	}
+	if busy {
+		// 409 lets the console offer interrupt-and-send / queue-until-idle
+		// instead of showing a generic failure for a mid-turn send.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "busy", "message": lastErr.Error()})
 		return
 	}
-	turnID, err = orchestrator.SendCodexRuntimeMessage(r.Context(), id, body.Text)
-	if err == nil {
-		writeJSON(w, map[string]string{"turnID": turnID})
-		return
-	}
-	turnID, err = orchestrator.SendClaudeRuntimeMessage(r.Context(), id, body.Text)
-	if err == nil {
-		writeJSON(w, map[string]string{"turnID": turnID})
-		return
-	}
-	if err := orchestrator.SendOpencodeRuntimeMessage(id, body.Text); err != nil {
-		writeErr(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeJSON(w, map[string]string{"turnID": "manual"})
+	writeErr(w, lastErr.Error(), http.StatusBadRequest)
 }
 
 func (h *orchestratorHandler) interruptRuntime(w http.ResponseWriter, r *http.Request, id string) {

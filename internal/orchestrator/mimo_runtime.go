@@ -611,7 +611,7 @@ func (m *MimoRuntimeManager) reserveTurn(rt *mimoRuntime) (*mimoclient.AcpClient
 	}
 	if rt.status == RuntimeBusy {
 		rt.mu.Unlock()
-		return nil, fmt.Errorf("mimo runtime already has an active turn")
+		return nil, fmt.Errorf("%w: mimo runtime already has an active turn", ErrRuntimeBusy)
 	}
 	if rt.status == RuntimeStopped {
 		rt.mu.Unlock()

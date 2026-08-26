@@ -570,7 +570,7 @@ func (m *CodexRuntimeManager) reserveTurn(rt *codexRuntime) (*codexclient.AppSer
 	}
 	if rt.status == RuntimeBusy {
 		rt.mu.Unlock()
-		return nil, fmt.Errorf("codex runtime already has an active turn")
+		return nil, fmt.Errorf("%w: codex runtime already has an active turn", ErrRuntimeBusy)
 	}
 	if rt.status == RuntimeStopped {
 		rt.mu.Unlock()

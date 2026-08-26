@@ -219,7 +219,12 @@ type PipelineRun struct {
 	Images []ImageRef `json:"images,omitempty"`
 	// MaintenanceEvents records reviewer-driven stall repairs applied during
 	// the run (detect → diagnose → nudge/restart/noop), newest last.
-	MaintenanceEvents []MaintenanceEvent  `json:"maintenanceEvents,omitempty"`
+	MaintenanceEvents []MaintenanceEvent `json:"maintenanceEvents,omitempty"`
+	// SeededNodes lists node IDs whose outputs were copied from a source run
+	// by node-level retry (SeedRetryRun). The executor skips running them and
+	// consumes the seeded attempt outputs as downstream input; Loop removes
+	// entries after the first round so later revise rounds re-run the node.
+	SeededNodes map[string]bool `json:"seededNodes,omitempty"`
 	CurrentNodeID     string              `json:"currentNodeID,omitempty"`
 	CreatedAt          string              `json:"createdAt"`
 	StartedAt          string              `json:"startedAt,omitempty"`
@@ -554,6 +559,13 @@ type ExecutionOptions struct {
 	// name). Orchestrator uses them for automatic vision delegation when an
 	// executor model cannot read images itself.
 	Images []ImageRef `json:"images,omitempty"`
+	// RetryFromNodeID + SeedSourceRunID drive node-level retry (POST
+	// /runs/{id}/retry): a NEW run is created from the same revision, the
+	// source run's completed upstream attempts/states are seeded into it, and
+	// execution begins at the retry node. Upstream outputs are reused as-is —
+	// no tokens are spent re-running the successful prefix.
+	RetryFromNodeID string `json:"retryFromNodeID,omitempty"`
+	SeedSourceRunID string `json:"seedSourceRunID,omitempty"`
 }
 
 // ── Loop Types (P7) ──

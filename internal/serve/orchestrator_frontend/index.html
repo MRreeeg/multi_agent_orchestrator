@@ -1170,7 +1170,7 @@ const I18N = {
     'src.custom': '客制化 Agent：', 'src.promptDefault': 'Prompt 式：内置 persona', 'src.skillInject': 'Prompt 式：Skill 注入 ', 'src.roleDesc': 'Prompt 式：角色描述', 'src.agentCfg': 'Agent 配置：',
     'nd.type': '类型：', 'nd.model': '模型：', 'nd.status': '状态：', 'nd.done': '已完成', 'nd.failed': '失败', 'nd.interrupted': '已中断', 'nd.empty': '完成但无输出', 'nd.pending': '待执行', 'nd.skill': 'Skill：', 'nd.agent': 'Agent：', 'nd.role': '角色：', 'nd.source': 'Agent 来源：', 'nd.unset': '未设置', 'nd.port': '端口：', 'nd.endpoint': '端点：', 'nd.policy': '策略：', 'nd.retained': 'retained（保留至手动停止）', 'nd.access': '访问方式：', 'nd.accessLocal': '本地历史会话', 'nd.accessConsole': 'Orchestrator Runtime Console', 'nd.accessBrowser': '浏览器', 'nd.enterConsole': '进入控制台', 'nd.noWeb': '无网页入口 — 使用本地 mimo 历史会话', 'nd.interrupt': 'Interrupt（保留 runtime）', 'nd.soon': '后续版本支持', 'nd.noRuntime': '无运行时实例（一次性执行，已结束）', 'nd.output': '输出内容', 'nd.errorTitle': '错误信息', 'nd.logs': '思考/工具日志', 'nd.emptyTitle': '⚠️ 执行完成但没有返回正文', 'nd.emptyHint': '这通常表示执行器没有真正产出内容，或输出被吞掉了。请优先查看下方日志。', 'nd.pendingTitle': '⏳ 尚未执行', 'nd.pendingHint': '执行流水线后，此节点的输出将显示在这里', 'nd.rtRunning': '🟢 运行中', 'nd.rtIdle': '🟡 空闲（可进入）', 'nd.rtBusy': '🔵 忙碌中', 'nd.rtStopped': '⚫ 已停止', 'nd.rtUnknown': '未知',
     'rd.running': '● 执行中', 'rd.runningEllipsis': '执行中…', 'rd.iter': '第 {cur} 轮 / 共 {max} 轮', 'rd.noRun': '没有可分析的 Run', 'rd.analyzing': '⏳ 正在分析执行进展…', 'rd.blocking': '卡点：', 'rd.noBlocking': '暂无卡点', 'rd.suggest': '建议：', 'rd.analysisTitle': '📊 执行进展分析', 'rd.analysisFail': '分析失败: ', 'rd.failedParen': '（失败 {n}）', 'toast.noLoop': '没有正在运行的 Loop', 'toast.stopReq': '已请求停止当前 Loop', 'toast.stopFail': '停止 Loop 失败: ',
-    'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.execLabel': '第 {n} 次执行',
+    'run.nodes': '节点: ', 'run.failed': '失败: ', 'run.trigger': '触发: ', 'run.loopInfo': 'Loop：第 ', 'run.mode': '模式：', 'run.term': '终止原因：', 'run.review': '最终 Review：', 'run.resume': '继续 Loop', 'run.stop': '停止', 'run.retry': '重试', 'run.execLabel': '第 {n} 次执行',
     'cfg.name': '节点名称', 'cfg.type': '节点类型', 'cfg.model': '模型', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': '运行模式', 'cfg.approval': '权限模式', 'cfg.reasoning': '思考强度', 'cfg.role': '职责描述（点击打开大窗口编辑）', 'cfg.assist': '辅助手', 'cfg.preset': '客制化 Agent（deepseek-harness 预设）', 'cfg.loop': 'Loop 循环', 'cfg.loopMode': '循环模式', 'cfg.loopMax': '最大轮数', 'cfg.loopReviewer': '审查节点', 'cfg.stall': '卡住自动维护', 'cfg.stallTitle': '节点执行卡住（长时间无进展）时，由审查者诊断并自动纠正：中断+发消息引导继续（serve 模式）或杀掉重跑。便宜/免费模型节点建议开启；贵模型节点可关闭。全局可用环境变量 REASONIX_STALL_MAINTENANCE=off 禁用。', 'cfg.rolePh': '描述该节点的职责...（点击打开大窗口）', 'cfg.execTitle': '驱动本节点的 Agent 引擎', 'cfg.execTitleCodex': 'Codex：run 为一次性 exec；serve 为保留 Runtime（app-server）', 'cfg.skillTitle': '默认执行器可使用 skill', 'cfg.skillTitleCodex': 'Codex 通过 Prompt 注入 Skill 内容', 'cfg.skillTitleMimo': 'mimo executor 当前不会使用 skill，但可保留配置', 'cfg.dshTitle': '本地客制化的 deepseek-harness agent（$DSH_HOME/.agent-presets）。选中后节点以该 agent 的 persona 与工具集运行（客制化 Agent）；留空则使用 deepseek-harness 内置 persona（Prompt 式）。', 'cfg.dshDefault': '默认（内置 persona，Prompt 式）', 'cfg.dshNoPatch': ' · 无 headless 补丁，不可用于节点', 'loop.off': '关闭', 'loop.on': '开启', 'loop.modeReview': '审查者决定', 'loop.modeFixed': '固定次数', 'loop.pickReviewer': '选择审查节点...', 'loop.overlay': 'Loop 运行时回到执行者 · {mode} · {max} 轮', 'loop.backTo': '↩ 回传 → {name}', 'loop.targetAll': '默认 · 全部执行者重跑', 'loop.targetExists': '该节点已在回传目标中', 'loop.removeTargetHint': '点击移除这条回传线', 'loop.addTargetHint': '从审查节点拖出反馈线到目标节点，即可添加回传', 'loop.defaultHint': '当前为默认回传（全部执行者每轮重跑）；从审查节点拖出反馈线可指定目标', 'loop.feedbackHint': '已识别反馈连线：Loop 采用运行时循环（虚线框），无需物理回边——已在右侧开启 Loop 并选择审查节点', 'loop.autoReviewer': '已自动选择审查节点：', 'loop.needReviewer': 'Loop 需要审查节点：请先添加一个审查者节点', 'assist.on': '开启', 'assist.off': '关闭', 'assist.model': '辅助模型', 'assist.driver': '驱动', 'assist.role': '职责', 'assist.rolePh': '例如：识图——描述截图/设计稿/报错图，或完成交给你的独立小任务', 'assist.enabledTitle': '节点的专属辅助 agent：可把识图等小任务交给它（默认 mimo 视觉），失败不阻塞主流程', 'assist.modelTitle': '辅助 agent 使用的视觉/对话模型', 'assist.driverTitle': '辅助请求走的模型路由：opencode（OpenAI 兼容 zen/go）或 claude（Anthropic 兼容 zen）', 'assist.driverOpenCode': 'opencode（zen/go）', 'assist.driverClaude': 'claude（zen anthropic）', 'assist.modelVision': 'mimo-v2.5（视觉 ✓）', 'assist.badgeTitle': '辅助手：识图等小任务', 'sc.checkedAt': '检查时间 ', 'sc.count': '共 ', 'sc.countSuffix': ' 个', 'sc.noSkills': '当前未发现可用 Skill', 'sc.probeNote': '节点配置与分析入口的下拉已按以上本机探测结果更新；每台电脑可能不同。', 'cfg.nodeTitle': '节点: ', 'model.placeholder': '选择模型...', 'model.custom': '✏️ ccswitch…', 'model.promptTitle': 'ccswitch 模型名', 'model.promptPh': '模型名（ccs/ccswitch 走 ccswitch 路由；其他如 deepseek-xxx、claude 全名将透传给 CLI 自行解析）', 'hero.chip1': '端口范围解析', 'hero.chip2': '重构并补测试', 'hero.chip3': '代码审查', 'preset.builtinGroup': '内置模板', 'preset.customGroup': '我的预设', 'preset.save': '存为预设', 'preset.saveTitle': '保存当前管道为预设', 'preset.savePh': '预设名称', 'preset.loadTitle': '加载预设', 'preset.loadMsg': '加载预设将替换当前管道，继续？', 'preset.loadOk': '加载', 'preset.loaded': '已加载预设: ', 'toolbar.clearMsg': '确定清空当前管道？所有节点与连线将被移除。', 'edge.deleteMsg': '删除此连线？', 'hist.deleteMsg1': '确定删除会话「{n}」吗？<br>会话将从历史列表中隐藏，相关数据会保留在归档状态。', 'hist.deleteMsg2': '确定删除会话「{n}」吗？<br>这会永久删除本地会话记录。', 'preset.d3.name': '三 Agent 流水线', 'preset.d3.desc': 'Pro 架构 → MiMo 实现 → Flash 审查', 'preset.d3.l1': '架构师', 'preset.d3.l2': '执行者', 'preset.d3.l3': '审查者', 'preset.d3.r1': '设计系统架构和方案', 'preset.d3.r2': '根据架构实现代码', 'preset.d3.r3': '审查代码质量和安全性', 'preset.pr.name': '并行调研', 'preset.pr.desc': '拆解任务 → 并行调研 → 汇总结果', 'preset.pr.l1': '任务拆解', 'preset.pr.l2': '调研 A', 'preset.pr.l3': '调研 B', 'preset.pr.l4': '汇总', 'preset.pr.r1': '将大任务拆解为可并行的子任务', 'preset.pr.r2': '调研方向 A', 'preset.pr.r3': '调研方向 B', 'preset.pr.r4': '汇总两路调研结果', 'preset.dr.name': '设计→审查', 'preset.dr.desc': 'Pro 设计 → Flash 审查设计', 'preset.dr.l1': '设计师', 'preset.dr.l2': '审查者', 'preset.dr.r1': '输出详细设计方案', 'preset.dr.r2': '审查方案可行性', 'preset.loop.name': '循环迭代（固定 3 轮）', 'preset.loop.desc': '架构 → 实现 → 审查，固定循环 3 轮（Loop）',
     'dlg.confirm': '确认', 'dlg.ok': '确定', 'dlg.cancel': '取消', 'dlg.newSession': '新建会话', 'dlg.newSessionDefault': '新编排会话', 'dlg.sessionNamePh': '会话名称',
     'ws.switch': '✏️ 切换', 'ws.unset': '未设置工作目录', 'ws.pick': '📂 浏览…', 'preset.load': '加载预设...', 'badge.enter': '进入', 'dlg.close': '关闭', 'toolbar.autoLayout': '自动布局', 'toolbar.delete': '删除', 'toolbar.clear': '清空', 'cfg.typeArchitect': '架构师（蓝色）', 'cfg.typeReviewer': '审查者（绿色）', 'cfg.typeExecutor': '执行者（红色）', 'rd.title': '执行详情', 'rd.loading': '加载中…', 'rd.status': '状态：', 'rd.trigger': '触发：', 'rd.nodes': '节点：', 'rd.loop': 'Loop 循环', 'rd.loopProgress': '进度：', 'rd.mode': '模式：', 'rd.termination': '终止：', 'rd.review': '审查：', 'rd.agents': '各 Agent 执行情况',
@@ -1201,7 +1201,7 @@ const I18N = {
     'src.custom': 'Custom Agent: ', 'src.promptDefault': 'Prompt: built-in persona', 'src.skillInject': 'Prompt: Skill ', 'src.roleDesc': 'Prompt: role description', 'src.agentCfg': 'Agent config: ',
     'nd.type': 'Type: ', 'nd.model': 'Model: ', 'nd.status': 'Status: ', 'nd.done': 'Done', 'nd.failed': 'Failed', 'nd.interrupted': 'Interrupted', 'nd.empty': 'Done, no output', 'nd.pending': 'Pending', 'nd.skill': 'Skill: ', 'nd.agent': 'Agent: ', 'nd.role': 'Role: ', 'nd.source': 'Agent source: ', 'nd.unset': 'Not set', 'nd.port': 'Port: ', 'nd.endpoint': 'Endpoint: ', 'nd.policy': 'Policy: ', 'nd.retained': 'retained (until manually stopped)', 'nd.access': 'Access: ', 'nd.accessLocal': 'Local history', 'nd.accessConsole': 'Orchestrator Runtime Console', 'nd.accessBrowser': 'Browser', 'nd.enterConsole': 'Open console', 'nd.noWeb': 'No web entry — use local mimo history', 'nd.interrupt': 'Interrupt (keep runtime)', 'nd.soon': 'Coming soon', 'nd.noRuntime': 'No runtime instance (one-shot execution, finished)', 'nd.output': 'Output', 'nd.errorTitle': 'Error', 'nd.logs': 'Reasoning / tool logs', 'nd.emptyTitle': '⚠️ Finished but returned no content', 'nd.emptyHint': 'Usually means the executor produced nothing or output was swallowed. Check the logs below.', 'nd.pendingTitle': '⏳ Not executed yet', 'nd.pendingHint': 'This node output will appear here after the pipeline runs', 'nd.rtRunning': '🟢 Running', 'nd.rtIdle': '🟡 Idle (enterable)', 'nd.rtBusy': '🔵 Busy', 'nd.rtStopped': '⚫ Stopped', 'nd.rtUnknown': 'Unknown',
     'rd.running': '● Running', 'rd.runningEllipsis': 'Running…', 'rd.iter': 'Round {cur} / {max}', 'rd.noRun': 'No run to analyze', 'rd.analyzing': '⏳ Analyzing run progress...', 'rd.blocking': 'Blockers: ', 'rd.noBlocking': 'No blockers', 'rd.suggest': 'Suggestions: ', 'rd.analysisTitle': '📊 Run Progress Analysis', 'rd.analysisFail': 'Analysis failed: ', 'rd.failedParen': ' (failed {n})', 'toast.noLoop': 'No Loop is running', 'toast.stopReq': 'Stop requested for current Loop', 'toast.stopFail': 'Failed to stop Loop: ',
-    'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.execLabel': 'Run #{n}',
+    'run.nodes': 'Nodes: ', 'run.failed': 'Failed: ', 'run.trigger': 'Trigger: ', 'run.loopInfo': 'Loop: ', 'run.mode': 'Mode: ', 'run.term': 'Termination: ', 'run.review': 'Final review: ', 'run.resume': 'Resume Loop', 'run.stop': 'Stop', 'run.retry': 'Retry', 'run.execLabel': 'Run #{n}',
     'cfg.name': 'Name', 'cfg.type': 'Type', 'cfg.model': 'Model', 'cfg.skill': 'Skill', 'cfg.agent': 'Agent', 'cfg.mode': 'Mode', 'cfg.approval': 'Approval', 'cfg.reasoning': 'Effort', 'cfg.role': 'Role description (click to edit in a large window)', 'cfg.assist': 'Helper agent', 'cfg.preset': 'Custom Agent (deepseek-harness preset)', 'cfg.loop': 'Loop', 'cfg.loopMode': 'Loop mode', 'cfg.loopMax': 'Max rounds', 'cfg.loopReviewer': 'Review node', 'cfg.stall': 'Stall auto-repair', 'cfg.stallTitle': 'When this node stalls (no progress for a while), the reviewer diagnoses and repairs it automatically: interrupt + message to continue (serve mode) or kill & rerun. Recommended for cheap/free models; can be off for expensive models. Global kill switch: env REASONIX_STALL_MAINTENANCE=off', 'cfg.rolePh': 'Describe this node role... (click to open large editor)', 'cfg.execTitle': 'Agent engine driving this node', 'cfg.execTitleCodex': 'Codex: run = one-shot exec; serve = retained Runtime (app-server)', 'cfg.skillTitle': 'Default executors can use skill', 'cfg.skillTitleCodex': 'Codex injects Skill via prompt', 'cfg.skillTitleMimo': 'mimo executor does not use skill; kept for compatibility', 'cfg.dshTitle': 'Locally customized deepseek-harness agent ($DSH_HOME/.agent-presets). Selected node runs with that agent persona and toolset (custom); empty uses deepseek-harness built-in persona (prompt-based).', 'cfg.dshDefault': 'Default (built-in persona, prompt-based)', 'cfg.dshNoPatch': ' · no headless patch, not usable for nodes', 'loop.off': 'Off', 'loop.on': 'On', 'loop.modeReview': 'Review decides', 'loop.modeFixed': 'Fixed rounds', 'loop.pickReviewer': 'Select review node...', 'loop.overlay': 'Loop returns to executor · {mode} · {max} rounds', 'loop.backTo': '↩ back to {name}', 'loop.targetAll': 'Default · all executors rerun', 'loop.targetExists': 'Already a feedback target', 'loop.removeTargetHint': 'Click to remove this feedback line', 'loop.addTargetHint': 'Drag a feedback line from the reviewer onto a node to add a target', 'loop.defaultHint': 'Default feedback (all executors rerun); drag a line from the reviewer to pin targets', 'loop.feedbackHint': 'Feedback edge detected: Loop runs as a runtime cycle (dashed box), no physical back-edge needed — Loop switched on and reviewer selected', 'loop.autoReviewer': 'Auto-selected review node: ', 'loop.needReviewer': 'Loop needs a reviewer: add a reviewer node first', 'assist.on': 'On', 'assist.off': 'Off', 'assist.model': 'Helper model', 'assist.driver': 'Driver', 'assist.role': 'Duty', 'assist.rolePh': 'e.g. vision — describe screenshots/designs/error images, or handle small side tasks', 'assist.enabledTitle': "Node's dedicated helper agent: delegate vision/small tasks (default mimo); failures never block", 'assist.modelTitle': 'Vision/chat model used by the helper agent', 'assist.driverTitle': 'Route for assist requests: opencode (OpenAI-compatible zen/go) or claude (Anthropic-compatible zen)', 'assist.driverOpenCode': 'opencode (zen/go)', 'assist.driverClaude': 'claude (zen anthropic)', 'assist.modelVision': 'mimo-v2.5 (Vision ✓)', 'assist.badgeTitle': 'Helper: vision & small tasks', 'sc.checkedAt': 'checked at ', 'sc.count': '', 'sc.countSuffix': '', 'sc.noSkills': 'No skills found', 'sc.probeNote': 'Node config and analysis pickers follow the probe results above; they differ per machine.', 'cfg.nodeTitle': 'Node: ', 'model.placeholder': 'Select model...', 'model.custom': '✏️ ccswitch…', 'model.promptTitle': 'ccswitch model name', 'model.promptPh': 'Model name (ccs/ccswitch route via CCSwitch; other names like deepseek-xxx or full Claude names pass through to the CLI)', 'hero.chip1': 'Port range parser', 'hero.chip2': 'Refactor & add tests', 'hero.chip3': 'Code review', 'preset.builtinGroup': 'Built-in templates', 'preset.customGroup': 'My presets', 'preset.save': 'Save as preset', 'preset.saveTitle': 'Save current pipeline as a preset', 'preset.savePh': 'Preset name', 'preset.loadTitle': 'Load preset', 'preset.loadMsg': 'Loading a preset will replace the current pipeline. Continue?', 'preset.loadOk': 'Load', 'preset.loaded': 'Preset loaded: ', 'toolbar.clearMsg': 'Clear the current pipeline? All nodes and edges will be removed.', 'edge.deleteMsg': 'Delete this edge?', 'hist.deleteMsg1': 'Delete session "{n}"?<br>It will be hidden from the history list; data stays archived.', 'hist.deleteMsg2': 'Delete session "{n}"?<br>This permanently removes the local session record.', 'preset.d3.name': 'Three-Agent Pipeline', 'preset.d3.desc': 'Pro architecture → MiMo implementation → Flash review', 'preset.d3.l1': 'Architect', 'preset.d3.l2': 'Executor', 'preset.d3.l3': 'Reviewer', 'preset.d3.r1': 'Design system architecture and plan', 'preset.d3.r2': 'Implement code from the architecture', 'preset.d3.r3': 'Review code quality and security', 'preset.pr.name': 'Parallel Research', 'preset.pr.desc': 'Split task → parallel research → merge results', 'preset.pr.l1': 'Task split', 'preset.pr.l2': 'Research A', 'preset.pr.l3': 'Research B', 'preset.pr.l4': 'Merge', 'preset.pr.r1': 'Split the task into parallel subtasks', 'preset.pr.r2': 'Research direction A', 'preset.pr.r3': 'Research direction B', 'preset.pr.r4': 'Merge both research results', 'preset.dr.name': 'Design → Review', 'preset.dr.desc': 'Pro design → Flash design review', 'preset.dr.l1': 'Designer', 'preset.dr.l2': 'Reviewer', 'preset.dr.r1': 'Produce a detailed design', 'preset.dr.r2': 'Review design feasibility', 'preset.loop.name': 'Loop Iterate (fixed 3 rounds)', 'preset.loop.desc': 'Architect → Implement → Review, fixed 3-round loop',
     'dlg.confirm': 'Confirm', 'dlg.ok': 'OK', 'dlg.cancel': 'Cancel', 'dlg.newSession': 'New Session', 'dlg.newSessionDefault': 'New orchestration session', 'dlg.sessionNamePh': 'Session name',
     'ws.switch': '✏️ Change', 'ws.unset': 'No workspace set', 'ws.pick': '📂 Browse…', 'preset.load': 'Load preset...', 'badge.enter': 'Enter', 'dlg.close': 'Close', 'toolbar.autoLayout': 'Auto layout', 'toolbar.delete': 'Delete', 'toolbar.clear': 'Clear', 'cfg.typeArchitect': 'Architect (blue)', 'cfg.typeReviewer': 'Reviewer (green)', 'cfg.typeExecutor': 'Executor (red)', 'rd.title': 'Run Details', 'rd.loading': 'Loading…', 'rd.status': 'Status: ', 'rd.trigger': 'Trigger: ', 'rd.nodes': 'Nodes: ', 'rd.loop': 'Loop', 'rd.loopProgress': 'Progress: ', 'rd.mode': 'Mode: ', 'rd.termination': 'Termination: ', 'rd.review': 'Review: ', 'rd.agents': 'Agent breakdown',
@@ -5208,6 +5208,9 @@ async function openRunDetail(runId) {
       // 不再截断 600 字。默认展开条件：节点失败、或属于当前查看轮的最新
       // 尝试（opts.open）；其余折叠保留全文可展开。
       const outOpen = errText ? true : (opts.open !== false);
+      // failed/interrupted 节点可从此节点起一个新 Run 重试：上游已完成输出
+      // 沿用（种子注入），不重复烧已完成前缀的 token。
+      const canRetry = st.status === 'failed' || st.status === 'interrupted';
       return '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
         '<span style="font-size:15px">' + stIcon + '</span>' +
@@ -5216,6 +5219,7 @@ async function openRunDetail(runId) {
         '<span style="font-size:11px;color:var(--muted-2);font-family:var(--mono)">' + escHtml(node.executor || '') + (node.model ? ' / ' + escHtml(node.model) : '') + '</span>' +
         '<span style="margin-left:auto;font-size:11px;color:var(--muted-2)">' + escHtml(st.status || '-') + (dur ? ' · ' + formatDuration(dur) : '') + (st.tokenUsage && st.tokenUsage.totalTokens ? ' · ' + formatNumber(st.tokenUsage.totalTokens) + ' tok' : '') + '</span>' +
         '</div>' +
+        (canRetry ? '<div style="margin-top:7px"><button class="rd-node-retry" data-run="' + escHtml(runId) + '" data-node="' + escHtml(node.id) + '" title="以上游已完成输出为种子，从此节点起新 Run 继续" style="font-size:11px;color:var(--accent);padding:3px 8px;border:1px solid var(--accent);border-radius:4px;background:none;cursor:pointer">⤴ 从此节点重试</button></div>' : '') +
         (output ? '<details class="rd-node-sec"' + (outOpen ? ' open' : '') + ' style="margin-top:7px;border:1px solid var(--border);border-radius:6px;background:var(--bg-2)">' +
           '<summary style="cursor:pointer;padding:6px 10px;font-size:11.5px;color:var(--muted-2);user-select:none">📄 输出' + (output.length > 0 ? ' · ' + output.length + ' 字' : '') + '</summary>' +
           '<div class="md-body" style="font-size:12px;color:var(--fg-2);word-break:break-word;padding:4px 12px 10px">' + renderMarkdown(output) + '</div>' +
@@ -5315,6 +5319,37 @@ $('#run-detail-modal').addEventListener('click', (e) => { if (e.target === e.cur
 document.addEventListener('click', ev => {
   const btn = ev.target.closest && ev.target.closest('.rd-detail-zoom');
   if (btn && btn.dataset.text) showOutputPreview(btn.dataset.text);
+});
+
+// 「从此节点重试」：以上游已完成输出为种子，从该节点起新 Run 继续。
+document.addEventListener('click', ev => {
+  const btn = ev.target.closest && ev.target.closest('.rd-node-retry');
+  if (!btn) return;
+  const runId = btn.dataset.run;
+  const nodeId = btn.dataset.node;
+  if (!runId || !nodeId || btn.disabled) return;
+  confirmDialog({
+    title: '从此节点重试',
+    message: '将从该节点起一个新的 Run 继续执行。<br>上游已完成节点的输出<b>直接沿用</b>，不重复执行、不重复消耗 token。',
+    okText: '开始重试'
+  }).then(async ok => {
+    if (!ok) return;
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = '重试中…';
+    try {
+      const res = await apiPost('/runs/' + encodeURIComponent(runId) + '/retry', { nodeID: nodeId });
+      toast('已从该节点起新 Run 继续执行（' + (res.runID || '') + '）', 'success');
+      const modal = $('#run-detail-modal');
+      if (modal) modal.style.display = 'none';
+      loadRuns();
+      if (typeof showRunDashboard === 'function') showRunDashboard(res.runID || '');
+    } catch (err) {
+      toast('重试失败: ' + (err.message || err), 'error');
+      btn.disabled = false;
+      btn.textContent = oldText;
+    }
+  });
 });
 
 async function showNodeDetail(node) {
@@ -5617,10 +5652,14 @@ function renderRuntimeConsole(runtimeID, data) {
     '<div><span style="color:var(--muted-2)">端点</span>  ' + escHtml(rt.endpoint || '-') + '</div>';
   const send = modal.querySelector('.rc-send');
   const interrupt = modal.querySelector('.rc-interrupt');
-  send.disabled = !data.canSend;
-  send.title = data.canSend
-    ? '发送（Enter 发送，Shift+Enter 换行）'
-    : (rt.status === 'busy' ? 'Runtime 正在执行，完成后可发送' : 'Runtime 不可用（空闲后可发送）');
+  // 记录最近一次 runtime 状态：busy 时点发送会进入三选面板（中断并发送 /
+  // 完成后自动发送 / 取消），而不是把消息打给忙碌的 server 后石沉大海。
+  modal.dataset.rtStatus = rt.status || '';
+  const busyNow = (rt.status || '') === 'busy';
+  send.disabled = busyNow ? false : !data.canSend;
+  send.title = busyNow
+    ? '节点执行中：点击发送可选择「中断当前轮并发送」或「完成后自动发送」'
+    : (data.canSend ? '发送（Enter 发送，Shift+Enter 换行）' : 'Runtime 不可用（空闲后可发送）');
   interrupt.disabled = !data.canInterrupt;
   interrupt.title = data.canInterrupt ? '中断当前 Turn（保留 Runtime 与会话）' : '当前无活动 Turn 可中断';
   // 输出/结果：本次运行的最终输出用 Obsidian 风格 markdown 渲染；空态区分
@@ -5673,6 +5712,15 @@ function renderRuntimeConsole(runtimeID, data) {
   const events = Array.isArray(data.events) ? data.events : [];
   const container = modal.querySelector('.rc-events');
   renderRuntimeEvents(container, events, modal);
+  // 挂起的人工消息：节点轮次结束（非 busy 且可发送）后自动发出。
+  const entry = runtimeConsoles.get(runtimeID) || {};
+  if (entry.pendingText && !busyNow && data.canSend) {
+    const pending = String(entry.pendingText);
+    entry.pendingText = '';
+    runtimeConsoles.set(runtimeID, entry);
+    toast('节点已空闲，正在发送挂起的消息…', 'success');
+    doSendRuntimeMessage(runtimeID, pending);
+  }
 }
 
 function runtimeEventKey(e) {
@@ -5824,18 +5872,83 @@ async function sendRuntimeConsoleMessage(runtimeID) {
   modal.dataset.sendConfirm = '';
   clearTimeout(modal._sendConfirmTimer);
   btn.classList.remove('rc-send--confirm');
+  // 节点轮次执行中：不把消息打给忙碌的 runtime（会被静默排队，看起来像没发
+  // 出），改为给出明确的三选面板。状态竞态兜底：后端返回 409 时同样进面板。
+  if (modal.dataset.rtStatus === 'busy') { showBusySendPanel(runtimeID, text); return; }
+  await doSendRuntimeMessage(runtimeID, text);
+}
+
+async function doSendRuntimeMessage(runtimeID, text) {
+  const modal = consoleModal(runtimeID);
+  if (!modal) return;
+  const input = modal.querySelector('.rc-input');
+  const btn = modal.querySelector('.rc-send');
   try {
     btn.disabled = true;
     btn.textContent = '发送中…';
     await apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/message', { text });
-    input.value = '';
-    btn.textContent = '➤ 发送';
+    if (input) input.value = '';
     toast('已发送到同一保留会话', 'success');
     await refreshRuntimeConsole(runtimeID);
   } catch (err) {
+    if (/\b409\b|"error":"busy"|runtime busy/i.test(String(err && err.message || err))) {
+      showBusySendPanel(runtimeID, text);
+    } else {
+      toast('发送失败: ' + (err.message || err), 'error');
+    }
+  } finally {
+    btn.disabled = false;
     btn.textContent = '➤ 发送';
-    toast('发送失败: ' + err.message, 'error');
   }
+}
+
+// 忙碌三选面板：中断当前轮并发送 / 完成后自动发送 / 取消。
+function showBusySendPanel(runtimeID, text) {
+  const modal = consoleModal(runtimeID);
+  if (!modal) return;
+  let panel = modal.querySelector('.rc-busy-panel');
+  if (panel) panel.remove();
+  panel = document.createElement('div');
+  panel.className = 'rc-busy-panel';
+  panel.style.cssText = 'border:1px solid var(--warning);background:var(--bg-2);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:var(--fg)';
+  panel.innerHTML = '⚠️ 该 Runtime 正在执行节点轮次，消息尚未发出。' +
+    '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">' +
+    '<button type="button" data-bz="interrupt" class="rc-btn rc-btn--primary">⚡ 中断当前轮并发送</button>' +
+    '<button type="button" data-bz="queue" class="rc-btn">⏳ 完成后自动发送</button>' +
+    '<button type="button" data-bz="cancel" class="rc-btn">✕ 取消</button></div>';
+  const inputEl = modal.querySelector('.rc-input');
+  inputEl.parentElement.insertBefore(panel, inputEl);
+  panel.querySelector('[data-bz="cancel"]').addEventListener('click', () => panel.remove());
+  panel.querySelector('[data-bz="queue"]').addEventListener('click', () => {
+    const entry = runtimeConsoles.get(runtimeID) || {};
+    entry.pendingText = text;
+    runtimeConsoles.set(runtimeID, entry);
+    panel.innerHTML = '⏳ 已挂起消息，节点轮次完成后将自动发送。<span style="color:var(--muted-2)">再次选择会替换内容。</span>';
+    toast('消息已挂起，将在节点完成后自动发送', 'success');
+  });
+  panel.querySelector('[data-bz="interrupt"]').addEventListener('click', () => {
+    panel.innerHTML = '⚡ 正在中断当前轮…';
+    apiPost('/runtimes/' + encodeURIComponent(runtimeID) + '/interrupt', {}).catch(() => {});
+    // 中断是异步生效的：轮询到非 busy 再真正发送（上限 90s）。
+    const deadline = Date.now() + 90000;
+    const timer = setInterval(async () => {
+      if (!consoleModal(runtimeID)) { clearInterval(timer); return; }
+      if (Date.now() > deadline) {
+        clearInterval(timer);
+        panel.innerHTML = '<span style="color:var(--danger)">等待中断生效超时，请稍后手动重发。</span>';
+        return;
+      }
+      try {
+        const d = await apiGet('/runtimes/' + encodeURIComponent(runtimeID) + '/console');
+        if ((d.runtime || {}).status !== 'busy') {
+          clearInterval(timer);
+          panel.remove();
+          toast('当前轮已中断，正在发送你的消息…', 'success');
+          await doSendRuntimeMessage(runtimeID, text);
+        }
+      } catch (_) {}
+    }, 1500);
+  });
 }
 
 // answerRuntimePermission resolves a parked tool-approval prompt on a runtime
@@ -6837,6 +6950,10 @@ function renderRuns() {
       ? `<button class="run-resume-btn" data-resume-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px">${T('run.resume')}</button>` : '';
     const cancelButton = r.status === 'running'
       ? `<button class="run-cancel-btn" data-cancel-run="${escHtml(r.id)}" style="margin-top:7px;margin-left:6px;padding:4px 9px;border:1px solid var(--danger);border-radius:5px;background:transparent;color:var(--danger);cursor:pointer;font-size:11px">${T('run.stop')}</button>` : '';
+    // 恢复入口：failed 一律可「⤴ 重试」（自动选第一个失败节点）；interrupted
+    // 非 Loop run 没有「继续 Loop」入口，也提供重试。
+    const retryButton = (r.status === 'failed' || (r.status === 'interrupted' && !cfg.enabled))
+      ? `<button class="run-retry-btn" data-retry-run="${escHtml(r.id)}" style="margin-top:7px;padding:4px 9px;border:1px solid var(--accent);border-radius:5px;background:transparent;color:var(--accent);cursor:pointer;font-size:11px" title="从第一个失败/中断节点起新 Run，上游输出沿用">⤴ ${T('run.retry')}</button>` : '';
     return `
     <div class="run-card" data-run-id="${escHtml(r.id)}" style="cursor:pointer;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px" title="${escHtml(r.id)}">
       <div style="display:flex;align-items:center;gap:8px">
@@ -6857,11 +6974,27 @@ function renderRuns() {
         ${finalDecision ? `<span>${T('run.review')}${escHtml(finalDecision)}</span>` : ''}
       </div>` : ''}
       ${r.error ? `<div style="font-size:11px;color:var(--danger);margin-top:4px">${escHtml(r.error.substring(0, 100))}</div>` : ''}
-      ${resumeButton}${cancelButton}
+      ${resumeButton}${cancelButton}${retryButton}
     </div>`;
   }).join('');
   list.querySelectorAll('.run-card').forEach(card => {
     card.addEventListener('click', () => { openRunDetail(card.getAttribute('data-run-id')); });
+  });
+  list.querySelectorAll('[data-retry-run]').forEach(btn => {
+    btn.addEventListener('click', async event => {
+      event.stopPropagation();
+      const runId = btn.getAttribute('data-retry-run');
+      btn.disabled = true;
+      try {
+        const res = await apiPost('/runs/' + encodeURIComponent(runId) + '/retry', {});
+        toast('已从断点起新 Run 继续执行（' + (res.runID || '') + '）', 'success');
+        loadRuns();
+        if (typeof showRunDashboard === 'function') showRunDashboard(res.runID || '');
+      } catch (err) {
+        toast('重试失败: ' + (err.message || err), 'error');
+        btn.disabled = false;
+      }
+    });
   });
   list.querySelectorAll('[data-resume-run]').forEach(btn => {
     btn.addEventListener('click', event => {

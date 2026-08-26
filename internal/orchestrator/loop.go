@@ -759,6 +759,28 @@ func (s *Store) executePipelineIteration(ctx context.Context, run *PipelineRun, 
 					s.mu.Unlock()
 					return
 				}
+				// Node-level retry seed: first round consumes the seeded
+				// output without executing; the entry is then removed so a
+				// later revise round re-runs this node like any other.
+				if run.SeededNodes[nodeID] {
+					delete(run.SeededNodes, nodeID)
+					state := run.NodeStates[nodeID]
+					state.Status = NodeComplete
+					if strings.TrimSpace(state.Output) == "" {
+						// Fall back to the seeded attempt's output if the
+						// node state carried none.
+						for _, attID := range run.NodeAttemptIDs {
+							if att, ok := s.attempts[attID]; ok && att.NodeID == nodeID && att.Status == "complete" {
+								state.Output = att.Output
+								break
+							}
+						}
+					}
+					state.DoneAt = time.Now().UTC().Format(time.RFC3339)
+					run.NodeStates[nodeID] = state
+					s.mu.Unlock()
+					return
+				}
 				nodeCopy := *node
 				if iterationNumber > 1 && loopSkipsNode(&run.LoopConfig, &nodeCopy) {
 					// Do not create a new attempt for skipped nodes (architect
