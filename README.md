@@ -4,6 +4,8 @@
 
 [English](README.en.md) · [简体中文](README.md)
 
+> [!NOTE] 命名说明：项目对外名称为 **Multi-Agent Orchestrator**。代码内核沿用历史命令名 **reasonix**（入口 cmd/reasonix/、执行器类型 reasonix、环境变量 REASONIX_*、二进制 bin/reasonix.exe）——文档/代码中的 reasonix 均指本项目内核，属历史遗留命名。
+
 **说一句话，剩下的交给管家。** 跨 Agent 协调编排控制台：架构师想、执行者做、审查者把关，随时人工介入。
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/dl/)

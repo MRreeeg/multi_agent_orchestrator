@@ -4,6 +4,8 @@
 
 [English](README.en.md) · [简体中文](README.md)
 
+> [!NOTE] Naming: the project is called **Multi-Agent Orchestrator**. The code kernel keeps the legacy command name **reasonix** (entry cmd/reasonix/, executor type reasonix, env vars REASONIX_*, binary bin/reasonix.exe) — any reasonix in docs/code refers to this project kernel. Legacy naming, not a separate project.
+
 **Say one sentence — let the steward handle the rest.** A cross-agent orchestration console: the architect thinks, executors build, a reviewer gates every round, and you can step in anytime.
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/dl/)
