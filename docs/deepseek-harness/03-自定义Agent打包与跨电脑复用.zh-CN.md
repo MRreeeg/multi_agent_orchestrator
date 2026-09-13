@@ -30,8 +30,18 @@ my-agent-pack/
 | 来源 | 路径 | 生效范围 |
 |---|---|---|
 | 项目级 | `<workspace>/.dsh/skills/` 或 `<workspace>/.agents/skills/` | 该工作区内的 DSH 会话 |
-| 用户级 | `$DSH_HOME/skills/`（默认 `~/.dsh/skills`）或 `~/.agents/skills/` | 该电脑上所有 DSH 会话 |
-| 自定义 | `customSkillDirs` 配置（可加任意目录） | 按配置 |
+| 用户级 | `$DSH_HOME/skills/`（默认 `~/.dsh/skills`）或 `~/.agents/skills/` | 该电脑上所有 DSH 会话（**推荐的共用落点**） |
+| 自定义 | `customSkillDirs` 配置（可加任意目录） | 仅当该 provider **未被禁用** 时（见下方警告） |
+
+> [!WARNING] `customSkillDirs` 在 web profile 下静默失效
+> `@deepseek-ai/dsh-web-app` 会在补丁层把 **host 平面的 `skill-filesystem` 行显式禁用**
+> （其原文：*the base host `skill-filesystem` row is disabled here (presets own local discovery)*）。
+> 因此写进 `$DSH_HOME/cordis.patch.yml` 的 `customSkillDirs` 命中一个 disabled 行——
+> **不报错，skill 也不会出现**。验证：`dsh --profile web --dump-config | findstr /C:"skill-filesystem" -A 6`，
+> 会看到 `disabled: true`。
+>
+> 真正生效的是各 preset 自己挂载的 provider，而**它们都会扫描默认用户根 `$DSH_HOME/skills`（rank 400）**。
+> 所以共用本机已有 skill 的正确做法是：把外部 skill 目录**链接**进 `$DSH_HOME/skills`（见 5.2 节）。
 
 格式（两种都认）：
 
@@ -126,8 +136,11 @@ $env:DEEPSEEK_API_KEY = "sk-..."
 cd my-agent-pack
 .\install.ps1 -Mode user
 
-# 3b)（强烈推荐）让 DSH 直接复用本机其他 agent 已下载的 skill，不重复安装：
-.\install.ps1 -Mode user -SkillDirs "C:\Users\你\.codex\skills;C:\Users\你\.local\share\mimocode\builtin_skills\0.1.9\skills"
+# 3b)（强烈推荐）让 DSH 共用本机其他 agent 已装的 skill——只建链接，不复制、不重装
+.\install.ps1 -Mode user -ShareSkills
+#   或单独运行（可先 -DryRun 预览）：
+pwsh -File .\share-skills.ps1 -DryRun
+pwsh -File .\share-skills.ps1
 
 # 4) （可选）按需改模型
 notepad $env:DSH_HOME\settings.yaml    # agent-default-model
@@ -136,7 +149,34 @@ notepad $env:DSH_HOME\settings.yaml    # agent-default-model
 dsh --profile headless "你是什么角色？有哪些 skill？"
 ```
 
-> 第 3b 步把已有 skill 根写进 `$DSH_HOME/cordis.patch.yml` 的 `skill-filesystem.customSkillDirs`（幂等托管块，可重复运行），DSH 的 Web 会话和 headless 节点都能按需发现它们——codex 的 52 个社区 skill、mimocode 内置 skill、`<skill-pack 目录>` 等，一份文件两套系统消费，谁都不用再下载一遍。
+> 第 3b 步用 **NTFS 目录联接（junction）** 把外部 skill 链进 `$DSH_HOME/skills`：文件仍只有一份
+> （在原目录里），DSH 任何预设都能发现；skill 监视器生效，**链接后无需重启**即出现在 agent 的 skill
+> 目录中。默认来源：`~/.codex/skills`（含 `.system`）、mimocode 内置 skill、`G:\codex\skillpack\codex_skills`；
+> 用 `-Source 'D:\my-skills'` 指定其他目录。
+>
+> 跨电脑时目标机器上没有的目录会自动跳过，脚本会给出"skip (missing root)"提示——不会因为某台机器
+> 没装 Codex 就报错。
+
+### 5.2 共用本机已有 skill 的正确做法（链接而非复制）
+
+```powershell
+# 预览：列出会链接哪些 skill、来自哪个目录
+pwsh -File .\share-skills.ps1 -DryRun
+
+# 执行：为每个外部 skill 建 junction -> $DSH_HOME/skills/<name>
+pwsh -File .\share-skills.ps1
+
+# 之后在 Codex/mimocode 里新增的 skill：重跑一次脚本即可（新增项自动补链）
+```
+
+| 维度 | `customSkillDirs` patch | junction 链接到 `$DSH_HOME/skills`（本方案） |
+|---|---|---|
+| web profile 是否生效 | ❌ 命中被禁用的 host 行，静默失效 | ✅ 所有 preset 的 provider 都扫该根 |
+| 是否复制文件 | 不复制（但根本没生效） | 不复制（指针，原目录仍持有唯一副本） |
+| 原目录更新是否跟随 | — | ✅ 立即跟随（同一份文件） |
+| 新增 skill 是否需重启 | — | ❌ 不需要（skill 根被监视） |
+| 是否要改 shipped preset | — | ❌ 不需要（只往用户根加链接） |
+
 
 ### 5.1 客制化 agent 预设的跨电脑使用（自检自动导入）
 

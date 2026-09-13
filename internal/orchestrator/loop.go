@@ -9,8 +9,53 @@ import (
 	"sync"
 	"time"
 
+	codexclient "reasonix/internal/executor/codex"
+	mimoclient "reasonix/internal/executor/mimo"
 	"reasonix/internal/event"
 )
+
+// execInterruptError classifies executor errors that represent a deliberate or
+// scheduler-driven interruption (resumable) rather than a business failure:
+//   - context errors are scheduler kills (parent cancel / deadline);
+//   - the provider interrupt sentinels (ErrRuntimeInterrupted, codex
+//     ErrAppServerTurnInterrupted, mimo ErrTurnInterrupted) are interrupts
+//     issued from the Runtime Console / operator cancel.
+//
+// Everything else is a real failure and must be surfaced verbatim so the loop
+// does not hide the actual cause behind a generic "context canceled".
+func execInterruptError(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	return errors.Is(err, ErrRuntimeInterrupted) ||
+		errors.Is(err, codexclient.ErrAppServerTurnInterrupted) ||
+		errors.Is(err, mimoclient.ErrTurnInterrupted)
+}
+
+// levelCancelCauseKey carries a per-level cancel-cause recorder through the
+// context. When a node in a level fails, the level context is canceled to cut
+// its parallel siblings; those siblings would otherwise record a bare
+// "context canceled" that hides why the loop stopped.
+type levelCancelCauseKey struct{}
+
+type levelCancelCause struct {
+	mu    sync.Mutex
+	cause string
+}
+
+func (c *levelCancelCause) set(cause string) {
+	c.mu.Lock()
+	if c.cause == "" {
+		c.cause = cause
+	}
+	c.mu.Unlock()
+}
+
+func (c *levelCancelCause) get() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.cause
+}
 
 const (
 	// A provider/tool call must not be able to leave a pipeline node in running
@@ -156,7 +201,7 @@ func (s *Store) executeLoopStateMachine(ctx context.Context, run *PipelineRun, p
 	for {
 		// Check context cancellation at iteration start
 		if ctx.Err() != nil {
-			if err := s.finishLoopRun(run, sessionID, "canceled", "context canceled", ""); err != nil {
+			if err := s.finishLoopRun(run, sessionID, "canceled", s.loopCancelError(run, nil), ""); err != nil {
 				return fmt.Errorf("context canceled: %w; persist: %v", ctx.Err(), err)
 			}
 			return ctx.Err()
@@ -235,16 +280,17 @@ func (s *Store) executeLoopStateMachine(ctx context.Context, run *PipelineRun, p
 		if ctx.Err() != nil {
 			if err := s.UpdateIteration(iter.ID, func(it *LoopIteration) {
 				it.Status = IterationCanceled
+				it.Error = s.loopCancelError(run, execErr)
 				it.FinishedAt = finishedAt
 			}); err != nil {
 				return failLoopPersistence(err, ctx.Err())
 			}
-			if err := s.finishLoopRun(run, sessionID, "canceled", "context canceled", "canceled"); err != nil {
+			if err := s.finishLoopRun(run, sessionID, "canceled", s.loopCancelError(run, execErr), "canceled"); err != nil {
 				return fmt.Errorf("close run: %w; context: %v", err, ctx.Err())
 			}
 			return ctx.Err()
 		}
-		if execErr != nil && (errors.Is(execErr, context.DeadlineExceeded) || errors.Is(execErr, context.Canceled)) {
+		if execErr != nil && execInterruptError(execErr) {
 			if err := s.UpdateIteration(iter.ID, func(it *LoopIteration) {
 				it.Status = IterationInterrupted
 				it.Error = execErr.Error()
@@ -569,6 +615,26 @@ func (s *Store) validateLoopConfig(run *PipelineRun, pipe *Pipeline) error {
 	return nil
 }
 
+// loopCancelError builds the run-level error text when the parent context is
+// canceled. A bare "context canceled" hides the actual cause whenever a real
+// node/iteration failure was already recorded — this surfaces that cause so the
+// user sees why the loop stopped instead of a shutdown-looking message.
+func (s *Store) loopCancelError(run *PipelineRun, execErr error) string {
+	if execErr != nil {
+		if execInterruptError(execErr) {
+			return fmt.Sprintf("context canceled（本轮被中断：%v）", execErr)
+		}
+		return fmt.Sprintf("context canceled（此前节点失败：%v）", execErr)
+	}
+	s.mu.RLock()
+	runErr := run.Error
+	s.mu.RUnlock()
+	if strings.TrimSpace(runErr) != "" && !strings.EqualFold(strings.TrimSpace(runErr), "context canceled") {
+		return fmt.Sprintf("context canceled（此前记录：%s）", runErr)
+	}
+	return "context canceled"
+}
+
 // finishLoopRun is the single exit point for all loop terminal states.
 // It sets the run status, error, termination reason, and persists to disk.
 func (s *Store) finishLoopRun(run *PipelineRun, sessionID, status, errMsg, terminationReason string) error {
@@ -736,8 +802,12 @@ func (s *Store) executePipelineIteration(ctx context.Context, run *PipelineRun, 
 		s.mu.Unlock()
 
 		// A node failure or timeout cancels the remaining parallel nodes in this
-		// level so the iteration cannot wait on a sibling forever.
+		// level so the iteration cannot wait on a sibling forever. The cancel
+		// cause is recorded on the context so cut siblings can report the real
+		// reason instead of a bare "context canceled".
 		levelCtx, cancelLevel := context.WithCancel(iterationCtx)
+		cancelInfo := &levelCancelCause{}
+		levelCtx = context.WithValue(levelCtx, levelCancelCauseKey{}, cancelInfo)
 		errCh := make(chan error, len(level))
 		var wg sync.WaitGroup
 		for _, nodeID := range level {
@@ -817,6 +887,12 @@ func (s *Store) executePipelineIteration(ctx context.Context, run *PipelineRun, 
 				err := s.executeNodeAttempt(nodeCtx, run, pipe, sessionID, iterationID, nodeID, nodeCopy)
 				cancelNode()
 				if err != nil {
+					// A real (non-interrupt) failure is the level's cancel cause:
+					// parallel siblings cut by cancelLevel read it from the
+					// context and surface it instead of "context canceled".
+					if !execInterruptError(err) {
+						cancelInfo.set(fmt.Sprintf("同轮节点 %q 失败：%v", nodeCopy.Label, err))
+					}
 					errCh <- err
 					cancelLevel()
 				}
@@ -1000,6 +1076,17 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 		execErr = retryErr
 	}
 
+	// 同层兄弟节点失败导致本轮被取消时，裸的 "context canceled" 会掩盖真实
+	// 原因。把取消原因织入错误，让 attempt 日志显示"为什么停"而不是一条
+	// 关闭信息（levelCancelCause 由 executePipelineIteration 挂到节点 ctx 上）。
+	if execErr != nil && (errors.Is(execErr, context.Canceled) || errors.Is(execErr, context.DeadlineExceeded)) {
+		if ci, ok := ctx.Value(levelCancelCauseKey{}).(*levelCancelCause); ok {
+			if cause := ci.get(); cause != "" {
+				execErr = fmt.Errorf("%s（%w）", cause, execErr)
+			}
+		}
+	}
+
 	// A canceled/deadline-exceeded serve request must not leave its provider
 	// process registered as running. Normal completion keeps the runtime for
 	// reuse, including a Loop Reviewer configured with mode=serve. The terminal
@@ -1009,6 +1096,10 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 		runtimeStopped = true
 		_ = stopManagedRuntime(nodeCopy.Executor, nodeRuntimeID)
 		s.UnregisterAgent(nodeRuntimeID)
+	} else if nodeRuntimeID != "" && execErr != nil && execInterruptError(execErr) {
+		// User interrupt from the Runtime Console: the retained runtime and its
+		// session/thread stay alive and usable, so it must not be marked error.
+		s.UpdateAgentStatus(nodeRuntimeID, "idle", "")
 	} else if nodeRuntimeID != "" && execErr != nil {
 		s.UpdateAgentStatus(nodeRuntimeID, "error", execErr.Error())
 	} else if nodeRuntimeID != "" {
@@ -1029,7 +1120,7 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 			a.TokenUsage.DurationMs = time.Since(mustParseTime(a.StartedAt)).Milliseconds()
 		}
 		if execErr != nil {
-			if errors.Is(execErr, context.Canceled) || errors.Is(execErr, context.DeadlineExceeded) {
+			if execInterruptError(execErr) {
 				a.Status = "interrupted"
 			} else {
 				a.Status = "failed"
@@ -1155,7 +1246,7 @@ func (s *Store) executeNodeAttempt(ctx context.Context, run *PipelineRun, pipe *
 	runState.Stderr = nodeStderr
 	var nodeErr error
 	if execErr != nil {
-		if errors.Is(execErr, context.Canceled) || errors.Is(execErr, context.DeadlineExceeded) {
+		if execInterruptError(execErr) {
 			runState.Status = NodeInterrupted
 			// Keep the low-level pipeline API's historical behavior: a direct
 			// canceled execution is observable as failed. ExecuteLoop converts

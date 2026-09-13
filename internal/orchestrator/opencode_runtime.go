@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -51,6 +52,11 @@ type opencodeRuntime struct {
 	// keyed by the opencode permission id. The Runtime Console answers them
 	// through AnswerOpencodeRuntimePermission.
 	pendingPerms map[string]PermissionRequestInfo
+
+	// interruptRequested is set by Interrupt while a node turn is busy. Execute
+	// checks it when the turn returns so an operator stop is reported as a
+	// deliberate interruption instead of "completed without assistant output".
+	interruptRequested bool
 }
 
 // OpenCodeRuntimeManager starts `opencode serve` as a retained, loopback-only
@@ -809,6 +815,21 @@ func (m *OpenCodeRuntimeManager) Execute(ctx context.Context, spec ExecSpec, onS
 		rt.output = text
 	}
 	rt.mu.Unlock()
+
+	// 用户从 Runtime Console 手动中断：把裸的 "no output"/上下文错误改写成
+	// 明确的"用户中断"，否则界面显示 "opencode turn completed without
+	// assistant output"，会让人误以为执行器功能失效而不是主动点击。
+	rt.mu.Lock()
+	userInterrupted := rt.interruptRequested
+	rt.interruptRequested = false
+	rt.mu.Unlock()
+	if userInterrupted {
+		if promptErr == nil {
+			promptErr = fmt.Errorf("%w（会话已保留，可继续对话或重试）", ErrRuntimeInterrupted)
+		} else {
+			promptErr = fmt.Errorf("%w（底层原因：%v；会话已保留，可继续对话或重试）", ErrRuntimeInterrupted, promptErr)
+		}
+	}
 	if promptErr != nil {
 		// 看门狗开枪（静默/总长超限）且没能恢复出部分产出时，把真实原因
 		// 包进错误——否则用户只看到裸的 "context canceled"，无从调参。
@@ -883,7 +904,8 @@ func (m *OpenCodeRuntimeManager) finishTurn(rt *opencodeRuntime, sessionID strin
 	rt.sessionID = sessionID
 	rt.turnID = ""
 	rt.status = RuntimeIdle
-	if turnErr == nil {
+	if turnErr == nil || errors.Is(turnErr, ErrRuntimeInterrupted) {
+		// 用户手动中断是预期的操作：Runtime 与会话保持可用，不显示为错误。
 		rt.lastErr = ""
 	} else {
 		rt.lastErr = turnErr.Error()
@@ -919,6 +941,9 @@ func (m *OpenCodeRuntimeManager) Interrupt(runtimeID string) error {
 	target.mu.Lock()
 	client := target.client
 	sessionID := target.sessionID
+	// Flag the in-flight node turn so Execute reports a deliberate interrupt
+	// instead of "completed without assistant output" when Abort drains it.
+	target.interruptRequested = true
 	target.mu.Unlock()
 	if client == nil || sessionID == "" {
 		return nil

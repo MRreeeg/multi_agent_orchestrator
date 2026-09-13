@@ -1083,7 +1083,10 @@ input,textarea,select{font:inherit;color:inherit}
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px">
             <strong style="font-size:12px;color:var(--muted-2)">输出 / 结果</strong>
-            <button class="rc-btn rc-btn--ghost rc-view-output" type="button" style="font-size:11px">↗ 新窗口查看</button>
+            <div style="display:flex;gap:8px">
+              <button class="rc-btn rc-btn--ghost rc-copy-output" type="button" style="font-size:11px">📋 复制</button>
+              <button class="rc-btn rc-btn--ghost rc-view-output" type="button" style="font-size:11px">↗ 新窗口查看</button>
+            </div>
           </div>
           <div class="rc-output" style="flex:1;min-height:0;overflow:auto;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;color:var(--fg-2);font:12.5px/1.5 var(--mono);white-space:pre-wrap"></div>
         </section>
@@ -5666,6 +5669,36 @@ function closeRuntimeConsole(runtimeID) {
   runtimeConsoles.delete(runtimeID);
 }
 
+// 复制到剪贴板（带旧浏览器回退）。成功返回 true，失败返回 false。
+async function copyRuntimeText(text) {
+  const value = String(text || '').trim();
+  if (!value) { toast('当前没有可复制的内容', 'error'); return false; }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (e) { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = value;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (e) { return false; }
+}
+
+function copyRuntimeTextFromModal(modal, selector, source) {
+  const btn = modal.querySelector(selector);
+  if (btn) btn.addEventListener('click', async () => {
+    const ok = await copyRuntimeText(source(modal));
+    if (ok) { toast('已复制', 'success'); } else { toast('复制失败，请手动选择复制', 'error'); }
+  });
+}
+
 // 输出/结果 应用内预览弹窗（替代会被浏览器拦截的 window.open）
 let outputPreviewEl = null;
 function showOutputPreview(text) {
@@ -5720,6 +5753,11 @@ async function openRuntimeConsole(runtimeID) {
     const text = out ? (out.dataset.raw || (out.textContent || '')).trim() : '';
     if (!text) { toast('当前没有可查看的输出', 'error'); return; }
     showOutputPreview(text);
+  });
+  // 输出/结果 一键复制，免去手动框选。
+  copyRuntimeTextFromModal(modal, '.rc-copy-output', (m) => {
+    const out = m.querySelector('.rc-output');
+    return out ? (out.dataset.raw || out.textContent || '') : '';
   });
   modal.querySelector('.rc-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -5854,6 +5892,10 @@ function runtimeEventKey(e) {
 function runtimeEventHtml(e) {
   const stamp = e.at ? new Date(e.at).toLocaleTimeString() : '--:--:--';
   const detail = e.text || e.payload || '';
+  // 每条日志旁独立的小复制按钮（只复制该条，不复制全部）。
+  const copyBtn = detail
+    ? '<button type="button" class="rc-copy-ev" title="复制此条日志" data-copy="' + escHtml(detail) + '" onclick="event.stopPropagation();copyRuntimeEvent(this)" style="margin-left:6px;border:1px solid rgba(127,127,127,.45);background:none;border-radius:4px;padding:0 6px;font-size:10.5px;line-height:18px;color:#57606a;cursor:pointer;vertical-align:middle">复制</button>'
+    : '';
   // Streaming deltas are already merged into one block per message by the
   // backend. Reasoning is folded by default so the assistant answer is the
   // visual focus; expanded state survives polling refreshes (see
@@ -5865,7 +5907,7 @@ function runtimeEventHtml(e) {
     // 人工介入消息：醒目的用户侧样式，与后续的回答事件形成对话感。
     return '<div style="padding:6px 4px;border-bottom:1px solid rgba(15,23,42,.07);background:var(--accent-soft);border-radius:8px;margin:3px 0">' +
       '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
-      '<span style="color:var(--accent);font-weight:600">👤 人工消息</span>' +
+      '<span style="color:var(--accent);font-weight:600">👤 人工消息</span>' + copyBtn +
       (detail ? '<div class="chat-bubble__inner rc-md" style="margin-top:3px">' + renderMarkdown(detail) + '</div>' : '') +
       '</div>';
   }
@@ -5875,7 +5917,7 @@ function runtimeEventHtml(e) {
   if (reasoning) {
     return '<details class="rc-ev">' +
       '<summary><span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
-      '<span style="color:#57606a;font-style:italic">' + escHtml(label) + '</span>' +
+      '<span style="color:#57606a;font-style:italic">' + escHtml(label) + '</span>' + copyBtn +
       '<span style="margin-left:auto;color:#8c959f">' + (detail ? '展开推理' : '') + '</span></summary>' +
       (detail ? '<div class="chat-bubble__inner rc-md">' + renderMarkdown(detail) + '</div>' : '<pre style="color:#57606a">（无推理内容）</pre>') +
       '</details>';
@@ -5885,18 +5927,25 @@ function runtimeEventHtml(e) {
     // the main chat (headings, tables, code blocks, bold…).
     return '<div style="padding:5px 4px;border-bottom:1px solid rgba(15,23,42,.07)">' +
       '<span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
-      '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
+      '<span style="color:' + color + '">' + escHtml(label) + '</span>' + copyBtn +
       (detail ? '<div class="chat-bubble__inner rc-md">' + renderMarkdown(detail) + '</div>' : '') +
       '</div>';
   }
   // Non-QA (system/tool/usage) events are folded; click to expand the raw log.
   return '<details class="rc-ev">' +
     '<summary><span style="color:#8c959f">' + escHtml(stamp) + '</span> ' +
-    '<span style="color:' + color + '">' + escHtml(label) + '</span>' +
+    '<span style="color:' + color + '">' + escHtml(label) + '</span>' + copyBtn +
     (e.level === 'error' ? ' <span style="color:#d1242f">⚠</span>' : '') +
     '<span style="margin-left:auto;color:#8c959f">' + (detail ? '展开日志' : '') + '</span></summary>' +
     (detail ? '<pre>' + escHtml(detail) + '</pre>' : '<pre style="color:#57606a">（无内容）</pre>') +
     '</details>';
+}
+
+function copyRuntimeEvent(btn) {
+  const text = btn && btn.dataset ? (btn.dataset.copy || '') : '';
+  copyRuntimeText(text).then(ok => {
+    toast(ok ? '已复制该条日志' : '复制失败，请手动选择复制', ok ? 'success' : 'error');
+  });
 }
 
 // Incremental renderer for the Runtime Console event list. Existing DOM nodes

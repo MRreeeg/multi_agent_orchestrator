@@ -807,7 +807,11 @@ func (h *orchestratorHandler) retryRunFromNode(w http.ResponseWriter, r *http.Re
 			return
 		}
 	}
-	newRun, err := h.store.ExecutePipelineV2(r.Context(), src.SessionID, src.PipelineRevisionID, src.Task, src.RewrittenTask, orchestrator.ExecutionOptions{
+	// Background context, never r.Context(): ExecutePipelineV2 runs the loop
+	// asynchronously and derives the run context from this parent. The request
+	// context is canceled as soon as the handler returns, which would kill the
+	// retried run with "context canceled" before it even starts.
+	newRun, err := h.store.ExecutePipelineV2(context.Background(), src.SessionID, src.PipelineRevisionID, src.Task, src.RewrittenTask, orchestrator.ExecutionOptions{
 		Trigger:         "retry",
 		ParentRunID:     src.ID,
 		RetryFromNodeID: nodeID,
